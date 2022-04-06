@@ -1,0 +1,211 @@
+# SPDX-License-Identifier: BUSL-1.1
+
+basePath: /v1
+definitions:
+  economy.Balance:
+    properties:
+      referrals:
+        $ref: '#/definitions/economy.ReferralBalance'
+      total:
+        example: 232.5
+        type: number
+    type: object
+  economy.ReferralBalance:
+    properties:
+      t1:
+        example: 232.5
+        type: number
+      t2:
+        example: 232.5
+        type: number
+    type: object
+  economy.TopMiner:
+    properties:
+      balance:
+        example: 232.5
+        type: number
+      profilePictureURL:
+        example: https://somecdn.com/p1.jpg
+        type: string
+      userId:
+        example: did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2
+        type: string
+    type: object
+  economy.UserEconomy:
+    properties:
+      adoption:
+        additionalProperties:
+          type: number
+        type: object
+      balance:
+        $ref: '#/definitions/economy.Balance'
+      currentTotalUsers:
+        example: 1000000
+        type: integer
+      globalRank:
+        example: 1000
+        type: integer
+      hourlyMiningRate:
+        example: 232.5
+        type: number
+      lastMiningStartedAt:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+    type: object
+  server.ErrorResponse:
+    properties:
+      code:
+        example: SOMETHING_NOT_FOUND
+        type: string
+      error:
+        example: something is missing
+        type: string
+    type: object
+info:
+  contact:
+    name: ICE
+    url: https://ice.io
+  description: API that handles everything related to user's economy including balance,
+    mining rate and adoption rate.
+  title: Economy API
+  version: latest
+paths:
+  /economy/start-mining:
+    patch:
+      consumes:
+      - application/json
+      description: Starts or resumes the mining for the authenticated user.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: if mining is in progress
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
+  /economy/top-miners:
+    get:
+      consumes:
+      - application/json
+      description: Returns the paginated leaderboard with top miners.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/economy.TopMiner'
+            type: array
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
+  /economy/user-economy/{userId}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the user's personal economy
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the user
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/economy.UserEconomy'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: if not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
+schemes:
+- https
+swagger: "2.0"

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BUSL-1.1
+
+generic-service-chart:
+  autoscaling:
+    maxReplicas: 70
+  applicationImage:
+    tag: &appVersion "latest"
+  applicationConfiguration:
+    development: false
+    logger:
+      level: info
+    cmd/freezer:
+      host: api.ice.io
+      version: *appVersion
+    #CHANGE_ME Application specific configuration.

@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: BUSL-1.1
+
+generic-service-chart:
+
+  applicationConfiguration:
+  #CHANGE_ME

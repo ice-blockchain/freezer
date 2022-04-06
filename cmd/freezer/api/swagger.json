@@ -1,0 +1,310 @@
+{
+    "schemes": [
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "API that handles everything related to user's economy including balance, mining rate and adoption rate.",
+        "title": "Economy API",
+        "contact": {
+            "name": "ICE",
+            "url": "https://ice.io"
+        },
+        "version": "latest"
+    },
+    "basePath": "/v1",
+    "paths": {
+        "/economy/start-mining": {
+            "patch": {
+                "description": "Starts or resumes the mining for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "if mining is in progress",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/economy/top-miners": {
+            "get": {
+                "description": "Returns the paginated leaderboard with top miners.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/economy.TopMiner"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/economy/user-economy/{userId}": {
+            "get": {
+                "description": "Returns the user's personal economy",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID of the user",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/economy.UserEconomy"
+                        }
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "if not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "economy.Balance": {
+            "type": "object",
+            "properties": {
+                "referrals": {
+                    "$ref": "#/definitions/economy.ReferralBalance"
+                },
+                "total": {
+                    "type": "number",
+                    "example": 232.5
+                }
+            }
+        },
+        "economy.ReferralBalance": {
+            "type": "object",
+            "properties": {
+                "t1": {
+                    "type": "number",
+                    "example": 232.5
+                },
+                "t2": {
+                    "type": "number",
+                    "example": 232.5
+                }
+            }
+        },
+        "economy.TopMiner": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number",
+                    "example": 232.5
+                },
+                "profilePictureURL": {
+                    "type": "string",
+                    "example": "https://somecdn.com/p1.jpg"
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"
+                }
+            }
+        },
+        "economy.UserEconomy": {
+            "type": "object",
+            "properties": {
+                "adoption": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "balance": {
+                    "$ref": "#/definitions/economy.Balance"
+                },
+                "currentTotalUsers": {
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "globalRank": {
+                    "type": "integer",
+                    "example": 1000
+                },
+                "hourlyMiningRate": {
+                    "type": "number",
+                    "example": 232.5
+                },
+                "lastMiningStartedAt": {
+                    "type": "string",
+                    "example": "2022-01-03T16:20:52.156534Z"
+                }
+            }
+        },
+        "server.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "SOMETHING_NOT_FOUND"
+                },
+                "error": {
+                    "type": "string",
+                    "example": "something is missing"
+                }
+            }
+        }
+    }
+}

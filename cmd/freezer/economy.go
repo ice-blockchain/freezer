@@ -1,0 +1,163 @@
+// SPDX-License-Identifier: BUSL-1.1
+
+package main
+
+import (
+	"context"
+
+	"github.com/ICE-Blockchain/freezer/economy"
+	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/gin-gonic/gin"
+)
+
+func (s *service) setupEconomyRoutes(router *gin.Engine) {
+	router.
+		Group("/v1").
+		GET("/economy/user-economy/:userId", server.RootHandler(newRequestGetUserEconomy, s.GetUserEconomy)).
+		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners)).
+		PATCH("/economy/start-mining", server.RootHandler(newRequestStartMining, s.StartMining))
+}
+
+// GetUserEconomy godoc
+// @Schemes
+// @Description  Returns the user's personal economy
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header  string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        userId         path      string  true  "ID of the user"
+// @Success      200            {object}  economy.UserEconomy
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      404            {object}  server.ErrorResponse  "if not found"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/user-economy/{userId} [GET].
+func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) server.Response {
+	req := r.(*RequestGetUserEconomy)
+
+	// TODO implement me
+	if req.AuthenticatedUser.ID == req.UserID {
+		// User is trying to get their own personal economy
+	} else {
+		// User is trying to get some other user's personal economy
+	}
+
+	return server.OK(req)
+}
+
+func newRequestGetUserEconomy() server.ParsedRequest {
+	return new(RequestGetUserEconomy)
+}
+
+func (req *RequestGetUserEconomy) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestGetUserEconomy) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestGetUserEconomy) Validate() *server.Response {
+	return server.RequiredStrings(map[string]string{"userId": req.UserID})
+}
+
+func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{c.ShouldBindUri, server.ShouldBindAuthenticatedUser(c)}
+}
+
+// GetTopMiners godoc
+// @Schemes
+// @Description  Returns the paginated leaderboard with top miners.
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Success      200            {array}   economy.TopMiner
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/top-miners [GET].
+func (s *service) GetTopMiners(ctx context.Context, r server.ParsedRequest) server.Response {
+	// req := r.(*RequestGetTopMiners)
+
+	// TODO implement me
+
+	return server.OK([]*economy.TopMiner{{
+		UserID:            "bogus",
+		ProfilePictureURL: "bogus",
+		Balance:           1.2,
+	}})
+}
+
+func newRequestGetTopMiners() server.ParsedRequest {
+	return new(RequestGetTopMiners)
+}
+
+func (req *RequestGetTopMiners) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestGetTopMiners) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestGetTopMiners) Validate() *server.Response {
+	return nil
+}
+
+func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
+}
+
+// StartMining godoc
+// @Schemes
+// @Description  Starts or resumes the mining for the authenticated user.
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Success      200            "OK"
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      409            {object}  server.ErrorResponse  "if mining is in progress"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/start-mining [PATCH].
+func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) server.Response {
+	req := r.(*RequestStartMining)
+
+	// TODO implement me
+
+	return server.OK(req)
+}
+
+func newRequestStartMining() server.ParsedRequest {
+	return new(RequestStartMining)
+}
+
+func (req *RequestStartMining) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestStartMining) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestStartMining) Validate() *server.Response {
+	return nil
+}
+
+func (req *RequestStartMining) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
+}
