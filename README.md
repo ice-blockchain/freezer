@@ -5,7 +5,7 @@
 ### Development
 tmp
 These are the crucial/critical operations you will need when developing `Freezer`:
-
+a
 1. If you need a DID token for `magic.link` for testing locally, see https://github.com/magiclabs/magic-admin-go/blob/master/token/did_test.go
 2. `make run`
     1. This runs the actual service.
