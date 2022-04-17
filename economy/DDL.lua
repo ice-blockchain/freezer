@@ -13,11 +13,15 @@ box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
 
 box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     user_id STRING primary key,
+                    hash_code UNSIGNED NOT NULL UNIQUE,
                     balance DOUBLE NOT NULL,
                     last_mining_started_at UNSIGNED,
                     profile_picture_url STRING,
+                    staking_start UNSIGNED,
+                    staking_end UNSIGNED,
                     created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL
+                    updated_at UNSIGNED NOT NULL,
+                    balance_updated_at UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS t1_referral_earnings  (

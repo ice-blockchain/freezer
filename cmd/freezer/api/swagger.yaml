@@ -30,6 +30,9 @@ definitions:
       userId:
         example: did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2
         type: string
+      username:
+        example: jdoe
+        type: string
     type: object
   economy.UserEconomy:
     properties:
@@ -51,6 +54,9 @@ definitions:
       lastMiningStartedAt:
         example: "2022-01-03T16:20:52.156534Z"
         type: string
+      remainingStakingPeriod:
+        example: 11111111111
+        type: integer
     type: object
   server.ErrorResponse:
     properties:
@@ -125,6 +131,14 @@ paths:
         name: Authorization
         required: true
         type: string
+      - description: max number of elements to return
+        in: query
+        name: limit
+        type: integer
+      - description: number of elements to skip before starting to fetch data
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:

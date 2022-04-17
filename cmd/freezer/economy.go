@@ -24,7 +24,7 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header  string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
 // @Failure      400            {object}  server.ErrorResponse  "if validations fail"
@@ -75,7 +75,9 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header  string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        limit          query     uint64  false  "max number of elements to return"
+// @Param        offset         query     uint64  false  "number of elements to skip before starting to fetch data"
 // @Success      200            {array}   economy.TopMiner
 // @Failure      400            {object}  server.ErrorResponse  "if validations fail"
 // @Failure      401            {object}  server.ErrorResponse  "if not authorized"
@@ -136,6 +138,7 @@ func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) serve
 	req := r.(*RequestStartMining)
 
 	// TODO implement me
+	// this produces a record on a specific message broker topic that will be consumed by `refrigerant`
 
 	return server.OK(req)
 }

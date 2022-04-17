@@ -106,6 +106,18 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "max number of elements to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of elements to skip before starting to fetch data",
+                        "name": "offset",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -267,6 +279,10 @@ const docTemplate = `{
                 "userId": {
                     "type": "string",
                     "example": "did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "jdoe"
                 }
             }
         },
@@ -297,6 +313,10 @@ const docTemplate = `{
                 "lastMiningStartedAt": {
                     "type": "string",
                     "example": "2022-01-03T16:20:52.156534Z"
+                },
+                "remainingStakingPeriod": {
+                    "type": "integer",
+                    "example": 11111111111
                 }
             }
         },
