@@ -14,8 +14,7 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 	router.
 		Group("/v1").
 		GET("/economy/user-economy/:userId", server.RootHandler(newRequestGetUserEconomy, s.GetUserEconomy)).
-		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners)).
-		PATCH("/economy/start-mining", server.RootHandler(newRequestStartMining, s.StartMining))
+		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners))
 }
 
 // GetUserEconomy godoc
@@ -24,7 +23,7 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
 // @Failure      400            {object}  server.ErrorResponse  "if validations fail"
@@ -75,7 +74,7 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header  string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        limit          query     uint64  false  "max number of elements to return"
 // @Param        offset         query     uint64  false  "number of elements to skip before starting to fetch data"
 // @Success      200            {array}   economy.TopMiner
@@ -116,51 +115,5 @@ func (req *RequestGetTopMiners) Validate() *server.Response {
 }
 
 func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{}) error {
-	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
-}
-
-// StartMining godoc
-// @Schemes
-// @Description  Starts or resumes the mining for the authenticated user.
-// @Tags         Economy
-// @Accept       json
-// @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
-// @Success      200            "OK"
-// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
-// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
-// @Failure      409            {object}  server.ErrorResponse  "if mining is in progress"
-// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
-// @Failure      500            {object}  server.ErrorResponse
-// @Failure      504            {object}  server.ErrorResponse  "if request times out"
-// @Router       /economy/start-mining [PATCH].
-func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) server.Response {
-	req := r.(*RequestStartMining)
-
-	// TODO implement me
-	// this produces a record on a specific message broker topic that will be consumed by `refrigerant`
-
-	return server.OK(req)
-}
-
-func newRequestStartMining() server.ParsedRequest {
-	return new(RequestStartMining)
-}
-
-func (req *RequestStartMining) SetAuthenticatedUser(user server.AuthenticatedUser) {
-	if req.AuthenticatedUser.ID == "" {
-		req.AuthenticatedUser = user
-	}
-}
-
-func (req *RequestStartMining) GetAuthenticatedUser() server.AuthenticatedUser {
-	return req.AuthenticatedUser
-}
-
-func (req *RequestStartMining) Validate() *server.Response {
-	return nil
-}
-
-func (req *RequestStartMining) Bindings(c *gin.Context) []func(obj interface{}) error {
 	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
 }

@@ -21,9 +21,9 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/economy/top-miners": {
-            "get": {
-                "description": "Returns the paginated leaderboard with top miners.",
+        "/economy/start-mining": {
+            "patch": {
+                "description": "Starts or resumes the mining for the authenticated user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -41,29 +41,11 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "max number of elements to return",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "number of elements to skip before starting to fetch data",
-                        "name": "offset",
-                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/economy.TopMiner"
-                            }
-                        }
+                        "description": "OK"
                     },
                     "400": {
                         "description": "if validations fail",
@@ -73,6 +55,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "if mining is in progress",
                         "schema": {
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
@@ -98,9 +86,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/economy/user-economy/{userId}": {
-            "get": {
-                "description": "Returns the user's personal economy",
+        "/economy/start-staking": {
+            "patch": {
+                "description": "Starts staking for the authenticated user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -120,19 +108,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "ID of the user",
-                        "name": "userId",
-                        "in": "path",
-                        "required": true
+                        "description": "Request params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/economy.Staking"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/economy.UserEconomy"
-                        }
+                        "description": "OK"
                     },
                     "400": {
                         "description": "if validations fail",
@@ -147,7 +134,13 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "if not found",
+                        "description": "user not found",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "if staking is already enabled",
                         "schema": {
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
@@ -175,31 +168,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "economy.Balance": {
-            "type": "object",
-            "properties": {
-                "referrals": {
-                    "$ref": "#/definitions/economy.ReferralBalance"
-                },
-                "total": {
-                    "type": "number",
-                    "example": 232.5
-                }
-            }
-        },
-        "economy.ReferralBalance": {
-            "type": "object",
-            "properties": {
-                "t1": {
-                    "type": "number",
-                    "example": 232.5
-                },
-                "t2": {
-                    "type": "number",
-                    "example": 232.5
-                }
-            }
-        },
         "economy.Staking": {
             "type": "object",
             "properties": {
@@ -210,60 +178,6 @@ const docTemplate = `{
                 "years": {
                     "type": "integer",
                     "example": 1
-                }
-            }
-        },
-        "economy.TopMiner": {
-            "type": "object",
-            "properties": {
-                "balance": {
-                    "type": "number",
-                    "example": 232.5
-                },
-                "profilePictureURL": {
-                    "type": "string",
-                    "example": "https://somecdn.com/p1.jpg"
-                },
-                "userId": {
-                    "type": "string",
-                    "example": "did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "jdoe"
-                }
-            }
-        },
-        "economy.UserEconomy": {
-            "type": "object",
-            "properties": {
-                "adoption": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
-                    }
-                },
-                "balance": {
-                    "$ref": "#/definitions/economy.Balance"
-                },
-                "currentTotalUsers": {
-                    "type": "integer",
-                    "example": 1000000
-                },
-                "globalRank": {
-                    "type": "integer",
-                    "example": 1000
-                },
-                "hourlyMiningRate": {
-                    "type": "number",
-                    "example": 232.5
-                },
-                "lastMiningStartedAt": {
-                    "type": "string",
-                    "example": "2022-01-03T16:20:52.156534Z"
-                },
-                "staking": {
-                    "$ref": "#/definitions/economy.Staking"
                 }
             }
         },
@@ -290,7 +204,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/v1",
 	Schemes:          []string{"https"},
 	Title:            "Economy API",
-	Description:      "API that handles everything related to read-only operations for user's economy.",
+	Description:      "API that handles everything related to write-only operations for user's economy.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 }

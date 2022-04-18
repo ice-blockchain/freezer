@@ -17,8 +17,8 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     balance DOUBLE NOT NULL,
                     last_mining_started_at UNSIGNED,
                     profile_picture_url STRING,
-                    staking_start UNSIGNED,
-                    staking_end UNSIGNED,
+                    staking_years UNSIGNED,
+                    staking_percentage DOUBLE,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL,
                     balance_updated_at UNSIGNED NOT NULL

@@ -20,7 +20,7 @@ import (
 //nolint:godot // Because those are comments parsed by swagger
 // @title                    Economy API
 // @version                  latest
-// @description              API that handles everything related to user's economy including balance, mining rate and adoption rate.
+// @description              API that handles everything related to read-only operations for user's economy.
 // @query.collection.format  multi
 // @schemes                  https
 // @contact.name             ICE

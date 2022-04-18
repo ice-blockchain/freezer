@@ -54,6 +54,8 @@ generate:
 	go install github.com/swaggo/swag/cmd/swag@latest
 	swag init --parseDependency --parseInternal -d cmd/freezer -g freezer.go -o cmd/freezer/api
 	swag fmt -d cmd/freezer -g freezer.go
+	swag init --parseDependency --parseInternal -d cmd/freezer-refrigerant -g freezer_refrigerant.go -o cmd/freezer-refrigerant/api
+	swag fmt -d cmd/freezer-refrigerant -g freezer_refrigerant.go
 #	go install github.com/golang/mock/mockgen@latest
 #	mockgen -source=CHANGE_ME.go -destination=CHANGE_ME.go -package=CHANGE_ME
 

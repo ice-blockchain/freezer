@@ -14,13 +14,17 @@ type (
 	TotalUsers           = uint64
 	BaseHourlyMiningRate = float64
 	UserEconomy          struct {
-		Balance                Balance                             `json:"balance"`
-		HourlyMiningRate       float64                             `json:"hourlyMiningRate" example:"232.5"`
-		GlobalRank             uint64                              `json:"globalRank" example:"1000"`
-		CurrentTotalUsers      TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
-		Adoption               map[TotalUsers]BaseHourlyMiningRate `json:"adoption"`
-		LastMiningStartedAt    time.Time                           `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
-		RemainingStakingPeriod time.Duration                       `json:"remainingStakingPeriod" example:"11111111111"`
+		Balance             Balance                             `json:"balance"`
+		HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
+		GlobalRank          uint64                              `json:"globalRank" example:"1000"`
+		CurrentTotalUsers   TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
+		Adoption            map[TotalUsers]BaseHourlyMiningRate `json:"adoption"`
+		LastMiningStartedAt time.Time                           `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
+		Staking             Staking                             `json:"staking"`
+	}
+	Staking struct {
+		Years      uint64  `json:"years" example:"1"`
+		Percentage float64 `json:"percentage" example:"25.0"`
 	}
 	Balance struct {
 		Total     float64         `json:"total" example:"232.5"`
@@ -40,7 +44,7 @@ type (
 		io.Closer
 	}
 	Processor interface {
-		io.Closer
+		Repository
 		CheckHealth(context.Context) error
 	}
 )

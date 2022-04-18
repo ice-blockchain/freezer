@@ -20,9 +20,6 @@ type (
 		Limit             uint64                   `form:"limit" example:"20"`
 		Offset            uint64                   `form:"offset" example:"0"`
 	}
-	RequestStartMining struct {
-		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
-	}
 )
 
 // Private API.

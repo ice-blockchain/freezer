@@ -4,6 +4,18 @@ package main
 
 import (
 	"github.com/ICE-Blockchain/freezer/economy"
+	"github.com/ICE-Blockchain/wintr/server"
+)
+
+// Public API.
+type (
+	RequestStartMining struct {
+		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
+	}
+	RequestStartStaking struct {
+		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
+		economy.Staking
+	}
 )
 
 // Private API.
@@ -19,6 +31,7 @@ type (
 		economyProcessor economy.Processor
 	}
 	config struct {
+		Host    string `yaml:"host"`
 		Version string `yaml:"version"`
 	}
 )

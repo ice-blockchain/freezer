@@ -2,23 +2,6 @@
 
 basePath: /v1
 definitions:
-  economy.Balance:
-    properties:
-      referrals:
-        $ref: '#/definitions/economy.ReferralBalance'
-      total:
-        example: 232.5
-        type: number
-    type: object
-  economy.ReferralBalance:
-    properties:
-      t1:
-        example: 232.5
-        type: number
-      t2:
-        example: 232.5
-        type: number
-    type: object
   economy.Staking:
     properties:
       percentage:
@@ -27,44 +10,6 @@ definitions:
       years:
         example: 1
         type: integer
-    type: object
-  economy.TopMiner:
-    properties:
-      balance:
-        example: 232.5
-        type: number
-      profilePictureURL:
-        example: https://somecdn.com/p1.jpg
-        type: string
-      userId:
-        example: did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2
-        type: string
-      username:
-        example: jdoe
-        type: string
-    type: object
-  economy.UserEconomy:
-    properties:
-      adoption:
-        additionalProperties:
-          type: number
-        type: object
-      balance:
-        $ref: '#/definitions/economy.Balance'
-      currentTotalUsers:
-        example: 1000000
-        type: integer
-      globalRank:
-        example: 1000
-        type: integer
-      hourlyMiningRate:
-        example: 232.5
-        type: number
-      lastMiningStartedAt:
-        example: "2022-01-03T16:20:52.156534Z"
-        type: string
-      staking:
-        $ref: '#/definitions/economy.Staking'
     type: object
   server.ErrorResponse:
     properties:
@@ -79,16 +24,16 @@ info:
   contact:
     name: ICE
     url: https://ice.io
-  description: API that handles everything related to read-only operations for user's
+  description: API that handles everything related to write-only operations for user's
     economy.
   title: Economy API
   version: latest
 paths:
-  /economy/top-miners:
-    get:
+  /economy/start-mining:
+    patch:
       consumes:
       - application/json
-      description: Returns the paginated leaderboard with top miners.
+      description: Starts or resumes the mining for the authenticated user.
       parameters:
       - default: Bearer <Add access token here>
         description: Insert your access token
@@ -96,29 +41,21 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: max number of elements to return
-        in: query
-        name: limit
-        type: integer
-      - description: number of elements to skip before starting to fetch data
-        in: query
-        name: offset
-        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            items:
-              $ref: '#/definitions/economy.TopMiner'
-            type: array
         "400":
           description: if validations fail
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "401":
           description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: if mining is in progress
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "422":
@@ -135,11 +72,11 @@ paths:
             $ref: '#/definitions/server.ErrorResponse'
       tags:
       - Economy
-  /economy/user-economy/{userId}:
-    get:
+  /economy/start-staking:
+    patch:
       consumes:
       - application/json
-      description: Returns the user's personal economy
+      description: Starts staking for the authenticated user.
       parameters:
       - default: Bearer <Add access token here>
         description: Insert your access token
@@ -147,18 +84,17 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: ID of the user
-        in: path
-        name: userId
+      - description: Request params
+        in: body
+        name: request
         required: true
-        type: string
+        schema:
+          $ref: '#/definitions/economy.Staking'
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/economy.UserEconomy'
         "400":
           description: if validations fail
           schema:
@@ -168,7 +104,11 @@ paths:
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "404":
-          description: if not found
+          description: user not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: if staking is already enabled
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "422":

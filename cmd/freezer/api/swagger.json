@@ -4,7 +4,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "API that handles everything related to user's economy including balance, mining rate and adoption rate.",
+        "description": "API that handles everything related to read-only operations for user's economy.",
         "title": "Economy API",
         "contact": {
             "name": "ICE",
@@ -14,71 +14,6 @@
     },
     "basePath": "/v1",
     "paths": {
-        "/economy/start-mining": {
-            "patch": {
-                "description": "Starts or resumes the mining for the authenticated user.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Economy"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "Bearer \u003cAdd access token here\u003e",
-                        "description": "Insert your access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "400": {
-                        "description": "if validations fail",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "if not authorized",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "if mining is in progress",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "if syntax fails",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
-                    "504": {
-                        "description": "if request times out",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/economy/top-miners": {
             "get": {
                 "description": "Returns the paginated leaderboard with top miners.",
@@ -258,6 +193,19 @@
                 }
             }
         },
+        "economy.Staking": {
+            "type": "object",
+            "properties": {
+                "percentage": {
+                    "type": "number",
+                    "example": 25
+                },
+                "years": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "economy.TopMiner": {
             "type": "object",
             "properties": {
@@ -307,9 +255,8 @@
                     "type": "string",
                     "example": "2022-01-03T16:20:52.156534Z"
                 },
-                "remainingStakingPeriod": {
-                    "type": "integer",
-                    "example": 11111111111
+                "staking": {
+                    "$ref": "#/definitions/economy.Staking"
                 }
             }
         },
