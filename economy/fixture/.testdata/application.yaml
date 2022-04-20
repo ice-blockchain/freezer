@@ -1,28 +1,17 @@
 # SPDX-License-Identifier: BUSL-1.1
 
-development: true
+development: false
 logger:
   encoder: console
-  level: debug
+  level: info
 cmd/freezer:
   host: localhost
-  version: local
-  defaultEndpointTimeout: 30s
+  version: latest
+  defaultEndpointTimeout: 5s
   httpServer:
-    port: 443
-    certPath: cmd/freezer/.testdata/localhost.crt
-    keyPath: cmd/freezer/.testdata/localhost.key
-  defaultPagination:
-    limit: 20
-    maxLimit: 1000
-cmd/freezer-refrigerant:
-  host: localhost
-  version: local
-  defaultEndpointTimeout: 30s
-  httpServer:
-    port: 1443
-    certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
-    keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
+    port: 44443
+    certPath: .testdata/localhost.crt
+    keyPath: .testdata/localhost.key
   defaultPagination:
     limit: 20
     maxLimit: 1000

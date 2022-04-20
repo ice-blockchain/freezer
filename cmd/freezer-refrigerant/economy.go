@@ -6,9 +6,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/ICE-Blockchain/wintr/server"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+
+	"github.com/ICE-Blockchain/wintr/server"
 )
 
 func (s *service) setupEconomyRoutes(router *gin.Engine) {
@@ -36,8 +37,8 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestStartMining)
 
-	// TODO implement me
-	// this produces a record on a specific message broker topic that will be consumed by `refrigerant`
+	//nolint:nolintlint // TODO implement me.
+	// This produces a record on a specific message broker topic that will be consumed by `refrigerant`.
 
 	return server.OK(req)
 }
@@ -84,7 +85,7 @@ func (req *RequestStartMining) Bindings(c *gin.Context) []func(obj interface{}) 
 func (s *service) StartStaking(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestStartStaking)
 
-	// TODO implement me
+	//nolint:nolintlint // TODO implement me.
 
 	return server.OK(req)
 }
