@@ -1,6 +1,0 @@
-# SPDX-License-Identifier: BUSL-1.1
-
----
-creation_rules:
-  - kms: CHANGE_ME
-    encrypted_regex: '(?i)^(.*user.*|.*pass.*|.*bearer.*|.+keys?.*|.*secret.*|.*token|crt|pem|key|extraClientConfigs)$'

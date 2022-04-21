@@ -117,15 +117,25 @@ jobs:
           tags: ${{ steps.build-image-info.outputs.cmd2Tags }}
       - name: Setting ENV variables for deployment
         run: |
-          echo "SOURCE_COMMIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "APP_TAG=${{steps.check_tag.outputs.next_tag}}" >> $GITHUB_ENV
-      - name: Checkout the target `deploy` branch
+      - name: Checkout the target `deploy` branch of `secret-infrastructure`
         uses: actions/checkout@v3
         with:
+          repository: ICE-Blockchain/secret-infrastructure
           ref: deploy
+          token: ${{ secrets.ICE_CI_CD_BOT_GH_PAT }}
+          path: secret-infrastructure
           fetch-depth: 0
-      - name: Reset origin HEAD of `deploy` to this commit SHA
-        run: git reset --hard ${{ env.SOURCE_COMMIT_SHA }}
+      - name: Rebase to secret-infrastructure master
+        run: git rebase origin/master
+      - name: Update [staging] application tag version in .deploy/helm/freezer-refrigerator/staging/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer-refrigerator/staging/common-values.yaml
+      - name: Update [production] application tag version in .deploy/helm/freezer-refrigerator/production/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer-refrigerator/production/common-values.yaml
       - name: Update [staging] application tag version in .deploy/helm/freezer/staging/common-values.yaml
         uses: mikefarah/yq@master
         with:
@@ -134,26 +144,17 @@ jobs:
         uses: mikefarah/yq@master
         with:
           cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer/production/common-values.yaml
-      - name: Update [staging] application tag version in .deploy/helm/freezer-refrigerant/staging/common-values.yaml
-        uses: mikefarah/yq@master
-        with:
-          cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer-refrigerant/staging/common-values.yaml
-      - name: Update [production] application tag version in .deploy/helm/freezer-refrigerant/production/common-values.yaml
-        uses: mikefarah/yq@master
-        with:
-          cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer-refrigerant/production/common-values.yaml
-
-      - name: Set git user
-        uses: fregante/setup-git-user@v1
       - name: Commit and Push Changes to Application Tag Version
         run: |
+          git config user.name "ICE CI/CD Bot"
+          git config user.email ice-cicd-bot@ice.vip
           git status
-          git add .deploy/helm/freezer/staging/common-values.yaml 
-          git add .deploy/helm/freezer/production/common-values.yaml
           git add .deploy/helm/freezer-refrigerant/staging/common-values.yaml 
           git add .deploy/helm/freezer-refrigerant/production/common-values.yaml
-          git commit -m "Updated tag version (${{env.APP_TAG}}) in application helm chart deployment manifests"
-          git push -f --set-upstream origin deploy
+          git add .deploy/helm/freezer/staging/common-values.yaml 
+          git add .deploy/helm/freezer/production/common-values.yaml
+          git commit -m "Updated `freezer` & `freezer-refrigerant` tag version (${{env.APP_TAG}}) in application helm chart deployment manifests"
+          git push --set-upstream origin deploy
       - name: Slack Notification For Success
         if: ${{ success() }}
         uses: rtCamp/action-slack-notify@v2

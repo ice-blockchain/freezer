@@ -18,12 +18,15 @@ linters-settings:
     default-signifies-exhaustive: true
   funlen:
     lines: 30
-    statements: 20
+    statements: 30
   gci:
     # put imports beginning with prefix after 3rd-party packages;
     # only support one prefix
     # if not set, use goimports.local-prefixes
-    local-prefixes: github.com/ICE-Blockchain
+    sections:
+      - Standard
+      - Default
+      - prefix(github.com/ICE-Blockchain)
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
     min-complexity: 10
@@ -82,7 +85,7 @@ linters-settings:
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
-    line-length: 120
+    line-length: 160
     # tab width in spaces. Default to 1.
     tab-width: 1
   nolintlint:
