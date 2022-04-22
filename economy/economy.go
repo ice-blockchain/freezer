@@ -17,7 +17,6 @@ import (
 
 func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
-
 	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
 
 	return &repository{
@@ -52,9 +51,12 @@ func closeDB(db tarantool.Connector) func() error {
 }
 
 func (r *repository) Close() error {
-	log.Info("closing economy repository...")
 
-	return errors.Wrap(r.close(), "closing economy repository failed")
+	if err := r.close(); err != nil {
+		return errors.Wrap(err, "unable close repository")
+	}
+
+	return nil
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
