@@ -20,7 +20,7 @@ cmd/freezer-refrigerant:
   version: local
   defaultEndpointTimeout: 30s
   httpServer:
-    port: 8443
+    port: 1443
     certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
     keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
   defaultPagination:
