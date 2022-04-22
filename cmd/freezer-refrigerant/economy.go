@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
+	"github.com/ICE-Blockchain/freezer/economy"
 	"github.com/ICE-Blockchain/wintr/server"
 )
 
@@ -37,8 +38,21 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestStartMining)
 
-	//nolint:nolintlint // TODO implement me.
-	// This produces a record on a specific message broker topic that will be consumed by `refrigerant`.
+	if err := s.economyRepository.StartMining(ctx, req.AuthenticatedUser.ID); err != nil {
+		m := err.Error()
+		code := http.StatusInternalServerError
+		if errors.Is(err, economy.ErrMiningInProgress) {
+			code = http.StatusConflict
+		}
+
+		return server.Response{
+			Code: code,
+			Data: server.ErrorResponse{
+				Error: m,
+				Code:  "ERR_START_MINING",
+			}.Fail(errors.Wrapf(err, m)),
+		}
+	}
 
 	return server.OK(req)
 }

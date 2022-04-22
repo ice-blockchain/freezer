@@ -5,17 +5,22 @@ package economy
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"io"
 	"time"
 
 	"github.com/framey-io/go-tarantool"
 
+	messagebroker "github.com/ICE-Blockchain/wintr/connectors/message_broker"
 	"github.com/ICE-Blockchain/wintr/connectors/storage"
 )
 
 // Public API.
 
-var ErrNotFound = storage.ErrNotFound
+var (
+	ErrNotFound         = storage.ErrNotFound
+	ErrMiningInProgress = errors.New("mining in progress")
+)
 
 type (
 	UserID               = string
@@ -51,25 +56,29 @@ type (
 	Repository interface {
 		io.Closer
 		ReadRepository
+		WriteRepository
 	}
 
-	// EconomyRepository manages the database operations related to `users_economy`.
+	// ReadRepository manages the database operations related to `users_economy`.
 	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
 	}
 
 	Processor interface {
-		Repository
+		io.Closer
 		CheckHealth(context.Context) error
 	}
+	// WriteRepository manage the database operations related to `user_economy`.
+	WriteRepository interface {
+		StartMining(context.Context, UserID) error
+	}
 )
-
-// Private API.
 
 const (
 	applicationYamlKey = "economy"
 	base10             = 10
 	bitSize64          = 64
+	miningDuration     = 24 * time.Hour
 )
 
 var (
@@ -80,6 +89,7 @@ var (
 )
 
 type (
+
 	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
@@ -104,17 +114,43 @@ type (
 		CurrentTotalUsers   uint64
 	}
 
+	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
+	// because it cannot deserialize time.Time or map/json structures properly.
+	// !! Order of fields is crucial, so do not change it !!
+	userEconomy struct { //nolint:govet // This is about DB
+		_msgpack            struct{} `msgpack:",asArray"`
+		UserID              string
+		HashCode            uint64
+		Balance             float64
+		LastMiningStartedAt uint64
+		ProfilePictureURL   string
+		StakingYears        uint64
+		StakingPercentage   float64
+		CreatedAt           uint64
+		UpdatedAt           uint64
+		BalanceUpdatedAt    uint64
+	}
+
+	// | miningStarted is internal structure to hold notification message.
+	miningStarted struct {
+		UserID UserID `json:"user_id"`
+		TS     uint64 `json:"ts"`
+	}
+
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
 		ReadRepository
+		WriteRepository
 	}
+
 	processor struct {
 		db tarantool.Connector
 	}
 
 	userEconomyRepository struct {
 		db tarantool.Connector
+		mb messagebroker.Client
 	}
 
 	// | config holds the configuration of this package mounted from `application.yaml`.

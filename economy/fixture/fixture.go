@@ -16,7 +16,12 @@ func TestSetup() func() {
 	return func() {
 		dbError, mbError := cleanUp(cleanUpStorage, cleanUpMessageBroker)
 		if dbError != nil || mbError != nil {
+<<<<<<< HEAD
 			log.Panic(errFixtureCleanupFailed, "dbError", dbError, "mbError", mbError)
+=======
+			err := errFixtureCleanup
+			log.Panic(err, "dbError", dbError, "mbError", mbError)
+>>>>>>> Start Mining endpoint implementation. Makefile coverage was chang…
 		}
 	}
 }
