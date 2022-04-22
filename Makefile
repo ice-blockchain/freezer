@@ -187,7 +187,7 @@ start-test-environment:
 getAddLicense: $(GOROOT)/bin/addlicense
 
 $(GOROOT)/bin/addlicense:
-	go install github.com/google/addlicense
+	go install github.com/google/addlicense@latest
 
 addLicense: getAddLicense
 	`go env GOROOT`/bin/addlicense -f LICENSE.header * .github/*
