@@ -59,7 +59,7 @@ generate:
 #	go install github.com/golang/mock/mockgen@latest
 #	mockgen -source=CHANGE_ME.go -destination=CHANGE_ME.go -package=CHANGE_ME
 
-checkGenerated: generate
+checkGenerated: generate addLicense
 	@if git status --porcelain | grep -e [.]go -e [.]json -e [.]yaml; then \
 		echo "Please commit generated files, using 'make generate'."; \
 		git --no-pager diff; \
