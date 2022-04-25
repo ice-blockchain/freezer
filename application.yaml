@@ -27,14 +27,12 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 economy:
-  defaultRates:
-    tier1Rate: 0.2
-    tier2Rate: 0.05
-    baseHourlyMiningRate: 1.0
+  rates:
+    tier1: 0.2
+    tier2: 0.05
   inactivityHoursDeadline: 24
   db:
     spaces:
-      - USERS
       - TOTAL_USERS
       - ADOPTION
       - USER_ECONOMY
@@ -47,7 +45,7 @@ economy:
   messageBroker:
     #It's not used, because we`re not consuming anything in the production code.
     #So, its configured here just for testing or other local purposes.
-    consumerGroup: freezer-economy
+    consumerGroup: freezer-refrigerant-testing
     createTopics: true
     urls:
       - localhost:9094

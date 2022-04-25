@@ -82,23 +82,24 @@ type (
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
 	userEconomy struct {
-		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              string
-		ProfilePictureURL   string
-		Balance             float64
-		StakingPercentage   float64
-		HashCode            uint64
-		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
-		T1Count             uint64
-		T2Count             uint64
-		GlobalRank          uint64
-		T1EarningsSum       float64
-		T2EarningsSum       float64
-		CurrentTotalUsers   uint64
+		_msgpack             struct{} `msgpack:",asArray"`
+		UserID               string
+		ProfilePictureURL    string
+		Balance              float64
+		StakingPercentage    float64
+		HashCode             uint64
+		LastMiningStartedAt  uint64
+		StakingYears         uint64
+		CreatedAt            uint64
+		UpdatedAt            uint64
+		BalanceUpdatedAt     uint64
+		T1Count              uint64
+		T2Count              uint64
+		GlobalRank           uint64
+		T1EarningsSum        float64
+		T2EarningsSum        float64
+		CurrentTotalUsers    uint64
+		BaseHourlyMiningRate float64
 	}
 
 	adoption struct {
@@ -110,13 +111,9 @@ type (
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
-		UserEconomyRepository
+		db    tarantool.Connector
 	}
 	processor struct {
-		db tarantool.Connector
-	}
-
-	economy struct {
 		db tarantool.Connector
 	}
 
@@ -127,10 +124,9 @@ type (
 				Name string `yaml:"name" json:"name"`
 			} `yaml:"topics"`
 		} `yaml:"messageBroker"`
-		DefaultRates struct {
-			Tier1Rate            float64
-			Tier2Rate            float64
-			BaseHourlyMiningRate float64
+		Rates struct {
+			Tier1 float64
+			Tier2 float64
 		}
 		InactivityHoursDeadline uint64
 	}

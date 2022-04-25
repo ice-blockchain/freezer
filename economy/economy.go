@@ -19,8 +19,8 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
 	return &repository{
-		close:                 db.Close,
-		UserEconomyRepository: &economy{db: db},
+		close: db.Close,
+		db:    db,
 	}
 }
 
@@ -47,22 +47,22 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	return nil
 }
 
-func (p *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
+func (r *repository) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
-	adoption, err := p.getAdoptions(ctx)
+	adoption, err := r.getAdoptions(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select adoption information")
 	}
 	if ownEconomy {
-		return p.getOwnUserEconomy(ctx, userID, adoption)
+		return r.getOwnUserEconomy(ctx, userID, adoption)
 	}
 
-	return p.getAnotherUserEconomy(ctx, userID, adoption)
+	return r.getAnotherUserEconomy(ctx, userID, adoption)
 }
 
-func (p *economy) getOwnUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
+func (r *repository) getOwnUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
@@ -72,7 +72,7 @@ func (p *economy) getOwnUserEconomy(ctx context.Context, userID UserID, adoption
 		"now":                time.Now().UTC().UnixNano(),
 		"inactivityDeadline": time.Duration(cfg.InactivityHoursDeadline) * time.Hour,
 	}
-	if err := p.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
+	if err := r.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
 		return nil, errors.Wrapf(err, "failed to get user economy for userID:%v", userID)
 	}
 	if len(result) == 0 {
@@ -89,60 +89,72 @@ func getUserEconomySQL() string {
 	t2EarningsSumSQL := getTiersEarningsSumSQL(t2ReferralsSpace())
 
 	return fmt.Sprintf(`SELECT ue.user_id,
-	 						   ue.profile_picture_url,
-							   ue.balance,
-							   ue.staking_percentage,
-							   ue.hash_code,
-							   ue.last_mining_started_at,
-							   ue.staking_years,
-							   ue.created_at,
-							   ue.updated_at,
-							   ue.balance_updated_at,
-							   (%[1]v) as t1_count,
-							   (%[2]v) as t2_count,
-							   (SELECT CASE WHEN count(1) = 0 THEN 1 ELSE count(1) END
-										FROM %[3]v
-										WHERE balance > (SELECT ue.balance 
-																FROM %[3]v ue INDEXED BY "pk_unnamed_%[3]v_1"
-																WHERE ue.user_id = :userId)) as global_rank,
-							   (%[4]v) as t1_earnings_sum,
-							   (%[5]v) as t2_earnings_sum,
-							   (SELECT count(1) FROM users) as current_total_users
-							FROM %[3]v ue INDEXED BY "pk_unnamed_%[3]v_1"
-							WHERE ue.user_id = :userId`, t1ActiveUsersSQL, t2ActiveUsersSQL, userEconomySpace(), t1EarningsSumSQL, t2EarningsSumSQL)
+			ue.profile_picture_url,
+			ue.balance,
+			ue.staking_percentage,
+			ue.hash_code,
+			ue.last_mining_started_at,
+			ue.staking_years,
+			ue.created_at,
+			ue.updated_at,
+			ue.balance_updated_at,
+			(%[1]v) as t1_count,
+			(%[2]v) as t2_count,
+			(SELECT count(1) + 1
+					FROM %[3]v
+					WHERE balance >= (SELECT ue.balance 
+											FROM %[3]v ue INDEXED BY "pk_unnamed_%[3]v_1"
+											WHERE ue.user_id = :userId) AND user_id != :userId) as global_rank,
+			(%[4]v) as t1_earnings_sum,
+			(%[5]v) as t2_earnings_sum,
+			(SELECT count(1) FROM %[3]v) as current_total_users,
+			(%[6]v) as base_hourly_mining_rate
+		FROM %[3]v ue INDEXED BY "pk_unnamed_%[3]v_1"
+		WHERE ue.user_id = :userId`,
+		t1ActiveUsersSQL, t2ActiveUsersSQL, userEconomySpace(), t1EarningsSumSQL, t2EarningsSumSQL, getBaseHourlyMiningRateSQL())
 }
 
-func (p *economy) getAnotherUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
+func (r *repository) getAnotherUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
 	// For now we return the same as for own user. It will be replaced later.
-	return p.getOwnUserEconomy(ctx, userID, adoptions)
+	return r.getOwnUserEconomy(ctx, userID, adoptions)
 }
 
 func getActiveUsersSQL(sqlCondition string) string {
 	return fmt.Sprintf(`SELECT count(1)
-				FROM %[1]v u INDEXED BY "pk_unnamed_%[1]v_1"
+				FROM %[1]v t1 INDEXED BY "pk_unnamed_%[1]v_1"
 					JOIN %[2]v ue INDEXED BY "pk_unnamed_%[2]v_1"
-						ON u.ID = ue.user_id
-				WHERE :now - ue.last_mining_started_at < :inactivityDeadline %[3]v`, usersSpace(), userEconomySpace(), sqlCondition)
+						ON t1.user_id = ue.user_id
+				WHERE %[3]v AND :now - ue.last_mining_started_at < :inactivityDeadline`, t1ReferralsSpace(), userEconomySpace(), sqlCondition)
 }
 
 func getActiveUsersT1Condition() string {
-	return "AND u.referred_by = :userId"
+	return "ue.user_id = :userId"
 }
 
 func getActiveUsersT2Condition() string {
-	return fmt.Sprintf(`AND u.id IN (SELECT id
-										FROM %[1]v
-										WHERE referred_by = :userId)`, usersSpace())
+	return fmt.Sprintf(`ue.user_id IN (SELECT referral_user_id
+										FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1"
+										WHERE user_id = :userId)`, t1ReferralsSpace())
 }
 
-func (p *economy) getAdoptions(ctx context.Context) (map[TotalUsers]BaseHourlyMiningRate, error) {
+func getBaseHourlyMiningRateSQL() string {
+	return fmt.Sprintf(`SELECT base_hourly_mining_rate
+						FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1"
+						WHERE total_users >= (SELECT count(1) FROM %[2]v)
+						ORDER BY total_users ASC LIMIT 1`, adoptionSpace(), userEconomySpace())
+}
+
+func (r *repository) getAdoptions(ctx context.Context) (map[TotalUsers]BaseHourlyMiningRate, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get adoptions failed because context failed")
 	}
 	var res []*adoption
 	sql := fmt.Sprintf(`SELECT * FROM %v`, adoptionSpace())
-	if err := p.db.PrepareExecuteTyped(sql, nil, &res); err != nil {
+	if err := r.db.PrepareExecuteTyped(sql, nil, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to get adoptions")
+	}
+	if len(res) == 0 {
+		return nil, errors.New("no adoptions in the database")
 	}
 
 	return toAdoptionsMap(res), nil
@@ -164,20 +176,7 @@ func getTiersEarningsSumSQL(table string) string {
 						WHERE user_id = :userId`, table)
 }
 
-func getAdoptionBaseRate(adoption map[TotalUsers]BaseHourlyMiningRate, currentTotalUsers uint64) float64 {
-	baseHourlyMiningRate := cfg.DefaultRates.BaseHourlyMiningRate
-	for totalUsers, rate := range adoption {
-		if currentTotalUsers <= totalUsers {
-			baseHourlyMiningRate = rate
-		}
-	}
-
-	return baseHourlyMiningRate
-}
-
 func (u *userEconomy) toUserEconomy(adoption map[TotalUsers]BaseHourlyMiningRate) *UserEconomy {
-	adoptionBaseRate := getAdoptionBaseRate(adoption, u.CurrentTotalUsers)
-
 	return &UserEconomy{
 		Balance: Balance{
 			Total: u.Balance,
@@ -186,7 +185,7 @@ func (u *userEconomy) toUserEconomy(adoption map[TotalUsers]BaseHourlyMiningRate
 				T2: u.T2EarningsSum,
 			},
 		},
-		HourlyMiningRate:    adoptionBaseRate * (float64(u.T1Count)*cfg.DefaultRates.Tier1Rate + float64(u.T2Count)*cfg.DefaultRates.Tier2Rate),
+		HourlyMiningRate:    u.BaseHourlyMiningRate * (float64(u.T1Count)*cfg.Rates.Tier1 + float64(u.T2Count)*cfg.Rates.Tier2), // * 100?
 		GlobalRank:          u.GlobalRank,
 		CurrentTotalUsers:   u.CurrentTotalUsers,
 		Adoption:            adoption,
@@ -204,10 +203,6 @@ func t1ReferralsSpace() string {
 
 func t2ReferralsSpace() string {
 	return "T2_REFERRAL_EARNINGS"
-}
-
-func usersSpace() string {
-	return "USERS"
 }
 
 func userEconomySpace() string {

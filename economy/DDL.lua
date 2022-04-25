@@ -5,21 +5,6 @@ box.execute([[CREATE TABLE IF NOT EXISTS total_users  (
                     value UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 
-box.execute([[CREATE TABLE IF NOT EXISTS users  (
-                    id STRING primary key,
-                    hash_code UNSIGNED NOT NULL UNIQUE,
-                    referred_by STRING REFERENCES users(id) ON DELETE SET NULL,
-                    username STRING NOT NULL UNIQUE,
-                    email STRING,
-                    full_name STRING,
-                    phone_number STRING,
-                    profile_picture STRING NOT NULL,
-                    country STRING NOT NULL,
-                    created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL,
-                    deleted_at UNSIGNED
-                    ) WITH ENGINE = 'vinyl';]])
-                    
 -- Not sure if this is needed.
 box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
                     total_users UNSIGNED primary key,
