@@ -28,7 +28,7 @@ cmd/freezer-refrigerant:
     maxLimit: 1000
 economy:
   rates:
-    tier1: 0.2
+    tier1: 0.25
     tier2: 0.05
   inactivityHoursDeadline: 24
   db:
@@ -45,7 +45,7 @@ economy:
   messageBroker:
     #It's not used, because we`re not consuming anything in the production code.
     #So, its configured here just for testing or other local purposes.
-    consumerGroup: freezer-refrigerant-testing
+    consumerGroup: freezer-local
     createTopics: true
     urls:
       - localhost:9094

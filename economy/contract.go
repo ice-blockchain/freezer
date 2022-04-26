@@ -50,11 +50,11 @@ type (
 	}
 	Repository interface {
 		io.Closer
-		UserEconomyRepository
+		ReadRepository
 	}
 
 	// EconomyRepository manages the database operations related to `users_economy`.
-	UserEconomyRepository interface {
+	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
 	}
 
@@ -68,6 +68,7 @@ type (
 
 const (
 	applicationYamlKey = "economy"
+	digitBase          = 64
 )
 
 var (
@@ -82,42 +83,36 @@ type (
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
 	userEconomy struct {
-		_msgpack             struct{} `msgpack:",asArray"`
-		UserID               string
-		ProfilePictureURL    string
-		Balance              float64
-		StakingPercentage    float64
-		HashCode             uint64
-		LastMiningStartedAt  uint64
-		StakingYears         uint64
-		CreatedAt            uint64
-		UpdatedAt            uint64
-		BalanceUpdatedAt     uint64
-		T1Count              uint64
-		T2Count              uint64
-		GlobalRank           uint64
-		T1EarningsSum        float64
-		T2EarningsSum        float64
-		CurrentTotalUsers    uint64
-		BaseHourlyMiningRate float64
-	}
-
-	adoption struct {
-		_msgpack             struct{} `msgpack:",asArray"`
-		TotalUsers           uint64
-		BaseHourlyMiningRate float64
+		_msgpack            struct{} `msgpack:",asArray"`
+		UserID              string
+		ProfilePictureURL   string
+		Adoptions           string
+		Balance             float64
+		StakingPercentage   float64
+		HashCode            uint64
+		LastMiningStartedAt uint64
+		StakingYears        uint64
+		CreatedAt           uint64
+		UpdatedAt           uint64
+		BalanceUpdatedAt    uint64
+		T1Count             uint64
+		T2Count             uint64
+		GlobalRank          uint64
+		T1EarningsSum       float64
+		T2EarningsSum       float64
+		CurrentTotalUsers   uint64
 	}
 
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
-		UserEconomyRepository
+		ReadRepository
 	}
 	processor struct {
 		db tarantool.Connector
 	}
 
-	economy struct {
+	userEconomyRepository struct {
 		db tarantool.Connector
 	}
 

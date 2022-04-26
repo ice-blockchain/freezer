@@ -17,8 +17,8 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
 	return &repository{
-		close:                 db.Close,
-		UserEconomyRepository: &economy{db: db},
+		close:          db.Close,
+		ReadRepository: &userEconomyRepository{db: db},
 	}
 }
 
