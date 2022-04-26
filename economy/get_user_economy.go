@@ -8,22 +8,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (r *repository) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
+func (e *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
-	adoption, err := r.getAdoptions(ctx)
+	adoption, err := e.getAdoptions(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select adoption information")
 	}
 	if ownEconomy {
-		return r.getOwnUserEconomy(ctx, userID, adoption)
+		return e.getOwnUserEconomy(ctx, userID, adoption)
 	}
 
-	return r.getAnotherUserEconomy(ctx, userID, adoption)
+	return e.getAnotherUserEconomy(ctx, userID, adoption)
 }
 
-func (r *repository) getOwnUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
+func (e *economy) getOwnUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
@@ -33,7 +33,7 @@ func (r *repository) getOwnUserEconomy(ctx context.Context, userID UserID, adopt
 		"now":                time.Now().UTC().UnixNano(),
 		"inactivityDeadline": time.Duration(cfg.InactivityHoursDeadline) * time.Hour,
 	}
-	if err := r.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
+	if err := e.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
 		return nil, errors.Wrapf(err, "failed to get user economy for userID:%v", userID)
 	}
 	if len(result) == 0 {
@@ -75,9 +75,9 @@ func getUserEconomySQL() string {
 		t1ActiveUsersSQL, t2ActiveUsersSQL, userEconomySpace(), t1EarningsSumSQL, t2EarningsSumSQL, getBaseHourlyMiningRateSQL())
 }
 
-func (r *repository) getAnotherUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
+func (e *economy) getAnotherUserEconomy(ctx context.Context, userID UserID, adoptions map[TotalUsers]BaseHourlyMiningRate) (*UserEconomy, error) {
 	// For now we return the same as for own user. It will be replaced later.
-	return r.getOwnUserEconomy(ctx, userID, adoptions)
+	return e.getOwnUserEconomy(ctx, userID, adoptions)
 }
 
 func getActiveUsersSQL(sqlCondition string) string {
@@ -105,13 +105,13 @@ func getBaseHourlyMiningRateSQL() string {
 						ORDER BY total_users ASC LIMIT 1`, adoptionSpace(), userEconomySpace())
 }
 
-func (r *repository) getAdoptions(ctx context.Context) (map[TotalUsers]BaseHourlyMiningRate, error) {
+func (e *economy) getAdoptions(ctx context.Context) (map[TotalUsers]BaseHourlyMiningRate, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get adoptions failed because context failed")
 	}
 	var res []*adoption
 	sql := fmt.Sprintf(`SELECT * FROM %v`, adoptionSpace())
-	if err := r.db.PrepareExecuteTyped(sql, nil, &res); err != nil {
+	if err := e.db.PrepareExecuteTyped(sql, nil, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to get adoptions")
 	}
 	if len(res) == 0 {

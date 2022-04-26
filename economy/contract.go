@@ -111,9 +111,13 @@ type (
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
-		db    tarantool.Connector
+		UserEconomyRepository
 	}
 	processor struct {
+		db tarantool.Connector
+	}
+
+	economy struct {
 		db tarantool.Connector
 	}
 
