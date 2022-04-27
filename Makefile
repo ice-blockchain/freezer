@@ -184,16 +184,14 @@ start-test-environment:
 	#go run -race -v local.go
 	go run -v local.go
 
-getAddLicense: $(GOROOT)/bin/addlicense
-
-$(GOROOT)/bin/addlicense:
-	go install github.com/google/addlicense@latest
+getAddLicense:
+	GO111MODULE=off go get -v -u github.com/google/addlicense
 
 addLicense: getAddLicense
-	`go env GOROOT`/bin/addlicense -f LICENSE.header * .github/*
+	`go env GOPATH`/bin/addlicense -f LICENSE.header * .github/*
 
 checkLicense: getAddLicense
-	`go env GOROOT`/bin/addlicense -f LICENSE.header -check * .github/*
+	`go env GOPATH`/bin/addlicense -f LICENSE.header -check * .github/*
 
 all: checkLicense checkModVersion checkIfAllDependenciesAreUpToDate checkGenerated build buildAllSupportedPlatforms test coverage benchmark clean
 local: addLicense checkLicense updateGoModVersion updateAllDependencies generate build buildMultiPlatformDockerImage test coverage benchmark lint clean
