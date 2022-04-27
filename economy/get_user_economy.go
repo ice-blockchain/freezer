@@ -126,10 +126,10 @@ func parseAdoptions(adoptions string, currentTotalUsers uint64) (map[uint64]floa
 
 	for _, adoption := range a {
 		parts := strings.Split(adoption, ":")
-		totalUsers, err := strconv.ParseUint(parts[0], digitBase, digitBitSize)
+		totalUsers, err := strconv.ParseUint(parts[0], base10, bitSize64)
 		log.Panic(errors.Wrapf(err, "can't parse rate uint for adoption:%v", parts[0]))
 
-		rate, err := strconv.ParseFloat(parts[1], digitBitSize)
+		rate, err := strconv.ParseFloat(parts[1], bitSize64)
 		log.Panic(errors.Wrapf(err, "can't parse baseHourlyMiningrate float64 %[1]v for adoption with total users:%[2]v", parts[1], parts[0]))
 
 		res[totalUsers] = rate

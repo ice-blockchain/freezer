@@ -68,8 +68,8 @@ type (
 
 const (
 	applicationYamlKey = "economy"
-	digitBase          = 10
-	digitBitSize       = 64
+	base10             = 10
+	bitSize64          = 64
 )
 
 var (
