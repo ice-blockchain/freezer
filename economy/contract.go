@@ -83,7 +83,7 @@ type (
 	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
-	userEconomy struct {
+	userEconomySummary struct {
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              string
 		ProfilePictureURL   string

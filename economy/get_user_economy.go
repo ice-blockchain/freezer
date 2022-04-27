@@ -29,7 +29,7 @@ func (u *userEconomyRepository) getOwnUserEconomy(ctx context.Context, userID Us
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
-	var result []*userEconomy
+	var result []*userEconomySummary
 	params := map[string]interface{}{
 		"userId":             userID,
 		"now":                time.Now().UTC().UnixNano(),
@@ -42,7 +42,7 @@ func (u *userEconomyRepository) getOwnUserEconomy(ctx context.Context, userID Us
 		return nil, errors.Wrapf(ErrNotFound, "no user economy found for id:%v", userID)
 	}
 
-	return result[0].toUserEconomy(), nil
+	return result[0].toUserEconomySummary(), nil
 }
 
 func getUserEconomySQL() string {
@@ -127,17 +127,10 @@ func parseAdoptions(adoptions string, currentTotalUsers uint64) (map[uint64]floa
 	for _, adoption := range a {
 		parts := strings.Split(adoption, ":")
 		totalUsers, err := strconv.ParseUint(parts[0], digitBase, digitBitSize)
-		if err != nil {
-			log.Panic(errors.Wrapf(err, "can't parse rate uint for adoption:%v", parts[0]))
+		log.Panic(errors.Wrapf(err, "can't parse rate uint for adoption:%v", parts[0]))
 
-			continue
-		}
 		rate, err := strconv.ParseFloat(parts[1], digitBitSize)
-		if err != nil {
-			log.Panic(errors.Wrapf(err, "can't parse baseHourlyMiningrate float64 %[1]v for adoption with total users:%[2]v", parts[1], parts[0]))
-
-			continue
-		}
+		log.Panic(errors.Wrapf(err, "can't parse baseHourlyMiningrate float64 %[1]v for adoption with total users:%[2]v", parts[1], parts[0]))
 
 		res[totalUsers] = rate
 		if currentTotalUsers <= totalUsers {
@@ -148,7 +141,7 @@ func parseAdoptions(adoptions string, currentTotalUsers uint64) (map[uint64]floa
 	return res, baseHourlyMiningRate
 }
 
-func (u *userEconomy) toUserEconomy() *UserEconomy {
+func (u *userEconomySummary) toUserEconomySummary() *UserEconomy {
 	adoptions, baseHourlyMiningRate := parseAdoptions(u.Adoptions, u.CurrentTotalUsers)
 
 	return &UserEconomy{
