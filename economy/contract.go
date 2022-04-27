@@ -68,7 +68,8 @@ type (
 
 const (
 	applicationYamlKey = "economy"
-	digitBase          = 64
+	digitBase          = 10
+	digitBitSize       = 64
 )
 
 var (
@@ -87,6 +88,7 @@ type (
 		UserID              string
 		ProfilePictureURL   string
 		Adoptions           string
+		CurrentTotalUsers   string
 		Balance             float64
 		StakingPercentage   float64
 		HashCode            uint64
@@ -100,7 +102,6 @@ type (
 		GlobalRank          uint64
 		T1EarningsSum       float64
 		T2EarningsSum       float64
-		CurrentTotalUsers   uint64
 	}
 
 	// | repository implements the public API that this package exposes.
@@ -126,7 +127,7 @@ type (
 		Rates struct {
 			Tier1 float64
 			Tier2 float64
-		}
-		InactivityHoursDeadline uint64
+		} `yaml:"rates"`
+		InactivityHoursDeadline uint64 `yaml:"inactivityHoursDeadline"`
 	}
 )

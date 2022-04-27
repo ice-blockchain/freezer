@@ -70,7 +70,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.17 // indirect
-	github.com/fsnotify/fsnotify v1.5.3 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/magiclabs/magic-admin-go v0.1.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
