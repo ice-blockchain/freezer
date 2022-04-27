@@ -88,7 +88,6 @@ type (
 		UserID              string
 		ProfilePictureURL   string
 		Adoptions           string
-		CurrentTotalUsers   string
 		Balance             float64
 		StakingPercentage   float64
 		HashCode            uint64
@@ -102,6 +101,7 @@ type (
 		GlobalRank          uint64
 		T1EarningsSum       float64
 		T2EarningsSum       float64
+		CurrentTotalUsers   uint64
 	}
 
 	// | repository implements the public API that this package exposes.

@@ -55,7 +55,6 @@ func getUserEconomySQL() string {
 		ue.user_id,
 		ue.profile_picture_url,
 		(%[1]v) as adoptions,
-		(SELECT key FROM %[2]v) as current_total_users,
 		ue.balance,
 		ue.staking_percentage,
 		ue.hash_code,
@@ -64,15 +63,16 @@ func getUserEconomySQL() string {
 		ue.created_at,
 		ue.updated_at,
 		ue.balance_updated_at,
-		(%[3]v) as t1_count,
-		(%[4]v) as t2_count,
-		(%[5]v) as global_rank,
-		(%[6]v) as t1_earnings_sum,
-		(%[7]v) as t2_earnings_sum
+		(%[2]v) as t1_count,
+		(%[3]v) as t2_count,
+		(%[4]v) as global_rank,
+		(%[5]v) as t1_earnings_sum,
+		(%[6]v) as t2_earnings_sum,
+		(SELECT value FROM %[7]v) as current_total_users
 	FROM %[8]v ue INDEXED BY "pk_unnamed_%[8]v_1"
 	WHERE ue.user_id = :userId`,
-		getAdoptionsSQL(), totalUsersSpace(), t1ActiveUsersCountSQL, t2ActiveUsersCountSQL,
-		getGlobalRankSQL(), t1EarningsSumSQL, t2EarningsSumSQL, userEconomySpace())
+		getAdoptionsSQL(), t1ActiveUsersCountSQL, t2ActiveUsersCountSQL,
+		getGlobalRankSQL(), t1EarningsSumSQL, t2EarningsSumSQL, totalUsersSpace(), userEconomySpace())
 }
 
 func (u *userEconomyRepository) getAnotherUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
@@ -149,12 +149,7 @@ func parseAdoptions(adoptions string, currentTotalUsers uint64) (map[uint64]floa
 }
 
 func (u *userEconomy) toUserEconomy() *UserEconomy {
-	currentTotalUsers, err := strconv.ParseUint(u.CurrentTotalUsers, digitBase, digitBitSize)
-	if err != nil {
-		log.Error(err, "can't parse current total users uint:%v", u.CurrentTotalUsers)
-	}
-
-	adoptions, baseHourlyMiningRate := parseAdoptions(u.Adoptions, currentTotalUsers)
+	adoptions, baseHourlyMiningRate := parseAdoptions(u.Adoptions, u.CurrentTotalUsers)
 
 	return &UserEconomy{
 		Balance: Balance{
@@ -166,7 +161,7 @@ func (u *userEconomy) toUserEconomy() *UserEconomy {
 		},
 		HourlyMiningRate:    baseHourlyMiningRate * (float64(u.T1Count)*cfg.Rates.Tier1 + float64(u.T2Count)*cfg.Rates.Tier2 + 1),
 		GlobalRank:          u.GlobalRank,
-		CurrentTotalUsers:   currentTotalUsers,
+		CurrentTotalUsers:   u.CurrentTotalUsers,
 		Adoption:            adoptions,
 		LastMiningStartedAt: time.Unix(int64(u.LastMiningStartedAt), 0),
 		Staking: Staking{
