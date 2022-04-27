@@ -4,10 +4,13 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/ICE-Blockchain/freezer/economy"
 	"github.com/ICE-Blockchain/wintr/server"
-	"github.com/gin-gonic/gin"
 )
 
 func (s *service) setupEconomyRoutes(router *gin.Engine) {
@@ -36,14 +39,18 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestGetUserEconomy)
 
-	// TODO implement me
-	if req.AuthenticatedUser.ID == req.UserID {
-		// User is trying to get their own personal economy
-	} else {
-		// User is trying to get some other user's personal economy
+	// If true user is trying to get own personal economy, otherwise another user economy.
+	ownEconomy := req.AuthenticatedUser.ID == req.UserID
+	ue, err := s.economyRepository.GetUserEconomy(ctx, req.UserID, ownEconomy)
+	if err != nil {
+		if errors.Is(err, economy.ErrNotFound) {
+			return userNotFound(err)
+		}
+
+		return server.Unexpected(err)
 	}
 
-	return server.OK(req)
+	return server.OK(ue)
 }
 
 func newRequestGetUserEconomy() server.ParsedRequest {
@@ -85,14 +92,14 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Failure      504            {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/top-miners [GET].
 func (s *service) GetTopMiners(ctx context.Context, r server.ParsedRequest) server.Response {
-	// req := r.(*RequestGetTopMiners)
+	// Req := r.(*RequestGetTopMiners).
 
-	// TODO implement me
+	//nolint:nolintlint // TODO implement me.
 
 	return server.OK([]*economy.TopMiner{{
 		UserID:            "bogus",
 		ProfilePictureURL: "bogus",
-		Balance:           1.2,
+		Balance:           1.2, //nolint:gomnd // It will be implementated later.
 	}})
 }
 
@@ -116,4 +123,14 @@ func (req *RequestGetTopMiners) Validate() *server.Response {
 
 func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{}) error {
 	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
+}
+
+func userNotFound(err error) server.Response {
+	return server.Response{
+		Data: server.ErrorResponse{
+			Error: err.Error(),
+			Code:  "USER_NOT_FOUND",
+		}.Fail(err),
+		Code: http.StatusNotFound,
+	}
 }

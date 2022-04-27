@@ -4,7 +4,6 @@ package main
 
 import (
 	"github.com/ICE-Blockchain/freezer/economy"
-
 	"github.com/ICE-Blockchain/wintr/server"
 )
 

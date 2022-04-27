@@ -5,16 +5,14 @@ package main
 import (
 	"context"
 
-	"github.com/ICE-Blockchain/freezer/cmd/freezer/api"
-
-	"github.com/ICE-Blockchain/freezer/economy"
-
-	"github.com/ICE-Blockchain/wintr/server"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
+	"github.com/ICE-Blockchain/freezer/cmd/freezer/api"
+	"github.com/ICE-Blockchain/freezer/economy"
 	appCfg "github.com/ICE-Blockchain/wintr/config"
 	"github.com/ICE-Blockchain/wintr/log"
+	"github.com/ICE-Blockchain/wintr/server"
 )
 
 //nolint:godot // Because those are comments parsed by swagger
@@ -55,7 +53,7 @@ func (s *service) Close(ctx context.Context) error {
 
 func (s *service) CheckHealth(ctx context.Context, r *server.RequestCheckHealth) server.Response {
 	log.Debug("checking health...", "package", "economy")
-	// TODO to be implemented
+	//nolint:nolintlint // TODO to be implemented.
 
 	return server.OK(r)
 }

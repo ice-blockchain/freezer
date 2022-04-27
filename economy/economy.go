@@ -2,29 +2,45 @@
 
 package economy
 
-import "context"
+import (
+	"context"
+
+	"github.com/pkg/errors"
+
+	appCfg "github.com/ICE-Blockchain/wintr/config"
+	"github.com/ICE-Blockchain/wintr/connectors/storage"
+	"github.com/ICE-Blockchain/wintr/log"
+)
 
 func New(ctx context.Context, cancel context.CancelFunc) Repository {
-	// TODO implement me
-	return &repository{}
+	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
+	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+
+	return &repository{
+		close:          db.Close,
+		ReadRepository: &userEconomyRepository{db: db},
+	}
 }
 
 func (r *repository) Close() error {
-	// TODO implement me
-	return nil
+	log.Info("closing economy repository...")
+
+	return errors.Wrap(r.close(), "closing economy repository failed")
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
-	// TODO implement me
-	return &processor{}
+	//nolint:nolintlint // TODO implement me
+	return nil
 }
 
 func (p *processor) Close() error {
-	// TODO implement me
+	//nolint:nolintlint // TODO implement me.
+
 	return nil
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	// TODO implement me
+	//nolint:nolintlint // TODO implement me.
+
 	return nil
 }
