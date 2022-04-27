@@ -68,7 +68,7 @@ func getUserEconomySQL() string {
 		(%[4]v) as global_rank,
 		(%[5]v) as t1_earnings_sum,
 		(%[6]v) as t2_earnings_sum,
-		(SELECT value FROM %[7]v) as current_total_users
+		(SELECT value FROM %[7]v WHERE key = 'TOTAL_USERS') as current_total_users
 	FROM %[8]v ue INDEXED BY "pk_unnamed_%[8]v_1"
 	WHERE ue.user_id = :userId`,
 		getAdoptionsSQL(), t1ActiveUsersCountSQL, t2ActiveUsersCountSQL,
