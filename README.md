@@ -1,6 +1,6 @@
 # Freezer Service
 
-``Freezer is handling everything related to user's ICE economy.``
+``Freezer is handling everything related to user's ice economy.``
 
 ### Development
 tmp

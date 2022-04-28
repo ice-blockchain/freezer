@@ -22,7 +22,7 @@ import (
 // @description              API that handles everything related to write-only operations for user's economy.
 // @query.collection.format  multi
 // @schemes                  https
-// @contact.name             ICE
+// @contact.name             ice
 // @contact.url              https://ice.io
 // @BasePath                 /v1
 func main() {
