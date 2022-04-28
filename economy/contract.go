@@ -114,27 +114,16 @@ type (
 		CurrentTotalUsers   uint64
 	}
 
-	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
-	// because it cannot deserialize time.Time or map/json structures properly.
-	// !! Order of fields is crucial, so do not change it !!
-	userEconomy struct { //nolint:govet // This is about DB
+	// | userEconomyLastMining is the internal structure for deserialization from the DB.
+	userEconomyLastMining struct {
 		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              string
-		HashCode            uint64
-		Balance             float64
 		LastMiningStartedAt uint64
-		ProfilePictureURL   string
-		StakingYears        uint64
-		StakingPercentage   float64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
 	}
 
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
-		UserID UserID `json:"userId"`
-		TS     uint64 `json:"ts"`
+		TS     time.Time `json:"ts"`
+		UserID UserID    `json:"userId"`
 	}
 
 	// | repository implements the public API that this package exposes.

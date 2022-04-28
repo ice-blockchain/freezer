@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/cmd/freezer/api"
@@ -41,7 +40,6 @@ func (s *service) RegisterRoutes(engine *gin.Engine) {
 }
 
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
-	s.economyProcessor = economy.StartProcessor(ctx, cancel)
 	s.economyRepository = economy.New(ctx, cancel)
 }
 
@@ -50,29 +48,12 @@ func (s *service) Close(ctx context.Context) error {
 		return errors.Wrap(ctx.Err(), "could not close economy processor because context ended")
 	}
 
-	err1 := s.economyRepository.Close()
-	err2 := s.economyProcessor.Close()
-
-	if err1 != nil && err2 != nil {
-		return multierror.Append(err1, err2)
-	}
-	var err error
-	if err1 != nil {
-		err = err1
-	}
-	if err2 != nil {
-		err = err2
-	}
-
-	return errors.Wrap(err, "could not close service")
+	return errors.Wrap(s.economyRepository.Close(), "could not close service")
 }
 
 func (s *service) CheckHealth(ctx context.Context, req *server.RequestCheckHealth) server.Response {
 	log.Debug("checking health...", "package", "economy")
-
-	if err := s.economyProcessor.CheckHealth(ctx); err != nil {
-		return server.Unexpected(err)
-	}
+	//nolint:nolintlint // TODO to be implemented.
 
 	return server.OK(req)
 }

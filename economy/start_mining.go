@@ -28,19 +28,18 @@ func (r *userEconomyRepository) StartMining(ctx context.Context, userID UserID) 
 		return ErrMiningInProgress
 	}
 
-	miningStarted, err := r.startMining(userID)
+	nowUtc := time.Now().UTC()
+	nowNano := uint64(nowUtc.UnixNano())
+
+	err = r.startMining(userID, nowNano)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mining")
 	}
 
-	if err = r.notifyStartMining(ctx, userID, miningStarted); err != nil {
-		return errors.Wrap(err, "unable to notify start mining")
-	}
-
-	return nil
+	return errors.Wrap(r.notifyStartMining(ctx, userID, nowUtc), "failed to notify that the user started mining")
 }
 
-func (r *userEconomyRepository) notifyStartMining(ctx context.Context, userID UserID, startedAt uint64) error {
+func (r *userEconomyRepository) notifyStartMining(ctx context.Context, userID UserID, startedAt time.Time) error {
 	m := miningStarted{
 		TS:     startedAt,
 		UserID: userID,
@@ -62,22 +61,20 @@ func (r *userEconomyRepository) notifyStartMining(ctx context.Context, userID Us
 	return errors.Wrapf(<-responder, "[start-mining] failed to send message to broker")
 }
 
-func (r *userEconomyRepository) startMining(userID string) (uint64, error) {
-	nowNano := uint64(time.Now().UnixNano())
-
+func (r *userEconomyRepository) startMining(userID string, startTime uint64) error {
 	params := map[string]interface{}{
 		"userId":        userID,
-		"miningStarted": nowNano,
-		"updatedAt":     nowNano,
+		"miningStarted": startTime,
+		"updatedAt":     startTime,
 	}
 
 	sql := fmt.Sprintf(`UPDATE %[1]v SET last_mining_started_at = :miningStarted, updated_at = :updatedAt WHERE user_id = :userId`, userEconomySpace())
 
 	if err := storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {
-		return 0, errors.Wrapf(err, "failed set last_mining_started_at for userID:%v", userID)
+		return errors.Wrapf(err, "failed set last_mining_started_at for userID:%v", userID)
 	}
 
-	return nowNano, nil
+	return nil
 }
 
 func (r *userEconomyRepository) isMiningInProgress(userID UserID) (bool, error) {
@@ -85,15 +82,15 @@ func (r *userEconomyRepository) isMiningInProgress(userID UserID) (bool, error) 
 		"userId": userID,
 	}
 
-	sql := fmt.Sprintf(`SELECT * FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" WHERE user_id = :userId`, userEconomySpace())
+	sql := fmt.Sprintf(`SELECT last_mining_started_at FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" WHERE user_id = :userId`, userEconomySpace())
 
-	var res []*userEconomy
+	var res []*userEconomyLastMining
 	if err := r.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return false, errors.Wrapf(err, "failed to get last_mining_started_at for userID:%v", userID)
 	}
 
 	if len(res) == 0 {
-		return false, errors.Wrapf(nil, "unable to find record for UserID:%v", userID)
+		return false, errors.Wrapf(storage.ErrNotFound, "unable to find record for UserID:%v", userID)
 	}
 
 	miningStared := time.Unix(0, int64(res[0].LastMiningStartedAt))

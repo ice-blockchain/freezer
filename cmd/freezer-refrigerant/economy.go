@@ -38,23 +38,22 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestStartMining)
 
-	if err := s.economyRepository.StartMining(ctx, req.AuthenticatedUser.ID); err != nil {
-		m := err.Error()
-		code := http.StatusInternalServerError
+	err := s.economyRepository.StartMining(ctx, req.AuthenticatedUser.ID)
+	if err != nil {
 		if errors.Is(err, economy.ErrMiningInProgress) {
-			code = http.StatusConflict
+			return server.Response{
+				Code: http.StatusConflict,
+				Data: server.ErrorResponse{
+					Error: err.Error(),
+					Code:  "MINING_IN_PROGRESS",
+				}.Fail(err),
+			}
 		}
 
-		return server.Response{
-			Code: code,
-			Data: server.ErrorResponse{
-				Error: m,
-				Code:  "ERR_START_MINING",
-			}.Fail(errors.Wrapf(err, m)),
-		}
+		return server.Unexpected(err)
 	}
 
-	return server.OK(req)
+	return server.OK()
 }
 
 func newRequestStartMining() server.ParsedRequest {
