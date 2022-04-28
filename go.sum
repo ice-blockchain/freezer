@@ -629,8 +629,8 @@ github.com/huin/goupnp v1.0.3-0.20220313090229-ca81a64b4204/go.mod h1:ZxNlw5WqJj
 github.com/huin/goutil v0.0.0-20170803182201-1ca381bf3150/go.mod h1:PpLOETDnJ0o3iZrZfqZzyLl6l7F3c6L1oWn7OICBi6o=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/ice-blockchain/wintr v1.3.0 h1:h5tgVIjmQPdYpAc1yVc0SbkFLJXEvyjvYUibiyBET6E=
-github.com/ice-blockchain/wintr v1.3.0/go.mod h1:ZT4NAsBRG9TPO3x+4Yr/evZu1tjzImmilkUKPxT2ReU=
+github.com/ice-blockchain/wintr v1.4.0 h1:LlyyH67I9PaxWP7pKmc4O61Do4uTpeKfmDvgFLXFVjc=
+github.com/ice-blockchain/wintr v1.4.0/go.mod h1:ZT4NAsBRG9TPO3x+4Yr/evZu1tjzImmilkUKPxT2ReU=
 github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.8/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.10/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
