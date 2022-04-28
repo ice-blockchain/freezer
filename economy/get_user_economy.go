@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/ICE-Blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/log"
 )
 
 func (u *userEconomyRepository) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
