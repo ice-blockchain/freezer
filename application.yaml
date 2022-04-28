@@ -27,13 +27,10 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 economy:
-<<<<<<< HEAD
   rates:
     tier1: 0.25
     tier2: 0.05
   inactivityHoursDeadline: 24
-=======
->>>>>>> Start Mining endpoint implementation. Makefile coverage was chang…
   db:
     spaces:
       - TOTAL_USERS
@@ -48,11 +45,7 @@ economy:
   messageBroker:
     #It's not used, because we`re not consuming anything in the production code.
     #So, its configured here just for testing or other local purposes.
-<<<<<<< HEAD
     consumerGroup: freezer-local
-=======
-    consumerGroup: freezer-economy
->>>>>>> Start Mining endpoint implementation. Makefile coverage was chang…
     createTopics: true
     urls:
       - localhost:9094
@@ -60,8 +53,4 @@ economy:
       - name: economy-events
         partitions: 10
         replicationFactor: 1
-<<<<<<< HEAD
         retention: 1000h
-=======
-        retention: 1000h
->>>>>>> Start Mining endpoint implementation. Makefile coverage was chang…
