@@ -1,9 +1,9 @@
-module github.com/ICE-Blockchain/freezer
+module github.com/ice-blockchain/freezer
 
 go 1.18
 
 require (
-	github.com/ICE-Blockchain/wintr v1.2.0
+	github.com/ice-blockchain/wintr v1.2.0
 	github.com/framey-io/go-tarantool v0.0.0-20220317175443-747a509561d8
 	github.com/gin-gonic/gin v1.7.7
 	github.com/hashicorp/go-multierror v1.1.1
@@ -149,3 +149,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
+
+replace github.com/ice-blockchain/wintr latest => github.com/ICE-Blockchain/wintr latest

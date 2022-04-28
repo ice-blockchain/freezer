@@ -3,8 +3,8 @@
 package main
 
 import (
-	"github.com/ICE-Blockchain/freezer/economy"
-	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/ice-blockchain/freezer/economy"
+	"github.com/ice-blockchain/wintr/server"
 )
 
 // Public API.

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	messagebroker "github.com/ICE-Blockchain/wintr/connectors/message_broker"
-	"github.com/ICE-Blockchain/wintr/connectors/storage"
-	"github.com/pkg/errors"
 	"time"
+
+	"github.com/pkg/errors"
+
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
 func (r *userEconomyRepository) StartMining(ctx context.Context, userID UserID) error {
@@ -70,7 +72,7 @@ func (r *userEconomyRepository) startMining(userID string) (uint64, error) {
 	sql := fmt.Sprintf(`UPDATE %[1]v SET last_mining_started_at = :miningStarted, updated_at = :updatedAt WHERE user_id = :userId`, userEconomySpace())
 
 	if err := storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {
-		return nowNano, errors.Wrapf(err, "failed set last_mining_started_at for userID:%v", userID)
+		return 0, errors.Wrapf(err, "failed set last_mining_started_at for userID:%v", userID)
 	}
 
 	return nowNano, nil

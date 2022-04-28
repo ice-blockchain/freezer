@@ -121,7 +121,7 @@ jobs:
       - name: Checkout the target `deploy` branch of `secret-infrastructure`
         uses: actions/checkout@v3
         with:
-          repository: ICE-Blockchain/secret-infrastructure
+          repository: ice-blockchain/secret-infrastructure
           ref: deploy
           token: ${{ secrets.ICE_CI_CD_BOT_GH_PAT }}
           path: secret-infrastructure

@@ -9,9 +9,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
-	appCfg "github.com/ICE-Blockchain/wintr/config"
-	messagebroker "github.com/ICE-Blockchain/wintr/connectors/message_broker"
-	"github.com/ICE-Blockchain/wintr/connectors/storage"
+	appCfg "github.com/ice-blockchain/wintr/config"
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
 func New(ctx context.Context, cancel context.CancelFunc) Repository {

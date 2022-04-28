@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ICE-Blockchain/freezer/economy"
-	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/ice-blockchain/freezer/economy"
+	"github.com/ice-blockchain/wintr/server"
 )
 
 func (s *service) setupEconomyRoutes(router *gin.Engine) {

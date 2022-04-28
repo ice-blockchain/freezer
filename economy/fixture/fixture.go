@@ -6,8 +6,8 @@ import (
 	"log"
 	"sync"
 
-	messagebrokerfixture "github.com/ICE-Blockchain/wintr/connectors/message_broker/fixture"
-	storagefixture "github.com/ICE-Blockchain/wintr/connectors/storage/fixture"
+	messagebrokerfixture "github.com/ice-blockchain/wintr/connectors/message_broker/fixture"
+	storagefixture "github.com/ice-blockchain/wintr/connectors/storage/fixture"
 )
 
 func TestSetup() func() {

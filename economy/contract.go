@@ -11,8 +11,8 @@ import (
 
 	"github.com/framey-io/go-tarantool"
 
-	messagebroker "github.com/ICE-Blockchain/wintr/connectors/message_broker"
-	"github.com/ICE-Blockchain/wintr/connectors/storage"
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
 // Public API.
