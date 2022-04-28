@@ -46,7 +46,6 @@ func closeAll(db tarantool.Connector, mb messagebroker.Client) func() error {
 }
 
 func (r *repository) Close() error {
-
 	if err := r.close(); err != nil {
 		return errors.Wrap(err, "unable close repository")
 	}
