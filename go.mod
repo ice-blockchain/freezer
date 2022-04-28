@@ -6,7 +6,7 @@ require (
 	github.com/framey-io/go-tarantool v0.0.0-20220317175443-747a509561d8
 	github.com/gin-gonic/gin v1.7.7
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/wintr v1.3.0
+	github.com/ice-blockchain/wintr v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/swaggo/swag v1.8.1
 )
