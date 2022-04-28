@@ -133,7 +133,7 @@ type (
 
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
-		UserID UserID `json:"user_id"`
+		UserID UserID `json:"userId"`
 		TS     uint64 `json:"ts"`
 	}
 
