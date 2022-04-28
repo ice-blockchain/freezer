@@ -51,7 +51,6 @@ func closeDB(db tarantool.Connector) func() error {
 }
 
 func (r *repository) Close() error {
-
 	if err := r.close(); err != nil {
 		return errors.Wrap(err, "unable close repository")
 	}
