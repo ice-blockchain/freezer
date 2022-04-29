@@ -31,7 +31,7 @@ var cfg config
 type (
 	// | service implements server.State and is responsible for managing the state and lifecycle of the package.
 	service struct {
-		economyRepository economy.Repository
+		economyProcessor economy.Processor
 	}
 	config struct {
 		Host              string `yaml:"host"`
