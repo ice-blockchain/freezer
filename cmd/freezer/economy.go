@@ -41,7 +41,7 @@ func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) se
 
 	// If true user is trying to get own personal economy, otherwise another user economy.
 	ownEconomy := req.AuthenticatedUser.ID == req.UserID
-	ue, err := s.economyProcessor.GetUserEconomy(ctx, req.UserID, ownEconomy)
+	ue, err := s.economyRepository.GetUserEconomy(ctx, req.UserID, ownEconomy)
 	if err != nil {
 		if errors.Is(err, economy.ErrNotFound) {
 			return userNotFound(err)
