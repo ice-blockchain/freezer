@@ -58,8 +58,7 @@ type (
 		ReadRepository
 	}
 	Processor interface {
-		io.Closer
-		ReadRepository
+		Repository
 		WriteRepository
 		CheckHealth(context.Context) error
 	}

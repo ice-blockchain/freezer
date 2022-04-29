@@ -4,6 +4,7 @@ package economy
 
 import (
 	"context"
+	"github.com/ice-blockchain/wintr/log"
 
 	"github.com/framey-io/go-tarantool"
 	"github.com/hashicorp/go-multierror"
@@ -51,6 +52,7 @@ func closeDB(db tarantool.Connector) func() error {
 }
 
 func (r *repository) Close() error {
+	log.Info("closing economy repository...")
 	return errors.Wrap(r.close(), "closing economy repository failed")
 }
 
@@ -68,6 +70,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 }
 
 func (p *processor) Close() error {
+	log.Info("closing economy processor...")
 	return errors.Wrap(p.close(), "closing economy processor failed")
 }
 
