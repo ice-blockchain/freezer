@@ -56,7 +56,6 @@ type (
 	Repository interface {
 		io.Closer
 		ReadRepository
-		WriteRepository
 	}
 	Processor interface {
 		Repository
@@ -88,7 +87,6 @@ var (
 )
 
 type (
-
 	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
@@ -128,7 +126,6 @@ type (
 	repository struct {
 		close func() error
 		ReadRepository
-		WriteRepository
 	}
 	// | processor implements the processing API that this package exposes.
 	processor struct {
