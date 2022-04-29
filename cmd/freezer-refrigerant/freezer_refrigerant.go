@@ -40,7 +40,7 @@ func (s *service) RegisterRoutes(engine *gin.Engine) {
 }
 
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
-	s.economyRepository = economy.New(ctx, cancel)
+	s.economyProcessor = economy.StartProcessor(ctx, cancel)
 }
 
 func (s *service) Close(ctx context.Context) error {
@@ -48,7 +48,7 @@ func (s *service) Close(ctx context.Context) error {
 		return errors.Wrap(ctx.Err(), "could not close economy processor because context ended")
 	}
 
-	return errors.Wrap(s.economyRepository.Close(), "could not close service")
+	return errors.Wrap(s.economyProcessor.Close(), "could not close service")
 }
 
 func (s *service) CheckHealth(ctx context.Context, req *server.RequestCheckHealth) server.Response {

@@ -20,7 +20,11 @@ type (
 
 // Private API.
 
-const applicationYamlKey = "cmd/freezer-refrigerant"
+const (
+	applicationYamlKey = "cmd/freezer-refrigerant"
+	miningInProgress   = "MINING_IN_PROGRESS"
+	userNotFound       = "USER_NOT_FOUND"
+)
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.
 var cfg config
@@ -28,7 +32,7 @@ var cfg config
 type (
 	// | service implements server.State and is responsible for managing the state and lifecycle of the package.
 	service struct {
-		economyRepository economy.Repository
+		economyProcessor economy.Processor
 	}
 	config struct {
 		Host    string `yaml:"host"`

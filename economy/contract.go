@@ -56,17 +56,16 @@ type (
 	Repository interface {
 		io.Closer
 		ReadRepository
-		WriteRepository
 	}
-
+	Processor interface {
+		io.Closer
+		ReadRepository
+		WriteRepository
+		CheckHealth(context.Context) error
+	}
 	// ReadRepository manages the database operations related to `users_economy`.
 	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
-	}
-
-	Processor interface {
-		io.Closer
-		CheckHealth(context.Context) error
 	}
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {
@@ -89,7 +88,6 @@ var (
 )
 
 type (
-
 	// | userEconomy is the internal (UserEconomy) structure for deserialization from the DB
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
@@ -130,18 +128,17 @@ type (
 	repository struct {
 		close func() error
 		ReadRepository
+	}
+	// | processor implements the processing API that this package exposes.
+	processor struct {
+		close func() error
+		ReadRepository
 		WriteRepository
 	}
-
-	processor struct {
-		db tarantool.Connector
-	}
-
-	userEconomyRepository struct {
+	economy struct {
 		db tarantool.Connector
 		mb messagebroker.Client
 	}
-
 	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {
 		MessageBroker struct {

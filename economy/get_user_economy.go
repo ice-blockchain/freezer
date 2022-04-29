@@ -14,7 +14,7 @@ import (
 	"github.com/ice-blockchain/wintr/log"
 )
 
-func (u *userEconomyRepository) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
+func (u *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
@@ -25,7 +25,7 @@ func (u *userEconomyRepository) GetUserEconomy(ctx context.Context, userID UserI
 	return u.getAnotherUserEconomy(ctx, userID)
 }
 
-func (u *userEconomyRepository) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
+func (u *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
@@ -75,7 +75,7 @@ func getUserEconomySQL() string {
 		getGlobalRankSQL(), t1EarningsSumSQL, t2EarningsSumSQL, totalUsersSpace(), userEconomySpace())
 }
 
-func (u *userEconomyRepository) getAnotherUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
+func (u *economy) getAnotherUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
 	// For now we return the same as for own user. It will be replaced later.
 	return u.getOwnUserEconomy(ctx, userID)
 }

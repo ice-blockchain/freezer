@@ -14,7 +14,7 @@ import (
 	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
-func (r *userEconomyRepository) StartMining(ctx context.Context, userID UserID) error {
+func (r *economy) StartMining(ctx context.Context, userID UserID) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "start mining failed because context failed")
 	}
@@ -39,7 +39,7 @@ func (r *userEconomyRepository) StartMining(ctx context.Context, userID UserID) 
 	return errors.Wrap(r.notifyStartMining(ctx, userID, nowUtc), "failed to notify that the user started mining")
 }
 
-func (r *userEconomyRepository) notifyStartMining(ctx context.Context, userID UserID, startedAt time.Time) error {
+func (r *economy) notifyStartMining(ctx context.Context, userID UserID, startedAt time.Time) error {
 	m := miningStarted{
 		TS:     startedAt,
 		UserID: userID,
@@ -61,7 +61,7 @@ func (r *userEconomyRepository) notifyStartMining(ctx context.Context, userID Us
 	return errors.Wrapf(<-responder, "[start-mining] failed to send message to broker")
 }
 
-func (r *userEconomyRepository) startMining(userID string, startTime uint64) error {
+func (r *economy) startMining(userID string, startTime uint64) error {
 	params := map[string]interface{}{
 		"userId":        userID,
 		"miningStarted": startTime,
@@ -77,7 +77,7 @@ func (r *userEconomyRepository) startMining(userID string, startTime uint64) err
 	return nil
 }
 
-func (r *userEconomyRepository) isMiningInProgress(userID UserID) (bool, error) {
+func (r *economy) isMiningInProgress(userID UserID) (bool, error) {
 	params := map[string]interface{}{
 		"userId": userID,
 	}

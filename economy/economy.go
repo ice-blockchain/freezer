@@ -16,13 +16,12 @@ import (
 
 func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+
 	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
-	mb := messagebroker.MustConnect(ctx, applicationYamlKey)
 
 	return &repository{
-		close:           closeAll(db, mb),
-		ReadRepository:  &userEconomyRepository{db, mb},
-		WriteRepository: &userEconomyRepository{db, mb},
+		close:          closeDB(db),
+		ReadRepository: &economy{db: db},
 	}
 }
 
@@ -45,22 +44,31 @@ func closeAll(db tarantool.Connector, mb messagebroker.Client) func() error {
 	}
 }
 
-func (r *repository) Close() error {
-	if err := r.close(); err != nil {
-		return errors.Wrap(err, "unable close repository")
+func closeDB(db tarantool.Connector) func() error {
+	return func() error {
+		return errors.Wrap(db.Close(), "closing db connection failed")
 	}
+}
 
-	return nil
+func (r *repository) Close() error {
+	return errors.Wrap(r.close(), "closing economy repository failed")
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
-	//nolint:nolintlint // TODO implement me.
-	return nil
+	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+
+	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
+	mb := messagebroker.MustConnect(ctx, applicationYamlKey)
+
+	return &processor{
+		close:           closeAll(db, mb),
+		ReadRepository:  &economy{db: db},
+		WriteRepository: &economy{db: db, mb: mb},
+	}
 }
 
 func (p *processor) Close() error {
-	//nolint:nolintlint // TODO implement me.
-	return nil
+	return errors.Wrap(p.close(), "closing economy processor failed")
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
