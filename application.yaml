@@ -49,8 +49,15 @@ economy:
     createTopics: true
     urls:
       - localhost:9094
+    consumingTopics:
+      - users-events
     topics:
       - name: economy-events
+        partitions: 10
+        replicationFactor: 1
+        retention: 1000h
+        ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
+      - name: users-events
         partitions: 10
         replicationFactor: 1
         retention: 1000h
