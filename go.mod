@@ -17,10 +17,9 @@ require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.2 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/containerd/cgroups v1.0.3 // indirect
-	github.com/containerd/containerd v1.6.3 // indirect
+	github.com/containerd/containerd v1.6.4 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.14+incompatible // indirect
