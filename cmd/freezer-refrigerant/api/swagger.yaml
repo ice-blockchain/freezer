@@ -22,7 +22,7 @@ definitions:
     type: object
 info:
   contact:
-    name: ICE
+    name: ice
     url: https://ice.io
   description: API that handles everything related to write-only operations for user's
     economy.

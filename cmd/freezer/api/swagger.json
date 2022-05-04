@@ -7,7 +7,7 @@
         "description": "API that handles everything related to read-only operations for user's economy.",
         "title": "Economy API",
         "contact": {
-            "name": "ICE",
+            "name": "ice",
             "url": "https://ice.io"
         },
         "version": "latest"

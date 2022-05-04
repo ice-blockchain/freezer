@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
-	"github.com/ICE-Blockchain/freezer/cmd/freezer/api"
-	"github.com/ICE-Blockchain/freezer/economy"
-	appCfg "github.com/ICE-Blockchain/wintr/config"
-	"github.com/ICE-Blockchain/wintr/log"
-	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/ice-blockchain/freezer/cmd/freezer/api"
+	"github.com/ice-blockchain/freezer/economy"
+	appCfg "github.com/ice-blockchain/wintr/config"
+	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/server"
 )
 
 //nolint:godot // Because those are comments parsed by swagger
@@ -21,7 +21,7 @@ import (
 // @description              API that handles everything related to write-only operations for user's economy.
 // @query.collection.format  multi
 // @schemes                  https
-// @contact.name             ICE
+// @contact.name             ice
 // @contact.url              https://ice.io
 // @BasePath                 /v1
 func main() {
@@ -48,7 +48,7 @@ func (s *service) Close(ctx context.Context) error {
 		return errors.Wrap(ctx.Err(), "could not close economy processor because context ended")
 	}
 
-	return errors.Wrap(s.economyProcessor.Close(), "could not close economy processor")
+	return errors.Wrap(s.economyProcessor.Close(), "could not close service")
 }
 
 func (s *service) CheckHealth(ctx context.Context, req *server.RequestCheckHealth) server.Response {

@@ -3,8 +3,8 @@
 package main
 
 import (
-	"github.com/ICE-Blockchain/freezer/economy"
-	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/ice-blockchain/freezer/economy"
+	"github.com/ice-blockchain/wintr/server"
 )
 
 // Public API.
@@ -20,7 +20,11 @@ type (
 
 // Private API.
 
-const applicationYamlKey = "cmd/freezer-refrigerant"
+const (
+	applicationYamlKey = "cmd/freezer-refrigerant"
+	miningInProgress   = "MINING_IN_PROGRESS"
+	userNotFound       = "USER_NOT_FOUND"
+)
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.
 var cfg config

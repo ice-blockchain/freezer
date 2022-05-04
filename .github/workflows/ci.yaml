@@ -121,7 +121,7 @@ jobs:
       - name: Checkout the target `deploy` branch of `secret-infrastructure`
         uses: actions/checkout@v3
         with:
-          repository: ICE-Blockchain/secret-infrastructure
+          repository: ice-blockchain/secret-infrastructure
           ref: deploy
           token: ${{ secrets.ICE_CI_CD_BOT_GH_PAT }}
           path: secret-infrastructure
@@ -146,7 +146,7 @@ jobs:
           cmd: yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' .deploy/helm/freezer/production/common-values.yaml
       - name: Commit and Push Changes to Application Tag Version
         run: |
-          git config user.name "ICE CI/CD Bot"
+          git config user.name "ice CI/CD Bot"
           git config user.email ice-cicd-bot@ice.vip
           git status
           git add .deploy/helm/freezer-refrigerant/staging/common-values.yaml 

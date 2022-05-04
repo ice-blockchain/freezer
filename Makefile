@@ -40,6 +40,7 @@ checkModVersion: updateGoModVersion
 	true;
 
 updateAllDependencies:
+	go get github.com/btcsuite/btcd/chaincfg/chainhash@latest
 	go get -t -u ./...
 	go mod tidy
 

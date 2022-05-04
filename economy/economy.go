@@ -5,20 +5,49 @@ package economy
 import (
 	"context"
 
+	"github.com/framey-io/go-tarantool"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
-	appCfg "github.com/ICE-Blockchain/wintr/config"
-	"github.com/ICE-Blockchain/wintr/connectors/storage"
-	"github.com/ICE-Blockchain/wintr/log"
+	appCfg "github.com/ice-blockchain/wintr/config"
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/log"
 )
 
 func New(ctx context.Context, cancel context.CancelFunc) Repository {
-	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
+	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
+
 	return &repository{
-		close:          db.Close,
-		ReadRepository: &userEconomyRepository{db: db},
+		close:          closeDB(db),
+		ReadRepository: &economy{db: db},
+	}
+}
+
+func closeAll(db tarantool.Connector, mb messagebroker.Client) func() error {
+	return func() error {
+		err1 := errors.Wrap(db.Close(), "closing db connection failed")
+		err2 := errors.Wrap(mb.Close(), "closing message broker connection failed")
+		if err1 != nil && err2 != nil {
+			return multierror.Append(err1, err2)
+		}
+		var err error
+		if err1 != nil {
+			err = err1
+		}
+		if err2 != nil {
+			err = err2
+		}
+
+		return errors.Wrapf(err, "failed to close all resources")
+	}
+}
+
+func closeDB(db tarantool.Connector) func() error {
+	return func() error {
+		return errors.Wrap(db.Close(), "closing db connection failed")
 	}
 }
 
@@ -29,18 +58,25 @@ func (r *repository) Close() error {
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
-	//nolint:nolintlint // TODO implement me
-	return nil
+	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+
+	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
+	mb := messagebroker.MustConnect(ctx, applicationYamlKey)
+
+	return &processor{
+		close:           closeAll(db, mb),
+		ReadRepository:  &economy{db: db},
+		WriteRepository: &economy{db: db, mb: mb},
+	}
 }
 
 func (p *processor) Close() error {
-	//nolint:nolintlint // TODO implement me.
+	log.Info("closing economy processor...")
 
-	return nil
+	return errors.Wrap(p.close(), "closing economy processor failed")
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
 	//nolint:nolintlint // TODO implement me.
-
 	return nil
 }

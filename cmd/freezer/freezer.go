@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
-	"github.com/ICE-Blockchain/freezer/cmd/freezer/api"
-	"github.com/ICE-Blockchain/freezer/economy"
-	appCfg "github.com/ICE-Blockchain/wintr/config"
-	"github.com/ICE-Blockchain/wintr/log"
-	"github.com/ICE-Blockchain/wintr/server"
+	"github.com/ice-blockchain/freezer/cmd/freezer/api"
+	"github.com/ice-blockchain/freezer/economy"
+	appCfg "github.com/ice-blockchain/wintr/config"
+	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/server"
 )
 
 //nolint:godot // Because those are comments parsed by swagger
@@ -21,7 +21,7 @@ import (
 // @description              API that handles everything related to read-only operations for user's economy.
 // @query.collection.format  multi
 // @schemes                  https
-// @contact.name             ICE
+// @contact.name             ice
 // @contact.url              https://ice.io
 // @BasePath                 /v1
 func main() {
