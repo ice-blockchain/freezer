@@ -53,7 +53,10 @@ func (s *service) Close(ctx context.Context) error {
 
 func (s *service) CheckHealth(ctx context.Context, req *server.RequestCheckHealth) server.Response {
 	log.Debug("checking health...", "package", "economy")
-	//nolint:nolintlint // TODO to be implemented.
+
+	if err := s.economyProcessor.CheckHealth(ctx); err != nil {
+		return server.Unexpected(err)
+	}
 
 	return server.OK(req)
 }

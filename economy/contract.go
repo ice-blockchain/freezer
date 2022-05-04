@@ -5,11 +5,11 @@ package economy
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"io"
 	"time"
 
 	"github.com/framey-io/go-tarantool"
+	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
@@ -119,8 +119,7 @@ type (
 
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
-		TS     time.Time `json:"ts"`
-		UserID UserID    `json:"userId"`
+		TS time.Time `json:"ts"`
 	}
 
 	// | repository implements the public API that this package exposes.

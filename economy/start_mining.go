@@ -41,8 +41,7 @@ func (r *economy) StartMining(ctx context.Context, userID UserID) error {
 
 func (r *economy) notifyStartMining(ctx context.Context, userID UserID, startedAt time.Time) error {
 	m := miningStarted{
-		TS:     startedAt,
-		UserID: userID,
+		TS: startedAt,
 	}
 
 	b, err := json.Marshal(m)
