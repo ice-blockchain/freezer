@@ -40,10 +40,11 @@ func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) serve
 
 	err := s.economyProcessor.StartMining(ctx, req.AuthenticatedUser.ID)
 	if err != nil {
-		if errors.Is(err, economy.ErrMiningInProgress) {
+		err = errors.Wrap(err, "start mining failed")
+		switch {
+		case errors.Is(err, economy.ErrMiningInProgress):
 			return endpointFailure(http.StatusConflict, err, miningInProgress)
-		}
-		if errors.Is(err, economy.ErrNotFound) {
+		case errors.Is(err, economy.ErrNotFound):
 			return endpointFailure(http.StatusNotFound, err, userNotFound)
 		}
 
