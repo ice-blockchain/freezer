@@ -31,6 +31,7 @@ func (s *usersSource) Process(ctx context.Context, m *messagebroker.Message) err
 		if err := s.deleteUserEconomy(u); err != nil {
 			return errors.Wrapf(err, "unable to call deleteUserEconomy")
 		}
+
 		return errors.Wrapf(s.updateTotalUsers(-1), "unable to call updateTotalUsers")
 	}
 
@@ -43,7 +44,6 @@ func (s *usersSource) Process(ctx context.Context, m *messagebroker.Message) err
 }
 
 func (s *usersSource) updateTotalUsers(diff int) error {
-
 	sql := fmt.Sprintf("UPDATE %[1]v SET"+
 		"VALUE = VALUE %+d"+
 		"WHERE KEY = 'TOTAL_USERS'", totalUsersSpace(), diff)
@@ -145,37 +145,38 @@ func (s *usersSource) createOrUpdateUserEconomy(u *user) error {
 	ue, err := s.findUserEconomy(u.ID)
 	switch {
 	case errors.Is(err, storage.ErrNotFound):
-		if err := s.updateTotalUsers(1); err != nil {
+		if err = s.updateTotalUsers(1); err != nil {
 			return errors.Wrapf(err, "unable to call updateTotalUsers")
 		}
+
 		return errors.Wrapf(s.createUserEconomy(u), "unable to call createUserEconomy")
 	case err != nil:
 		return errors.Wrapf(err, "unable to call findUserEconomy")
 	}
 
-	ue.ProfilePictureUrl = u.ProfilePictureURL
+	ue.ProfilePictureURL = u.ProfilePictureURL
 
 	return errors.Wrapf(s.updateUserEconomy(ue), "unable to call updateUserEconomy")
 }
 
-func (s *usersSource) findUserEconomy(userId UserID) (*userEconomy, error) {
+func (s *usersSource) findUserEconomy(userID UserID) (*userEconomy, error) {
 	params := map[string]interface{}{
-		"userId": userId,
+		"userID": userID,
 	}
 
 	sql := fmt.Sprintf(`
 		SELECT * 
 		FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" 
-		WHERE user_id = :userId`, userEconomySpace())
+		WHERE user_id = :userID`, userEconomySpace())
 
 	var res []*userEconomy
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
-		return nil, errors.Wrapf(err, "failed to get %q record for userId:%v", userEconomySpace(), userId)
+		return nil, errors.Wrapf(err, "failed to get %q record for userID:%v", userEconomySpace(), userID)
 	}
 
 	if len(res) == 0 {
 		return nil, errors.Wrapf(storage.ErrNotFound,
-			"unable to find %q record for userId:%v", userEconomySpace(), userId)
+			"unable to find %q record for userID:%v", userEconomySpace(), userID)
 	}
 
 	return res[0], nil
@@ -185,7 +186,7 @@ func (s *usersSource) updateUserEconomy(ue *userEconomy) error {
 	nowT := uint64(time.Now().UTC().UnixNano())
 	params := map[string]interface{}{
 		"userId":            ue.UserID,
-		"profilePictureUrl": ue.ProfilePictureUrl,
+		"profilePictureUrl": ue.ProfilePictureURL,
 		"updatedAt":         nowT,
 	}
 

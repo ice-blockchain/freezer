@@ -14,7 +14,7 @@ type (
 	userEconomy struct {
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              UserID
-		ProfilePictureUrl   string
+		ProfilePictureURL   string
 		Balance             float64
 		StakingPercentage   float64
 		HashCode            uint64
