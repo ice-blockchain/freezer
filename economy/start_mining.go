@@ -50,7 +50,7 @@ func (r *economy) notifyStartMining(ctx context.Context, userID UserID, startedA
 	}
 
 	responder := make(chan error, 1)
-	r.mb.SendMessage(ctx, &messagebroker.Message{
+	r.mbProducer.SendMessage(ctx, &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     userID,
 		Topic:   cfg.MessageBroker.Topics[0].Name,
