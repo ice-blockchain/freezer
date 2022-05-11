@@ -91,6 +91,7 @@ type (
 	// because it cannot deserialize time.Time or map/json structures properly.
 	// !! Order of fields is crucial, so do not change it !!
 	userEconomySummary struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              string
 		ProfilePictureURL   string
@@ -113,6 +114,7 @@ type (
 
 	// | userEconomyLastMining is the internal structure for deserialization from the DB.
 	userEconomyLastMining struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		LastMiningStartedAt uint64
 	}

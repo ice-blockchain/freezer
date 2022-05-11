@@ -14,6 +14,7 @@ type (
 	UserID = string
 
 	userEconomy struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              UserID
 		ProfilePictureURL   string
@@ -33,17 +34,20 @@ type (
 	}
 
 	referredBy struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		UserID   UserID
 	}
 
 	totalUsers struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		Key      string
 		Value    uint64
 	}
 
 	referralEarnings struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack       struct{} `msgpack:",asArray"`
 		UserID         UserID
 		ReferralUserID UserID

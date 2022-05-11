@@ -14,18 +14,18 @@ import (
 	"github.com/ice-blockchain/wintr/log"
 )
 
-func (u *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
+func (e *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
 	if ownEconomy {
-		return u.getOwnUserEconomy(ctx, userID)
+		return e.getOwnUserEconomy(ctx, userID)
 	}
 
-	return u.getAnotherUserEconomy(ctx, userID)
+	return e.getAnotherUserEconomy(ctx, userID)
 }
 
-func (u *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
+func (e *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "get user economy failed because context failed")
 	}
@@ -35,7 +35,7 @@ func (u *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEc
 		"now":                time.Now().UTC().UnixNano(),
 		"inactivityDeadline": time.Duration(cfg.InactivityHoursDeadline) * time.Hour,
 	}
-	if err := u.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
+	if err := e.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
 		return nil, errors.Wrapf(err, "failed to get user economy for userID:%v", userID)
 	}
 	if len(result) == 0 {
@@ -75,9 +75,9 @@ func getUserEconomySQL() string {
 		getGlobalRankSQL(), t1EarningsSumSQL, t2EarningsSumSQL, totalUsersSpace(), userEconomySpace())
 }
 
-func (u *economy) getAnotherUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
+func (e *economy) getAnotherUserEconomy(ctx context.Context, userID UserID) (*UserEconomy, error) {
 	// For now we return the same as for own user. It will be replaced later.
-	return u.getOwnUserEconomy(ctx, userID)
+	return e.getOwnUserEconomy(ctx, userID)
 }
 
 func getGlobalRankSQL() string {
