@@ -134,8 +134,8 @@ type (
 		WriteRepository
 	}
 	economy struct {
-		db         tarantool.Connector
-		mbProducer messagebroker.Client
+		db tarantool.Connector
+		mb messagebroker.Client
 	}
 	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {

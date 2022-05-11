@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
-	"github.com/ice-blockchain/freezer/economy/internal/storages/users"
+	usereconomy "github.com/ice-blockchain/freezer/economy/internal/storages/user_economy"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
@@ -76,13 +76,13 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	return &processor{
 		close:           closeAll(db, mbProducer, mbConsumer),
 		ReadRepository:  &economy{db: db},
-		WriteRepository: &economy{db: db, mbProducer: mbProducer},
+		WriteRepository: &economy{db: db, mb: mbProducer},
 	}
 }
 
 func processors(ctx context.Context, db tarantool.Connector) map[messagebroker.Topic]messagebroker.Processor {
 	return map[messagebroker.Topic]messagebroker.Processor{
-		cfg.MessageBroker.ConsumingTopics[0]: users.New(db),
+		cfg.MessageBroker.ConsumingTopics[0]: usereconomy.New(db),
 	}
 }
 

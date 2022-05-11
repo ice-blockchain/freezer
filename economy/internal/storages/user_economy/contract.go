@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-package users
+package usereconomy
 
 import (
 	"time"
@@ -27,14 +27,29 @@ type (
 		BalanceUpdatedAt    uint64
 	}
 
-	// | usersSource is responsible for processing new messages of sourceUser type, transforming it and storing it in the db as user type.
-	usersSource struct {
+	// | userEconomySource is responsible for processing new messages of sourceUser type, transforming it and storing it in the db as user type.
+	userEconomySource struct {
 		db tarantool.Connector
 	}
 
 	referredBy struct {
 		_msgpack struct{} `msgpack:",asArray"`
 		UserID   UserID
+	}
+
+	totalUsers struct {
+		_msgpack struct{} `msgpack:",asArray"`
+		Key      string
+		Value    uint64
+	}
+
+	referralEarnings struct {
+		_msgpack       struct{} `msgpack:",asArray"`
+		UserID         UserID
+		ReferralUserID UserID
+		Earnings       float64
+		CreatedAt      uint64
+		UpdatedAt      uint64
 	}
 
 	user struct {
