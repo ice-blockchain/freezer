@@ -23,7 +23,7 @@ require (
 	github.com/containerd/containerd v1.6.4 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.14+incompatible // indirect
+	github.com/docker/docker v20.10.15+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.17 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.15.2 // indirect
+	github.com/klauspost/compress v1.15.4 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/magiclabs/magic-admin-go v0.1.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
@@ -61,32 +61,32 @@ require (
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
 	github.com/opencontainers/runc v1.1.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/rs/zerolog v1.26.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
-	github.com/spf13/cast v1.4.1 // indirect
+	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.11.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/swaggo/gin-swagger v1.4.3 // indirect
 	github.com/testcontainers/testcontainers-go v0.13.0 // indirect
-	github.com/twmb/franz-go v1.5.0 // indirect
-	github.com/twmb/franz-go/pkg/kadm v0.0.0-20220503231155-779f582cfde3 // indirect
+	github.com/twmb/franz-go v1.5.2 // indirect
+	github.com/twmb/franz-go/pkg/kadm v0.0.0-20220509001821-f57c05003903 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.0.0 // indirect
 	github.com/twmb/go-rbtree v1.0.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f // indirect
+	golang.org/x/crypto v0.0.0-20220511200225-c6db032c6c88 // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.10 // indirect
-	google.golang.org/genproto v0.0.0-20220504150022-98cd25cafc72 // indirect
+	google.golang.org/genproto v0.0.0-20220505152158-f39f71e6c8f3 // indirect
 	google.golang.org/grpc v1.46.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
