@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: BUSL-1.1
-
 basePath: /v1
 definitions:
   economy.Balance:
@@ -38,9 +36,6 @@ definitions:
         type: string
       userId:
         example: did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2
-        type: string
-      username:
-        example: jdoe
         type: string
     type: object
   economy.UserEconomy:
