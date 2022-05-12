@@ -13,6 +13,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
 
 box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     user_id STRING primary key,
+                    username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
                     balance DOUBLE NOT NULL,
                     staking_percentage DOUBLE,

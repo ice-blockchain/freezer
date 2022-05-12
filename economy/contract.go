@@ -49,6 +49,7 @@ type (
 	}
 	TopMiner struct {
 		UserID            string  `json:"userId" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Username          string  `json:"username" example:"jdoe"`
 		ProfilePictureURL string  `json:"profilePictureURL" example:"https://somecdn.com/p1.jpg"`
 		Balance           float64 `json:"balance" example:"232.5"`
 	}
@@ -94,6 +95,7 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              string
+		Username            string
 		ProfilePictureURL   string
 		Adoptions           string
 		Balance             float64
@@ -122,15 +124,6 @@ type (
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
 		TS time.Time `json:"ts"`
-	}
-
-	// | topMiner is internal structure for deserialization from the DB.
-	topMiner struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack          struct{} `msgpack:",asArray"`
-		UserID            UserID
-		ProfilePictureURL string
-		Balance           float64
 	}
 
 	// | repository implements the public API that this package exposes.

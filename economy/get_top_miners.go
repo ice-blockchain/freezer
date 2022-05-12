@@ -24,23 +24,10 @@ func (e *economy) GetTopMiners(ctx context.Context, limit, offset uint64) ([]*To
 		FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" 
 		ORDER BY balance LIMIT :limit OFFSET :offset`, space)
 
-	var res []*topMiner
+	var res []*TopMiner
 	if err := e.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to get %q record with limit:%v and offset:%v", space, limit, offset)
 	}
 
-	topMiners := make([]*TopMiner, 0, len(res))
-	for _, item := range res {
-		topMiners = append(topMiners, item.toTopMiner())
-	}
-
-	return topMiners, nil
-}
-
-func (t *topMiner) toTopMiner() *TopMiner {
-	return &TopMiner{
-		UserID:            t.UserID,
-		ProfilePictureURL: t.ProfilePictureURL,
-		Balance:           t.Balance,
-	}
+	return res, nil
 }

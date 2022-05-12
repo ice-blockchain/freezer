@@ -53,6 +53,7 @@ func getUserEconomySQL() string {
 
 	return fmt.Sprintf(`SELECT
 		ue.user_id,
+		us.username,
 		ue.profile_picture_url,
 		(%[1]v) as adoptions,
 		ue.balance,
