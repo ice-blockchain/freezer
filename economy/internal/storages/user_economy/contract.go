@@ -56,6 +56,11 @@ type (
 		UpdatedAt      uint64
 	}
 
+	userSnapshot struct {
+		User   *user
+		Before *user
+	}
+
 	user struct {
 		CreatedAt         time.Time  `json:"createdAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		UpdatedAt         time.Time  `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`

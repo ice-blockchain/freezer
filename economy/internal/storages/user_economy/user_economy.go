@@ -26,25 +26,25 @@ func (s *userEconomySource) Process(ctx context.Context, m *messagebroker.Messag
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	u := new(user)
+	u := new(userSnapshot)
 	if err := json.Unmarshal(m.Value, u); err != nil {
 		return errors.Wrapf(err, "userEconomySource: cannot unmarshall %v into %#v", string(m.Value), u)
 	}
 
-	if !u.DeletedAt.IsZero() {
-		if err := s.deleteUserEconomy(u); err != nil {
+	if !u.User.DeletedAt.IsZero() {
+		if err := s.deleteUserEconomy(u.User); err != nil {
 			return errors.Wrapf(err, "unable to call deleteUserEconomy")
 		}
 
 		return errors.Wrapf(s.updateTotalUsers(-1), "unable to call updateTotalUsers")
 	}
 
-	err := s.createOrUpdateUserEconomy(u)
+	err := s.createOrUpdateUserEconomy(u.User)
 	if err != nil {
 		return errors.Wrapf(err, "unable to call createOrUpdateUserEconomy")
 	}
 
-	return errors.Wrap(s.createEarnings(u), "unable to call createEarnings")
+	return errors.Wrap(s.createEarnings(u.User), "unable to call createEarnings")
 }
 
 func (s *userEconomySource) deleteUserEconomy(u *user) error {
