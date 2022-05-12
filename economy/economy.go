@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
+	usereconomy "github.com/ice-blockchain/freezer/economy/internal/storages/user_economy"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
@@ -26,22 +27,28 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	}
 }
 
-func closeAll(db tarantool.Connector, mb messagebroker.Client) func() error {
+func closeAll(db tarantool.Connector, mbProducer, mbConsumer messagebroker.Client) func() error {
 	return func() error {
-		err1 := errors.Wrap(db.Close(), "closing db connection failed")
-		err2 := errors.Wrap(mb.Close(), "closing message broker connection failed")
-		if err1 != nil && err2 != nil {
-			return multierror.Append(err1, err2)
-		}
-		var err error
+		err1 := errors.Wrap(mbConsumer.Close(), "closing message broker consumer connection failed")
+		err2 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
+		err3 := errors.Wrap(db.Close(), "closing db connection failed")
+		errs := make([]error, 0, 1+1+1)
 		if err1 != nil {
-			err = err1
+			errs = append(errs, err1)
 		}
 		if err2 != nil {
-			err = err2
+			errs = append(errs, err2)
+		}
+		if err3 != nil {
+			errs = append(errs, err3)
+		}
+		if len(errs) > 1 {
+			return multierror.Append(nil, errs...)
+		} else if len(errs) == 1 {
+			return errors.Wrapf(errs[0], "failed to close all resources")
 		}
 
-		return errors.Wrapf(err, "failed to close all resources")
+		return nil
 	}
 }
 
@@ -61,12 +68,21 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
 	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
-	mb := messagebroker.MustConnect(ctx, applicationYamlKey)
+	mbProducer := messagebroker.MustConnect(ctx, applicationYamlKey)
+
+	mbProcessors := processors(context.Background(), db)
+	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey, mbProcessors)
 
 	return &processor{
-		close:           closeAll(db, mb),
+		close:           closeAll(db, mbProducer, mbConsumer),
 		ReadRepository:  &economy{db: db},
-		WriteRepository: &economy{db: db, mb: mb},
+		WriteRepository: &economy{db: db, mb: mbProducer},
+	}
+}
+
+func processors(ctx context.Context, db tarantool.Connector) map[messagebroker.Topic]messagebroker.Processor {
+	return map[messagebroker.Topic]messagebroker.Processor{
+		cfg.MessageBroker.ConsumingTopics[0]: usereconomy.New(db),
 	}
 }
 
