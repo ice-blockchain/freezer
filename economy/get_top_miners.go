@@ -20,7 +20,7 @@ func (e *economy) GetTopMiners(ctx context.Context, limit, offset uint64) ([]*To
 		"offset": offset,
 	}
 
-	sql := fmt.Sprintf(`SELECT user_id, profile_picture_url, balance 
+	sql := fmt.Sprintf(`SELECT user_id, username, profile_picture_url, balance 
 		FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" 
 		ORDER BY balance LIMIT :limit OFFSET :offset`, space)
 
