@@ -115,6 +115,7 @@ func (s *userEconomySource) createUserEconomy(u *user) error {
 
 	ue := &userEconomy{
 		UserID:              u.ID,
+		Username:            u.Username,
 		ProfilePictureURL:   u.ProfilePictureURL,
 		Balance:             0.0,
 		StakingPercentage:   0.0,
@@ -139,6 +140,7 @@ func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
 	//nolint:gomnd // Those are not magic numbers, those are the indexes of the fields.
 	incrementOps := []tarantool.Op{
 		{Op: "=", Field: 1, Arg: ue.ProfilePictureURL},
+		{Op: "=", Field: 2, Arg: ue.Username},
 		{Op: "=", Field: 8, Arg: nowT},
 	}
 

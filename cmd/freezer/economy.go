@@ -92,15 +92,14 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Failure      504            {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/top-miners [GET].
 func (s *service) GetTopMiners(ctx context.Context, r server.ParsedRequest) server.Response {
-	// Req := r.(*RequestGetTopMiners).
+	req := r.(*RequestGetTopMiners)
 
-	//nolint:nolintlint // TODO implement me.
+	repoTopMiners, err := s.economyRepository.GetTopMiners(ctx, req.Limit, req.Offset)
+	if err != nil {
+		return server.Unexpected(err)
+	}
 
-	return server.OK([]*economy.TopMiner{{
-		UserID:            "bogus",
-		ProfilePictureURL: "bogus",
-		Balance:           1.2, //nolint:gomnd // It will be implementated later.
-	}})
+	return server.OK(repoTopMiners)
 }
 
 func newRequestGetTopMiners() server.ParsedRequest {
@@ -118,6 +117,14 @@ func (req *RequestGetTopMiners) GetAuthenticatedUser() server.AuthenticatedUser 
 }
 
 func (req *RequestGetTopMiners) Validate() *server.Response {
+	if req.Limit == 0 {
+		req.Limit = cfg.DefaultPagination.Limit
+	}
+
+	if req.Limit > cfg.DefaultPagination.MaxLimit {
+		req.Limit = cfg.DefaultPagination.MaxLimit
+	}
+
 	return nil
 }
 

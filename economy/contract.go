@@ -65,6 +65,7 @@ type (
 	// ReadRepository manages the database operations related to `users_economy`.
 	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
+		GetTopMiners(context.Context, uint64, uint64) ([]*TopMiner, error)
 	}
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {
@@ -94,6 +95,7 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              string
+		Username            string
 		ProfilePictureURL   string
 		Adoptions           string
 		Balance             float64

@@ -17,6 +17,7 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		UserID              UserID
+		Username            string
 		ProfilePictureURL   string
 		Balance             float64
 		StakingPercentage   float64
