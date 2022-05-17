@@ -20,6 +20,7 @@ import (
 var (
 	ErrNotFound         = storage.ErrNotFound
 	ErrMiningInProgress = errors.New("mining in progress")
+	ErrStakingEnabled   = errors.New("staking enabled")
 )
 
 type (
@@ -70,6 +71,7 @@ type (
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {
 		StartMining(context.Context, UserID) error
+		StartStaking(context.Context, UserID, Staking) error
 	}
 )
 
@@ -124,6 +126,12 @@ type (
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
 		TS time.Time `json:"ts"`
+	}
+
+	// | stakingEnabled is internal structure to hold notification message.
+	stakingEnabled struct {
+		TS time.Time `json:"ts"`
+		Staking
 	}
 
 	// | repository implements the public API that this package exposes.

@@ -24,6 +24,7 @@ const (
 	applicationYamlKey = "cmd/freezer-refrigerant"
 	miningInProgress   = "MINING_IN_PROGRESS"
 	userNotFound       = "USER_NOT_FOUND"
+	stakingEnabled     = "STAKING_ENABLED"
 )
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.
