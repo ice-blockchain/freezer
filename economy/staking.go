@@ -70,7 +70,7 @@ func (e *economy) enableStaking(userID string, staking Staking, updatedAt time.T
 		{Op: "=", Field: 9, Arg: updatedAt.UnixNano()},
 	}
 
-	return errors.Wrapf(e.db.UpdateTyped(space, index, key, ops, &[]interface{}{}),
+	return errors.Wrapf(e.db.UpdateTyped(space, index, key, ops, &[]*userEconomy{}),
 		"failed set staking_years:%v, staking_persentage:%v for userID:%v", staking.Years, staking.Percentage, userID)
 }
 

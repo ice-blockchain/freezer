@@ -116,6 +116,22 @@ type (
 		CurrentTotalUsers   uint64
 	}
 
+	userEconomy struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack            struct{} `msgpack:",asArray"`
+		UserID              UserID
+		Username            string
+		ProfilePictureURL   string
+		Balance             float64
+		StakingPercentage   float64
+		HashCode            uint64
+		LastMiningStartedAt uint64
+		StakingYears        uint64
+		CreatedAt           uint64
+		UpdatedAt           uint64
+		BalanceUpdatedAt    uint64
+	}
+
 	// | userEconomyLastMining is the internal structure for deserialization from the DB.
 	userEconomyLastMining struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
