@@ -38,7 +38,6 @@ func (e *economy) StartStaking(ctx context.Context, userID UserID, staking Staki
 }
 
 func (e *economy) isStakingEnabled(userID UserID) (bool, error) {
-
 	params := map[string]interface{}{
 		"userID": userID,
 	}
@@ -60,11 +59,11 @@ func (e *economy) isStakingEnabled(userID UserID) (bool, error) {
 }
 
 func (e *economy) enableStaking(userID string, staking Staking, updatedAt time.Time) error {
-
 	space := "USER_ECONOMY"
 	index := "pk_unnamed_USER_ECONOMY_1"
 	key := tarantool.StringKey{S: userID}
 
+	//nolint:gomnd // Those are not magic numbers, those are the indexes of the fields.
 	ops := []tarantool.Op{
 		{Op: "=", Field: 4, Arg: staking.Percentage},
 		{Op: "=", Field: 7, Arg: staking.Years},
