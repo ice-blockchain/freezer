@@ -4,14 +4,13 @@ package economy
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/framey-io/go-tarantool"
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
 func (e *economy) StartStaking(ctx context.Context, userID UserID, staking Staking) error {
@@ -25,13 +24,12 @@ func (e *economy) StartStaking(ctx context.Context, userID UserID, staking Staki
 	}
 
 	if stakingEnabled {
-		return ErrStakingEnabled
+		return ErrStakingAlreadyEnabled
 	}
 
 	nowUtc := time.Now().UTC()
-	nowNano := uint64(nowUtc.UnixNano())
 
-	err = e.enableStaking(userID, staking, nowNano)
+	err = e.enableStaking(userID, staking, nowUtc)
 	if err != nil {
 		return errors.Wrap(err, "unable to enable staking")
 	}
@@ -40,53 +38,41 @@ func (e *economy) StartStaking(ctx context.Context, userID UserID, staking Staki
 }
 
 func (e *economy) isStakingEnabled(userID UserID) (bool, error) {
-	space := userEconomySpace()
 
 	params := map[string]interface{}{
 		"userID": userID,
 	}
 
-	sql := fmt.Sprintf(`SELECT staking_years, staking_percentage 
-		FROM %[1]v INDEXED BY "pk_unnamed_%[1]v_1" 
-		WHERE user_id = :userID `, space)
+	sql := `SELECT staking_years > 0 AND staking_percentage > 0 
+		FROM USER_ECONOMY INDEXED BY "pk_unnamed_USER_ECONOMY_1" 
+		WHERE user_id = :userID`
 
-	var res []*Staking
+	var res []stakingAlreadyEnabled
 	if err := e.db.PrepareExecuteTyped(sql, params, &res); err != nil {
-		return false, errors.Wrapf(err, "failed to get %q record with userID %v", space, userID)
+		return false, errors.Wrapf(err, "failed to get user_economy record with userID %v", userID)
 	}
 
 	if len(res) == 0 {
 		return false, ErrNotFound
 	}
 
-	return res[0].IsValid(), nil
+	return res[0].Value, nil
 }
 
-func (s Staking) IsValid() bool {
-	return (s.Years >= 1 && s.Years <= 5) &&
-		(s.Percentage > 0.0 && s.Percentage <= 100)
-}
+func (e *economy) enableStaking(userID string, staking Staking, updatedAt time.Time) error {
 
-func (e *economy) enableStaking(userID string, staking Staking, startTime uint64) error {
-	params := map[string]interface{}{
-		"userId":     userID,
-		"years":      staking.Years,
-		"percentage": staking.Percentage,
-		"updatedAt":  startTime,
+	space := "USER_ECONOMY"
+	index := "pk_unnamed_USER_ECONOMY_1"
+	key := tarantool.StringKey{S: userID}
+
+	ops := []tarantool.Op{
+		{Op: "=", Field: 4, Arg: staking.Percentage},
+		{Op: "=", Field: 7, Arg: staking.Years},
+		{Op: "=", Field: 9, Arg: updatedAt.UnixNano()},
 	}
 
-	sql := fmt.Sprintf(`
-		UPDATE %[1]v 
-		SET staking_years = :years, 
-			staking_percentage = :percentage, 
-			updated_at = :updatedAt 
-		WHERE user_id = :userId`, userEconomySpace())
-
-	if err := storage.CheckSQLDMLErr(e.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed set staking_years:%v, staking_persentage:%v for userID:%v", staking.Years, staking.Percentage, userID)
-	}
-
-	return nil
+	return errors.Wrapf(e.db.UpdateTyped(space, index, key, ops, &[]interface{}{}),
+		"failed set staking_years:%v, staking_persentage:%v for userID:%v", staking.Years, staking.Percentage, userID)
 }
 
 func (e *economy) notifyStartStaking(ctx context.Context, userID UserID, staking Staking, startedAt time.Time) error {
@@ -104,7 +90,7 @@ func (e *economy) notifyStartStaking(ctx context.Context, userID UserID, staking
 	e.mb.SendMessage(ctx, &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     userID,
-		Topic:   cfg.MessageBroker.Topics[0].Name,
+		Topic:   cfg.MessageBroker.Topics[1].Name,
 		Value:   b,
 	}, responder)
 
