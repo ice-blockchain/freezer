@@ -18,9 +18,9 @@ import (
 // Public API.
 
 var (
-	ErrNotFound         = storage.ErrNotFound
-	ErrMiningInProgress = errors.New("mining in progress")
-	ErrStakingEnabled   = errors.New("staking enabled")
+	ErrNotFound              = storage.ErrNotFound
+	ErrMiningInProgress      = errors.New("mining in progress")
+	ErrStakingAlreadyEnabled = errors.New("staking already enabled")
 )
 
 type (
@@ -121,6 +121,13 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
 		LastMiningStartedAt uint64
+	}
+
+	// | stakingAlreadyEnabled is the internal structure for deserialization from the DB.
+	stakingAlreadyEnabled struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		Value    bool
 	}
 
 	// | miningStarted is internal structure to hold notification message.
