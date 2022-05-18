@@ -100,8 +100,8 @@ func (s *service) StartStaking(ctx context.Context, r server.ParsedRequest) serv
 	if err != nil {
 		err = errors.Wrap(err, "start staking failed")
 		switch {
-		case errors.Is(err, economy.ErrStakingEnabled):
-			return *server.Conflict(err, stakingEnabled)
+		case errors.Is(err, economy.ErrStakingAlreadyEnabled):
+			return *server.Conflict(err, stakingAlradyEnabled)
 		case errors.Is(err, economy.ErrNotFound):
 			return *server.NotFound(err, userNotFound)
 		}
