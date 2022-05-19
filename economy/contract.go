@@ -146,13 +146,13 @@ type (
 		Value    bool
 	}
 
-	// | miningStarted is internal structure to hold notification message.
-	miningStarted struct {
+	// | MiningStarted is structure to hold notification message.
+	MiningStarted struct {
 		TS time.Time `json:"ts"`
 	}
 
-	// | stakingEnabled is internal structure to hold notification message.
-	stakingEnabled struct {
+	// | StakingEnabled is structure to hold notification message sent to message broker.
+	StakingEnabled struct {
 		TS time.Time `json:"ts"`
 		Staking
 	}
