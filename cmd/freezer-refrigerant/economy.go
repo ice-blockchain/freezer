@@ -43,25 +43,15 @@ func (s *service) StartMining(ctx context.Context, r server.ParsedRequest) serve
 		err = errors.Wrap(err, "start mining failed")
 		switch {
 		case errors.Is(err, economy.ErrMiningInProgress):
-			return endpointFailure(http.StatusConflict, err, miningInProgress)
+			return *server.Conflict(err, miningInProgress)
 		case errors.Is(err, economy.ErrNotFound):
-			return endpointFailure(http.StatusNotFound, err, userNotFound)
+			return *server.NotFound(err, userNotFound)
 		}
 
 		return server.Unexpected(err)
 	}
 
 	return server.OK()
-}
-
-func endpointFailure(httpCode int, err error, code string) server.Response {
-	return server.Response{
-		Code: httpCode,
-		Data: server.ErrorResponse{
-			Error: err.Error(),
-			Code:  code,
-		}.Fail(err),
-	}
 }
 
 func newRequestStartMining() server.ParsedRequest {
@@ -106,9 +96,20 @@ func (req *RequestStartMining) Bindings(c *gin.Context) []func(obj interface{}) 
 func (s *service) StartStaking(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestStartStaking)
 
-	//nolint:nolintlint // TODO implement me.
+	err := s.economyProcessor.StartStaking(ctx, req.AuthenticatedUser.ID, req.Staking)
+	if err != nil {
+		err = errors.Wrap(err, "start staking failed")
+		switch {
+		case errors.Is(err, economy.ErrStakingAlreadyEnabled):
+			return *server.Conflict(err, stakingAlradyEnabled)
+		case errors.Is(err, economy.ErrNotFound):
+			return *server.NotFound(err, userNotFound)
+		}
 
-	return server.OK(req)
+		return server.Unexpected(err)
+	}
+
+	return server.OK()
 }
 
 func newRequestStartStaking() server.ParsedRequest {

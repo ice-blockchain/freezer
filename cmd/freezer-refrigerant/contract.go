@@ -21,9 +21,10 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey = "cmd/freezer-refrigerant"
-	miningInProgress   = "MINING_IN_PROGRESS"
-	userNotFound       = "USER_NOT_FOUND"
+	applicationYamlKey   = "cmd/freezer-refrigerant"
+	miningInProgress     = "MINING_IN_PROGRESS"
+	userNotFound         = "USER_NOT_FOUND"
+	stakingAlradyEnabled = "STAKING_ALREADY_ENABLED"
 )
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.

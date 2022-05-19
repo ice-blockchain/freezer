@@ -52,7 +52,11 @@ economy:
     consumingTopics:
       - users-events
     topics:
-      - name: economy-events
+      - name: economy-mining
+        partitions: 10
+        replicationFactor: 1
+        retention: 1000h
+      - name: economy-staking
         partitions: 10
         replicationFactor: 1
         retention: 1000h

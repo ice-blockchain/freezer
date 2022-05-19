@@ -18,8 +18,9 @@ import (
 // Public API.
 
 var (
-	ErrNotFound         = storage.ErrNotFound
-	ErrMiningInProgress = errors.New("mining in progress")
+	ErrNotFound              = storage.ErrNotFound
+	ErrMiningInProgress      = errors.New("mining in progress")
+	ErrStakingAlreadyEnabled = errors.New("staking already enabled")
 )
 
 type (
@@ -70,6 +71,7 @@ type (
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {
 		StartMining(context.Context, UserID) error
+		StartStaking(context.Context, UserID, Staking) error
 	}
 )
 
@@ -114,6 +116,22 @@ type (
 		CurrentTotalUsers   uint64
 	}
 
+	userEconomy struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack            struct{} `msgpack:",asArray"`
+		UserID              UserID
+		Username            string
+		ProfilePictureURL   string
+		Balance             float64
+		StakingPercentage   float64
+		HashCode            uint64
+		LastMiningStartedAt uint64
+		StakingYears        uint64
+		CreatedAt           uint64
+		UpdatedAt           uint64
+		BalanceUpdatedAt    uint64
+	}
+
 	// | userEconomyLastMining is the internal structure for deserialization from the DB.
 	userEconomyLastMining struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
@@ -121,9 +139,22 @@ type (
 		LastMiningStartedAt uint64
 	}
 
+	// | stakingAlreadyEnabled is the internal structure for deserialization from the DB.
+	stakingAlreadyEnabled struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		Value    bool
+	}
+
 	// | miningStarted is internal structure to hold notification message.
 	miningStarted struct {
 		TS time.Time `json:"ts"`
+	}
+
+	// | stakingEnabled is internal structure to hold notification message.
+	stakingEnabled struct {
+		TS time.Time `json:"ts"`
+		Staking
 	}
 
 	// | repository implements the public API that this package exposes.

@@ -138,13 +138,13 @@ func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
 	key := tarantool.StringKey{S: ue.UserID}
 
 	//nolint:gomnd // Those are not magic numbers, those are the indexes of the fields.
-	incrementOps := []tarantool.Op{
-		{Op: "=", Field: 1, Arg: ue.ProfilePictureURL},
-		{Op: "=", Field: 2, Arg: ue.Username},
-		{Op: "=", Field: 8, Arg: nowT},
+	ops := []tarantool.Op{
+		{Op: "=", Field: 1, Arg: ue.Username},
+		{Op: "=", Field: 2, Arg: ue.ProfilePictureURL},
+		{Op: "=", Field: 9, Arg: nowT},
 	}
 
-	return errors.Wrapf(s.db.UpdateTyped(space, index, key, incrementOps, &[]*userEconomy{}),
+	return errors.Wrapf(s.db.UpdateTyped(space, index, key, ops, &[]*userEconomy{}),
 		"failed to update user economy record for user.ID:%v", ue.UserID)
 }
 
