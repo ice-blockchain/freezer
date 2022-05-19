@@ -73,6 +73,17 @@ type (
 		StartMining(context.Context, UserID) error
 		StartStaking(context.Context, UserID, Staking) error
 	}
+
+	// | MiningStarted is structure to hold notification message.
+	MiningStarted struct {
+		TS time.Time `json:"ts"`
+	}
+
+	// | StakingEnabled is structure to hold notification message sent to message broker.
+	StakingEnabled struct {
+		TS time.Time `json:"ts"`
+		Staking
+	}
 )
 
 const (
@@ -144,17 +155,6 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		Value    bool
-	}
-
-	// | MiningStarted is structure to hold notification message.
-	MiningStarted struct {
-		TS time.Time `json:"ts"`
-	}
-
-	// | StakingEnabled is structure to hold notification message sent to message broker.
-	StakingEnabled struct {
-		TS time.Time `json:"ts"`
-		Staking
 	}
 
 	// | repository implements the public API that this package exposes.
