@@ -40,7 +40,7 @@ func (e *economy) StartMining(ctx context.Context, userID UserID) error {
 }
 
 func (e *economy) notifyStartMining(ctx context.Context, userID UserID, startedAt time.Time) error {
-	m := miningStarted{
+	m := MiningStarted{
 		TS: startedAt,
 	}
 

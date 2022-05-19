@@ -75,7 +75,7 @@ func (e *economy) enableStaking(userID string, staking Staking, updatedAt time.T
 }
 
 func (e *economy) notifyStartStaking(ctx context.Context, userID UserID, staking Staking, startedAt time.Time) error {
-	m := stakingEnabled{
+	m := StakingEnabled{
 		TS:      startedAt,
 		Staking: staking,
 	}
