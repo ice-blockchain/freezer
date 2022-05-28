@@ -48,7 +48,11 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     user_id STRING primary key,
                     username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
-                    balance STRING NOT NULL,
+                    balance STRING NOT NULL DEFAULT '0',
+                    balance_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w3 UNSIGNED NOT NULL DEFAULT 0,
                     hash_code UNSIGNED NOT NULL UNIQUE,
                     last_mining_started_at UNSIGNED,
                     created_at UNSIGNED NOT NULL,
@@ -58,10 +62,15 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
 -- balance is in ice flakes
 -- if staking is enabled for the user, and the percentage is 100%, user_economy.balance is gonna always be 0.
 box.execute([[CREATE INDEX IF NOT EXISTS user_economy_last_mining_started_at_ix ON user_economy (last_mining_started_at);]])
+box.execute([[CREATE INDEX IF NOT EXISTS user_economy_balance_words_ix ON user_economy (balance_w3, balance_w2, balance_w1, balance_w0);]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS staking  (
                     user_id STRING primary key REFERENCES user_economy(user_id) ON DELETE CASCADE,
-                    balance STRING NOT NULL,
+                    balance STRING NOT NULL DEFAULT '0',
+                    balance_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    balance_w3 UNSIGNED NOT NULL DEFAULT 0,
                     percentage UNSIGNED NOT NULL,
                     years UNSIGNED NOT NULL,
                     created_at UNSIGNED NOT NULL,
@@ -69,6 +78,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS staking  (
                     balance_updated_at UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 -- When staking happens, you move staking.percentage*user_economy.balance/100 to staking.balance, for that user_id
+box.execute([[CREATE INDEX IF NOT EXISTS staking_balance_words_ix ON staking (balance_w3, balance_w2, balance_w1, balance_w0);]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS staking_bonus  (
                     years UNSIGNED primary key,
@@ -86,36 +96,60 @@ box.execute([[INSERT INTO staking_bonus (years, percentage)
 box.execute([[CREATE TABLE IF NOT EXISTS t0_referral_earnings  (
                     user_id STRING NOT NULL REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     referral_user_id STRING NOT NULL,
-                    earnings STRING NOT NULL DEFAULT '0',
-                    staked_earnings STRING NOT NULL DEFAULT '0',
+                    amount STRING NOT NULL DEFAULT '0',
+                    amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w3 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount STRING NOT NULL DEFAULT '0',
+                    staked_amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w3 UNSIGNED NOT NULL DEFAULT 0,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL,
                     primary key(user_id, referral_user_id)
                     ) WITH ENGINE = 'vinyl';]])
--- earnings are in ice flakes
+-- amount is in ice flakes
 -- t0 is the user that referred/invited the user to the app, so T0 -invited> user_id -invited> T1 -invited> T2
 
 box.execute([[CREATE TABLE IF NOT EXISTS t1_referral_earnings  (
                     user_id STRING NOT NULL REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     referral_user_id STRING NOT NULL,
-                    earnings STRING NOT NULL DEFAULT '0',
-                    staked_earnings STRING NOT NULL DEFAULT '0',
+                    amount STRING NOT NULL DEFAULT '0',
+                    amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w3 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount STRING NOT NULL DEFAULT '0',
+                    staked_amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w3 UNSIGNED NOT NULL DEFAULT 0,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL,
                     primary key(user_id, referral_user_id)
                     ) WITH ENGINE = 'vinyl';]])
--- earnings are in ice flakes
+-- amount is in ice flakes
 
 box.execute([[CREATE TABLE IF NOT EXISTS t2_referral_earnings  (
                     user_id STRING NOT NULL REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     referral_user_id STRING NOT NULL,
-                    earnings STRING NOT NULL DEFAULT '0',
-                    staked_earnings STRING NOT NULL DEFAULT '0',
+                    amount STRING NOT NULL DEFAULT '0',
+                    amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    amount_w3 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount STRING NOT NULL DEFAULT '0',
+                    staked_amount_w0 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w1 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w2 UNSIGNED NOT NULL DEFAULT 0,
+                    staked_amount_w3 UNSIGNED NOT NULL DEFAULT 0,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL,
                     primary key(user_id, referral_user_id)
                     ) WITH ENGINE = 'vinyl';]])
--- earnings are in ice flakes
+-- amount is in ice flakes
 
 -- BALANCE calculation (for user_id = '1'):
 -- t0Referrals = select count(1) from t0_referral_earnings t0 join user_economy u on t0.referral_user_id = u.user_id where t0.user_id = '1' and u.last_mining_started_at < 24h ago
@@ -134,10 +168,34 @@ box.execute([[CREATE TABLE IF NOT EXISTS t2_referral_earnings  (
 -- staking.balance += stakedHourlyMiningRate * elapsedNanoseconds / 3600000000000
 
 -- Referral EARNINGS
--- t0_referral_earnings.earnings += t0Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 1440000000000000
--- t1_referral_earnings.earnings += t1Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 1440000000000000
--- t2_referral_earnings.earnings += t2Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 7200000000000000
+-- t0_referral_earnings.amount += t0Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 1440000000000000
+-- t1_referral_earnings.amount += t1Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 1440000000000000
+-- t2_referral_earnings.amount += t2Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 7200000000000000
 -- staked
--- t0_referral_earnings.staked_earnings += t0Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 144000000000000000
--- t1_referral_earnings.staked_earnings += t1Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 144000000000000000
--- t2_referral_earnings.staked_earnings += t2Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 720000000000000000
+-- t0_referral_earnings.staked_amount += t0Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 144000000000000000
+-- t1_referral_earnings.staked_amount += t1Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 144000000000000000
+-- t2_referral_earnings.staked_amount += t2Referrals * stakingPercentageBonus * stakingPercentageAllocation * baseHourlyMiningRate * elapsedNanoseconds / 720000000000000000
+
+-- Balance related SQL example
+--SELECT ...
+--FROM ... x1
+--WHERE   ...
+---------- ‼️This is how you compare balances. I.E. In this case we look for balances that are >= than a specific one provided as an arg (via its words)‼️
+--        AND (CASE
+--                WHEN x1.balance_w3 == :balance_w3
+--                    THEN (CASE
+--                             WHEN x1.balance_w2 == :balance_w2
+--                                 THEN (CASE
+--                                          WHEN x1.balance_w1 == :balance_w1
+--                                              THEN (x1.balance_w0 >= :balance_w0)
+--                                          ELSE x1.balance_w1 > :balance_w1
+--                                       END)
+--                             ELSE x1.balance_w2 > :balance_w2
+--                          END)
+--                ELSE x1.balance_w3 > :balance_w3
+--             END)
+-- ‼️This is how you sort balances‼️
+--ORDER BY x1.balance_w3 DESC,
+--         x1.balance_w2 DESC,
+--         x1.balance_w1 DESC,
+--         x1.balance_w0 DESC;
