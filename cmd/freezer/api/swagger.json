@@ -14,6 +14,98 @@
     },
     "basePath": "/v1",
     "paths": {
+        "/economy/estimated-earnings": {
+            "get": {
+                "description": "Returns estimated earnings based on the provided parameters.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "if the user that referred you should be active or not",
+                        "name": "t0",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of t1 active referrals you desire",
+                        "name": "t1",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of t2 active referrals you desire",
+                        "name": "t2",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of years you want to enable staking for",
+                        "name": "stakingYears",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the percentage [0..100] of your balance you want to stake",
+                        "name": "stakingAllocation",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/economy.EstimatedEarnings"
+                        }
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/economy/top-miners": {
             "get": {
                 "description": "Returns the paginated leaderboard with top miners.",
@@ -177,6 +269,19 @@
                 "total": {
                     "type": "number",
                     "example": 232.5
+                }
+            }
+        },
+        "economy.EstimatedEarnings": {
+            "type": "object",
+            "properties": {
+                "stakingHourlyMiningRate": {
+                    "type": "string",
+                    "example": "12.123456789"
+                },
+                "standardHourlyMiningRate": {
+                    "type": "string",
+                    "example": "12.123456789"
                 }
             }
         },

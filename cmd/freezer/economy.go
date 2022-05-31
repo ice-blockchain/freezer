@@ -4,10 +4,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/economy"
 	"github.com/ice-blockchain/wintr/server"
@@ -17,7 +17,8 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 	router.
 		Group("/v1").
 		GET("/economy/user-economy/:userId", server.RootHandler(newRequestGetUserEconomy, s.GetUserEconomy)).
-		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners))
+		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners)).
+		GET("/economy/estimated-earnings", server.RootHandler(newRequestGetEstimatedEarnings, s.GetEstimatedEarnings))
 }
 
 // GetUserEconomy godoc
@@ -29,12 +30,12 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
-// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
-// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      400                {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401                {object}  server.ErrorResponse  "if not authorized"
 // @Failure      404            {object}  server.ErrorResponse  "if not found"
-// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
-// @Failure      500            {object}  server.ErrorResponse
-// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Failure      422                {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500                {object}  server.ErrorResponse
+// @Failure      504                {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/user-economy/{userId} [GET].
 func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestGetUserEconomy)
@@ -81,7 +82,7 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        limit          query     uint64  false  "max number of elements to return"
 // @Param        offset         query     uint64  false  "number of elements to skip before starting to fetch data"
 // @Success      200            {array}   economy.TopMiner
@@ -130,6 +131,61 @@ func (req *RequestGetTopMiners) Validate() *server.Response {
 
 func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{}) error {
 	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
+}
+
+// GetEstimatedEarnings godoc
+// @Schemes
+// @Description  Returns estimated earnings based on the provided parameters.
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        t0                 query     bool    false  "if the user that referred you should be active or not"
+// @Param        t1                 query     uint64  false  "number of t1 active referrals you desire"
+// @Param        t2                 query     uint64  false  "number of t2 active referrals you desire"
+// @Param        stakingYears       query     uint8   false  "number of years you want to enable staking for"
+// @Param        stakingAllocation  query     uint8   false  "the percentage [0..100] of your balance you want to stake"
+// @Success      200                {object}  economy.EstimatedEarnings
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/estimated-earnings [GET].
+func (s *service) GetEstimatedEarnings(ctx context.Context, r server.ParsedRequest) server.Response {
+	resp, err := s.economyRepository.GetEstimatedEarnings(ctx, &r.(*RequestGetEstimatedEarnings).GetEstimatedEarningsArg)
+	if err != nil {
+		return server.Unexpected(errors.Wrapf(err, "failed to get estimated earnings for userID:%v", r.(*RequestGetEstimatedEarnings).AuthenticatedUser.ID))
+	}
+
+	return server.OK(resp)
+}
+
+func newRequestGetEstimatedEarnings() server.ParsedRequest {
+	return new(RequestGetEstimatedEarnings)
+}
+
+func (req *RequestGetEstimatedEarnings) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestGetEstimatedEarnings) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestGetEstimatedEarnings) Validate() *server.Response {
+	//nolint:gomnd // Not a magic number, its 100%.
+	if req.StakingAllocation > 100 {
+		return server.BadRequest(errors.Errorf("staking allocation has to be within [0,100], %v is invalid", req.StakingAllocation), "MISSING_PROPERTIES")
+	}
+
+	return nil
+}
+
+func (req *RequestGetEstimatedEarnings) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{c.ShouldBindQuery, server.ShouldBindAuthenticatedUser(c)}
 }
 
 func userNotFound(err error) server.Response {

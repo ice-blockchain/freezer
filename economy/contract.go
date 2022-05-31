@@ -11,6 +11,7 @@ import (
 	"github.com/framey-io/go-tarantool"
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
 )
@@ -36,6 +37,10 @@ type (
 		HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
 		GlobalRank          uint64                              `json:"globalRank" example:"1000"`
 	}
+	EstimatedEarnings struct {
+		StandardHourlyMiningRate *coin.ICEFlake `json:"standardHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
+		StakingHourlyMiningRate  *coin.ICEFlake `json:"stakingHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
+	}
 	Staking struct {
 		Years      uint64  `json:"years" example:"1"`
 		Percentage float64 `json:"percentage" example:"25.0"`
@@ -47,6 +52,13 @@ type (
 	ReferralBalance struct {
 		T1 float64 `json:"t1" example:"232.5"`
 		T2 float64 `json:"t2" example:"232.5"`
+	}
+	GetEstimatedEarningsArg struct {
+		T1ActiveReferrals uint64 `form:"t1" example:"20"`
+		T2ActiveReferrals uint64 `form:"t2" example:"20"`
+		T0ActiveReferee   bool   `form:"t0" example:"true"`
+		StakingYears      uint8  `form:"stakingYears" example:"1"`
+		StakingAllocation uint8  `form:"stakingAllocation" example:"100"`
 	}
 	TopMiner struct {
 		UserID            string  `json:"userId" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
@@ -67,6 +79,7 @@ type (
 	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
 		GetTopMiners(context.Context, uint64, uint64) ([]*TopMiner, error)
+		GetEstimatedEarnings(context.Context, *GetEstimatedEarningsArg) (*EstimatedEarnings, error)
 	}
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {

@@ -19,6 +19,10 @@ type (
 		Limit             uint64                   `form:"limit" example:"20"`
 		Offset            uint64                   `form:"offset" example:"0"`
 	}
+	RequestGetEstimatedEarnings struct {
+		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
+		economy.GetEstimatedEarningsArg
+	}
 )
 
 // Private API.

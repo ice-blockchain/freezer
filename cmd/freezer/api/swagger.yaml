@@ -10,6 +10,15 @@ definitions:
         example: 232.5
         type: number
     type: object
+  economy.EstimatedEarnings:
+    properties:
+      stakingHourlyMiningRate:
+        example: "12.123456789"
+        type: string
+      standardHourlyMiningRate:
+        example: "12.123456789"
+        type: string
+    type: object
   economy.ReferralBalance:
     properties:
       t1:
@@ -84,6 +93,67 @@ info:
   title: Economy API
   version: latest
 paths:
+  /economy/estimated-earnings:
+    get:
+      consumes:
+      - application/json
+      description: Returns estimated earnings based on the provided parameters.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: if the user that referred you should be active or not
+        in: query
+        name: t0
+        type: boolean
+      - description: number of t1 active referrals you desire
+        in: query
+        name: t1
+        type: integer
+      - description: number of t2 active referrals you desire
+        in: query
+        name: t2
+        type: integer
+      - description: number of years you want to enable staking for
+        in: query
+        name: stakingYears
+        type: integer
+      - description: the percentage [0..100] of your balance you want to stake
+        in: query
+        name: stakingAllocation
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/economy.EstimatedEarnings'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
   /economy/top-miners:
     get:
       consumes:
