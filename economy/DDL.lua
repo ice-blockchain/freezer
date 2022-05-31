@@ -55,6 +55,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
 -- balance is in ice flakes
 -- if staking is enabled for the user, and the percentage is 100%, balances.amount{type=standard} is gonna always be 0.
 box.execute([[CREATE INDEX IF NOT EXISTS user_economy_last_mining_started_at_ix ON user_economy (last_mining_started_at);]])
+box.execute([[CREATE INDEX IF NOT EXISTS user_economy_username_ix ON user_economy (username);]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS staking  (
                     user_id STRING primary key REFERENCES user_economy(user_id) ON DELETE CASCADE,

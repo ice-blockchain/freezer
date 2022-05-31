@@ -197,6 +197,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "a keyword to look for",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "max number of elements to return",
                         "name": "limit",
@@ -502,8 +508,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "balance": {
-                    "type": "number",
-                    "example": 232.5
+                    "type": "string",
+                    "example": "12.123456789"
                 },
                 "profilePictureURL": {
                     "type": "string",

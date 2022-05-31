@@ -74,8 +74,8 @@ definitions:
   economy.TopMiner:
     properties:
       balance:
-        example: 232.5
-        type: number
+        example: "12.123456789"
+        type: string
       profilePictureURL:
         example: https://somecdn.com/p1.jpg
         type: string
@@ -258,6 +258,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: a keyword to look for
+        in: query
+        name: keyword
         type: string
       - description: max number of elements to return
         in: query

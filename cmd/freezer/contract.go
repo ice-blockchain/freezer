@@ -16,8 +16,7 @@ type (
 	}
 	RequestGetTopMiners struct {
 		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
-		Limit             uint64                   `form:"limit" example:"20"`
-		Offset            uint64                   `form:"offset" example:"0"`
+		economy.GetTopMinersArg
 	}
 	RequestGetEstimatedEarnings struct {
 		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`

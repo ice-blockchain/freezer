@@ -61,10 +61,10 @@ type (
 		StakingAllocation uint8  `form:"stakingAllocation" example:"100"`
 	}
 	TopMiner struct {
-		UserID            string  `json:"userId" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Username          string  `json:"username" example:"jdoe"`
-		ProfilePictureURL string  `json:"profilePictureURL" example:"https://somecdn.com/p1.jpg"`
-		Balance           float64 `json:"balance" example:"232.5"`
+		Balance           *coin.ICEFlake `json:"balance" swaggertype:"string" example:"12.123456789"`
+		UserID            string         `json:"userId" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Username          string         `json:"username" example:"jdoe"`
+		ProfilePictureURL string         `json:"profilePictureURL" example:"https://somecdn.com/p1.jpg"`
 	}
 	AdoptionMilestone struct {
 		HourlyMiningRate *coin.ICEFlake `json:"hourlyMiningRate" swaggertype:"string" example:"12.123456789"`
@@ -89,7 +89,12 @@ type (
 		UserGrowth []*DailyUserGrowth `json:"userGrowth"`
 		Users      UserCounter        `json:"users"`
 	}
-	Days       = uint16
+	Days            = uint16
+	GetTopMinersArg struct {
+		Keyword string `form:"keyword" example:"ab"`
+		Limit   uint64 `form:"limit" example:"20"`
+		Offset  uint64 `form:"offset" example:"0"`
+	}
 	Repository interface {
 		io.Closer
 		ReadRepository
@@ -102,7 +107,7 @@ type (
 	// ReadRepository manages the database operations related to `users_economy`.
 	ReadRepository interface {
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
-		GetTopMiners(context.Context, uint64, uint64) ([]*TopMiner, error)
+		GetTopMiners(context.Context, *GetTopMinersArg) ([]*TopMiner, error)
 		GetEstimatedEarnings(context.Context, *GetEstimatedEarningsArg) (*EstimatedEarnings, error)
 		GetAdoption(context.Context) (*Adoption, error)
 		GetUserStats(context.Context, Days) (*UserStats, error)

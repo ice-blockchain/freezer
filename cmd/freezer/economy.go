@@ -29,7 +29,7 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
 // @Failure      400                {object}  server.ErrorResponse  "if validations fail"
@@ -84,7 +84,8 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        keyword        query     string  false  "a keyword to look for"
 // @Param        limit          query     uint64  false  "max number of elements to return"
 // @Param        offset         query     uint64  false  "number of elements to skip before starting to fetch data"
 // @Success      200            {array}   economy.TopMiner
@@ -95,14 +96,12 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Failure      504            {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/top-miners [GET].
 func (s *service) GetTopMiners(ctx context.Context, r server.ParsedRequest) server.Response {
-	req := r.(*RequestGetTopMiners)
-
-	repoTopMiners, err := s.economyRepository.GetTopMiners(ctx, req.Limit, req.Offset)
+	resp, err := s.economyRepository.GetTopMiners(ctx, &r.(*RequestGetTopMiners).GetTopMinersArg)
 	if err != nil {
 		return server.Unexpected(err)
 	}
 
-	return server.OK(repoTopMiners)
+	return server.OK(resp)
 }
 
 func newRequestGetTopMiners() server.ParsedRequest {
