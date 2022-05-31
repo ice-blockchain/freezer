@@ -23,11 +23,22 @@ type (
 		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
 		economy.GetEstimatedEarningsArg
 	}
+	RequestGetAdoption struct {
+		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
+	}
+	RequestGetUserStats struct {
+		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
+		// Default is `7`.
+		LastNoOfDays uint16 `form:"lastNoOfDays" example:"7"`
+	}
 )
 
 // Private API.
 
-const applicationYamlKey = "cmd/freezer"
+const (
+	applicationYamlKey  = "cmd/freezer"
+	defaultLastNoOfDays = 7
+)
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.
 var cfg config

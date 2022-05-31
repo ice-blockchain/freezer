@@ -2,6 +2,26 @@
 
 basePath: /v1
 definitions:
+  economy.Adoption:
+    properties:
+      adoption:
+        items:
+          $ref: '#/definitions/economy.AdoptionMilestone'
+        type: array
+      users:
+        $ref: '#/definitions/economy.UserCounter'
+    type: object
+  economy.AdoptionMilestone:
+    properties:
+      achieved:
+        example: true
+        type: boolean
+      hourlyMiningRate:
+        example: "12.123456789"
+        type: string
+      users:
+        $ref: '#/definitions/economy.UserCounter'
+    type: object
   economy.Balance:
     properties:
       referrals:
@@ -9,6 +29,20 @@ definitions:
       total:
         example: 232.5
         type: number
+    type: object
+  economy.DailyUserGrowth:
+    properties:
+      day:
+        example: 31
+        type: integer
+      month:
+        example: 12
+        type: integer
+      users:
+        $ref: '#/definitions/economy.UserCounter'
+      year:
+        example: 2022
+        type: integer
     type: object
   economy.EstimatedEarnings:
     properties:
@@ -52,6 +86,15 @@ definitions:
         example: jdoe
         type: string
     type: object
+  economy.UserCounter:
+    properties:
+      active:
+        example: 1000000000
+        type: integer
+      total:
+        example: 1000000000
+        type: integer
+    type: object
   economy.UserEconomy:
     properties:
       adoption:
@@ -75,6 +118,15 @@ definitions:
       staking:
         $ref: '#/definitions/economy.Staking'
     type: object
+  economy.UserStats:
+    properties:
+      userGrowth:
+        items:
+          $ref: '#/definitions/economy.DailyUserGrowth'
+        type: array
+      users:
+        $ref: '#/definitions/economy.UserCounter'
+    type: object
   server.ErrorResponse:
     properties:
       code:
@@ -93,6 +145,47 @@ info:
   title: Economy API
   version: latest
 paths:
+  /economy/adoption:
+    get:
+      consumes:
+      - application/json
+      description: Returns the current adoption information.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/economy.Adoption'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
   /economy/estimated-earnings:
     get:
       consumes:
@@ -239,6 +332,51 @@ paths:
             $ref: '#/definitions/server.ErrorResponse'
         "404":
           description: if not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Economy
+  /economy/user-stats:
+    get:
+      consumes:
+      - application/json
+      description: Returns statistics about the user population.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: number of days in the past to look for. Defaults to 7.
+        in: query
+        name: lastNoOfDays
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/economy.UserStats'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "422":

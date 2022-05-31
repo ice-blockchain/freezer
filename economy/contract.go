@@ -66,6 +66,30 @@ type (
 		ProfilePictureURL string  `json:"profilePictureURL" example:"https://somecdn.com/p1.jpg"`
 		Balance           float64 `json:"balance" example:"232.5"`
 	}
+	AdoptionMilestone struct {
+		HourlyMiningRate *coin.ICEFlake `json:"hourlyMiningRate" swaggertype:"string" example:"12.123456789"`
+		Users            UserCounter    `json:"users"`
+		Achieved         bool           `json:"achieved" example:"true"`
+	}
+	UserCounter struct {
+		Total  uint64 `json:"total,omitempty" example:"1000000000"`
+		Active uint64 `json:"active,omitempty" example:"1000000000"`
+	}
+	Adoption struct {
+		Adoption []*AdoptionMilestone `json:"adoption"`
+		Users    UserCounter          `json:"users"`
+	}
+	DailyUserGrowth struct {
+		Year  int         `json:"year" example:"2022"`
+		Month int         `json:"month" example:"12"`
+		Day   int         `json:"day" example:"31"`
+		Users UserCounter `json:"users"`
+	}
+	UserStats struct {
+		UserGrowth []*DailyUserGrowth `json:"userGrowth"`
+		Users      UserCounter        `json:"users"`
+	}
+	Days       = uint16
 	Repository interface {
 		io.Closer
 		ReadRepository
@@ -80,6 +104,8 @@ type (
 		GetUserEconomy(context.Context, string, bool) (*UserEconomy, error)
 		GetTopMiners(context.Context, uint64, uint64) ([]*TopMiner, error)
 		GetEstimatedEarnings(context.Context, *GetEstimatedEarningsArg) (*EstimatedEarnings, error)
+		GetAdoption(context.Context) (*Adoption, error)
+		GetUserStats(context.Context, Days) (*UserStats, error)
 	}
 	// WriteRepository manage the database operations related to `user_economy`.
 	WriteRepository interface {

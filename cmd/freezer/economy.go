@@ -18,7 +18,9 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 		Group("/v1").
 		GET("/economy/user-economy/:userId", server.RootHandler(newRequestGetUserEconomy, s.GetUserEconomy)).
 		GET("/economy/top-miners", server.RootHandler(newRequestGetTopMiners, s.GetTopMiners)).
-		GET("/economy/estimated-earnings", server.RootHandler(newRequestGetEstimatedEarnings, s.GetEstimatedEarnings))
+		GET("/economy/estimated-earnings", server.RootHandler(newRequestGetEstimatedEarnings, s.GetEstimatedEarnings)).
+		GET("/economy/adoption", server.RootHandler(newRequestGetAdoption, s.GetAdoption)).
+		GET("/economy/user-stats", server.RootHandler(newRequestGetUserStats, s.GetUserStats))
 }
 
 // GetUserEconomy godoc
@@ -139,7 +141,7 @@ func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{})
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        t0                 query     bool    false  "if the user that referred you should be active or not"
 // @Param        t1                 query     uint64  false  "number of t1 active referrals you desire"
 // @Param        t2                 query     uint64  false  "number of t2 active referrals you desire"
@@ -185,6 +187,101 @@ func (req *RequestGetEstimatedEarnings) Validate() *server.Response {
 }
 
 func (req *RequestGetEstimatedEarnings) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{c.ShouldBindQuery, server.ShouldBindAuthenticatedUser(c)}
+}
+
+// GetAdoption godoc
+// @Schemes
+// @Description  Returns the current adoption information.
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Success      200            {object}  economy.Adoption
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/adoption [GET].
+func (s *service) GetAdoption(ctx context.Context, r server.ParsedRequest) server.Response {
+	resp, err := s.economyRepository.GetAdoption(ctx)
+	if err != nil {
+		return server.Unexpected(errors.Wrapf(err, "failed to get current adoption for userID:%v", r.(*RequestGetAdoption).AuthenticatedUser.ID))
+	}
+
+	return server.OK(resp)
+}
+
+func newRequestGetAdoption() server.ParsedRequest {
+	return new(RequestGetAdoption)
+}
+
+func (req *RequestGetAdoption) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestGetAdoption) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestGetAdoption) Validate() *server.Response {
+	return nil
+}
+
+func (req *RequestGetAdoption) Bindings(c *gin.Context) []func(obj interface{}) error {
+	return []func(obj interface{}) error{server.ShouldBindAuthenticatedUser(c)}
+}
+
+// GetUserStats godoc
+// @Schemes
+// @Description  Returns statistics about the user population.
+// @Tags         Economy
+// @Accept       json
+// @Produce      json
+// @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        lastNoOfDays   query     uint16  false  "number of days in the past to look for. Defaults to 7."
+// @Success      200            {object}  economy.UserStats
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Router       /economy/user-stats [GET].
+func (s *service) GetUserStats(ctx context.Context, r server.ParsedRequest) server.Response {
+	resp, err := s.economyRepository.GetUserStats(ctx, r.(*RequestGetUserStats).LastNoOfDays)
+	if err != nil {
+		return server.Unexpected(errors.Wrapf(err, "failed to get user stats for userID:%v", r.(*RequestGetUserStats).AuthenticatedUser.ID))
+	}
+
+	return server.OK(resp)
+}
+
+func newRequestGetUserStats() server.ParsedRequest {
+	return new(RequestGetUserStats)
+}
+
+func (req *RequestGetUserStats) SetAuthenticatedUser(user server.AuthenticatedUser) {
+	if req.AuthenticatedUser.ID == "" {
+		req.AuthenticatedUser = user
+	}
+}
+
+func (req *RequestGetUserStats) GetAuthenticatedUser() server.AuthenticatedUser {
+	return req.AuthenticatedUser
+}
+
+func (req *RequestGetUserStats) Validate() *server.Response {
+	if req.LastNoOfDays == 0 {
+		req.LastNoOfDays = defaultLastNoOfDays
+	}
+
+	return nil
+}
+
+func (req *RequestGetUserStats) Bindings(c *gin.Context) []func(obj interface{}) error {
 	return []func(obj interface{}) error{c.ShouldBindQuery, server.ShouldBindAuthenticatedUser(c)}
 }
 

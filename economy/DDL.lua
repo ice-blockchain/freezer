@@ -7,7 +7,6 @@ box.execute([[CREATE TABLE IF NOT EXISTS global  (
 -- (key,value) : ('TOTAL_USERS', 10000) -----> ++ or -- when user registers/deletes account
 -- (key,value) : ('TOTAL_ACTIVE_USERS', 10) -----> you reset this with `select count(1) from user_economy where last_mining_started_at < 24h` and you do that in the same logic you populate adoption_history in
 
--- ##TODO: is this ok here? It can also be in eskimo. Not sure yet.
 box.execute([[CREATE TABLE IF NOT EXISTS total_users_history  (
                     minute_timestamp UNSIGNED primary key,
                     hour_timestamp UNSIGNED NOT NULL CHECK (minute_timestamp >= hour_timestamp*60 and minute_timestamp < (hour_timestamp+1)*60),

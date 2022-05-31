@@ -21,6 +21,68 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/economy/adoption": {
+            "get": {
+                "description": "Returns the current adoption information.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/economy.Adoption"
+                        }
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/economy/estimated-earnings": {
             "get": {
                 "description": "Returns estimated earnings based on the provided parameters.",
@@ -264,9 +326,107 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/economy/user-stats": {
+            "get": {
+                "description": "Returns statistics about the user population.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Economy"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of days in the past to look for. Defaults to 7.",
+                        "name": "lastNoOfDays",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/economy.UserStats"
+                        }
+                    },
+                    "400": {
+                        "description": "if validations fail",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "economy.Adoption": {
+            "type": "object",
+            "properties": {
+                "adoption": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/economy.AdoptionMilestone"
+                    }
+                },
+                "users": {
+                    "$ref": "#/definitions/economy.UserCounter"
+                }
+            }
+        },
+        "economy.AdoptionMilestone": {
+            "type": "object",
+            "properties": {
+                "achieved": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "hourlyMiningRate": {
+                    "type": "string",
+                    "example": "12.123456789"
+                },
+                "users": {
+                    "$ref": "#/definitions/economy.UserCounter"
+                }
+            }
+        },
         "economy.Balance": {
             "type": "object",
             "properties": {
@@ -276,6 +436,26 @@ const docTemplate = `{
                 "total": {
                     "type": "number",
                     "example": 232.5
+                }
+            }
+        },
+        "economy.DailyUserGrowth": {
+            "type": "object",
+            "properties": {
+                "day": {
+                    "type": "integer",
+                    "example": 31
+                },
+                "month": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "users": {
+                    "$ref": "#/definitions/economy.UserCounter"
+                },
+                "year": {
+                    "type": "integer",
+                    "example": 2022
                 }
             }
         },
@@ -339,6 +519,19 @@ const docTemplate = `{
                 }
             }
         },
+        "economy.UserCounter": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "example": 1000000000
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 1000000000
+                }
+            }
+        },
         "economy.UserEconomy": {
             "type": "object",
             "properties": {
@@ -369,6 +562,20 @@ const docTemplate = `{
                 },
                 "staking": {
                     "$ref": "#/definitions/economy.Staking"
+                }
+            }
+        },
+        "economy.UserStats": {
+            "type": "object",
+            "properties": {
+                "userGrowth": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/economy.DailyUserGrowth"
+                    }
+                },
+                "users": {
+                    "$ref": "#/definitions/economy.UserCounter"
                 }
             }
         },
