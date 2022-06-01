@@ -15,7 +15,6 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 		return nil, errors.Wrap(ctx.Err(), "get top miners failed because context failed")
 	}
 
-	// TODO we need to know if we need only type = 'standard' or we need type = 'staking' as well.
 	sql := fmt.Sprintf(`
 		SELECT  u.user_id,
 				u.username, 
@@ -25,7 +24,7 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 				JOIN USER_ECONOMY u
 					on lower(u.username) LIKE :keyword ESCAPE '\'
 					on b.user_id = u.user_id
-					and lower(b.type) = 'standard'
+					and lower(b.type) = 'total'
 		ORDER BY b.amount_w3 DESC,
 				 b.amount_w2 DESC,
 				 b.amount_w1 DESC,

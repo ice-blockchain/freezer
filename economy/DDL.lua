@@ -72,6 +72,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS balances (
                         CHECK (
                             lower(type) == 'standard' or
                             lower(type) == 'staking' or
+                            lower(type) == 'total' or
                             lower(type) == 't0_referral_standard_earnings' or
                             POSITION('t0_referral_standard_earnings~', lower(type)) != 0  or
                             lower(type) == 't0_referral_staking_earnings' or
@@ -124,6 +125,8 @@ box.execute([[INSERT INTO staking_bonus (years, percentage)
 
 -- stakedHourlyMiningRate = stakingPercentageBonus * hourlyMiningRate * stakingPercentageAllocation / 10000
 -- balances{type=staking}.amount += stakedHourlyMiningRate * elapsedNanoseconds / 3600000000000
+
+-- balances{type=total}.amount = balances{type=standard}.amount + balances{type=staking}.amount
 
 -- Referral EARNINGS
 -- balances{type=t0_referral_standard_earnings~{userId}}.amount += t0Referrals * (100-stakingPercentageAllocation) * baseHourlyMiningRate * elapsedNanoseconds / 1440000000000000
