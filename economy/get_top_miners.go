@@ -42,6 +42,6 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 func (arg *GetTopMinersArg) params() map[string]interface{} {
 	return map[string]interface{}{
 		"offset":         arg.Offset,
-		"hashtagKeyword": fmt.Sprintf("%%%v%%", strings.ReplaceAll(strings.ToLower(arg.Keyword), "_", "\\_")),
+		"keyword": fmt.Sprintf("%%%v%%", strings.ReplaceAll(strings.ToLower(arg.Keyword), "_", "\\_")),
 	}
 }
