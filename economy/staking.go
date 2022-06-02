@@ -43,6 +43,7 @@ func (e *economy) StartStaking(ctx context.Context, userID UserID, staking Staki
 func (e *economy) isStakingEnabled(userID UserID) (bool, error) {
 	params := map[string]interface{}{
 		"userID": userID,
+		"type":   balanceTypeStaking,
 	}
 
 	sql := `SELECT s.years > 0 AND s.percentage > 0 AND b.amount IS NOT NULL
@@ -117,7 +118,6 @@ func (e *economy) updateStaking(userID UserID, s *Staking) error {
 	index := "pk_unnamed_STAKING_1"
 	key := tarantool.StringKey{S: userID}
 
-	//nolint:gomnd // Those are not magic numbers, those are the indexes of the fields.
 	ops := []tarantool.Op{
 		{Op: "=", Field: 1, Arg: time.Now()},
 		{Op: "=", Field: 3, Arg: s.Percentage},
