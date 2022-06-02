@@ -21,7 +21,7 @@ box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_date_ix ON total_us
 box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
                     total_active_users UNSIGNED primary key,
                     base_hourly_mining_rate STRING NOT NULL,
-                    active BOOLEAN NOT NULL UNIQUE DEFAULT false
+                    active BOOLEAN NOT NULL DEFAULT false
                     ) WITH ENGINE = 'vinyl';]])
 box.execute([[INSERT INTO adoption (total_active_users, base_hourly_mining_rate, active)
                           VALUES (0, '16000000000', true),
@@ -48,7 +48,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
                     hash_code UNSIGNED NOT NULL UNIQUE,
-                    last_mining_started_at UNSIGNED,
+                    last_mining_started_at UNSIGNED DEFAULT 0,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])

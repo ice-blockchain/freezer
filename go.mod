@@ -4,7 +4,8 @@ go 1.18
 
 require (
 	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
-	github.com/gin-gonic/gin v1.8.1
+	cosmossdk.io/math v1.0.0-beta.2
+	github.com/gin-gonic/gin v1.8.0
 	github.com/goccy/go-json v0.9.7
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ice-blockchain/wintr v1.12.0
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	cosmossdk.io/math v1.0.0-beta.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
