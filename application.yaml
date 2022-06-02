@@ -28,8 +28,9 @@ cmd/freezer-refrigerant:
     maxLimit: 1000
 economy:
   rates:
-    tier1: 0.25
-    tier2: 0.05
+    tier0: 25
+    tier1: 25
+    tier2: 5
   inactivityHoursDeadline: 24
   db:
     spaces:
@@ -54,6 +55,7 @@ economy:
       - localhost:9094
     consumingTopics:
       - users-events
+      - balances-update
     topics:
       - name: economy-mining
         partitions: 10
@@ -68,3 +70,9 @@ economy:
         partitions: 10
         replicationFactor: 1
         retention: 1000h
+      - name: balances-update
+        partitions: 10
+        partition: 1
+        replicationFactor: 1
+        retention: 1000h
+        cleanupPolicy: compact # TODO: check if it the right key-value.

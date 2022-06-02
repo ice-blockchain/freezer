@@ -48,7 +48,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
                     username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
                     hash_code UNSIGNED NOT NULL UNIQUE,
-                    last_mining_started_at UNSIGNED,
+                    last_mining_started_at UNSIGNED DEFAULT 0,
                     created_at UNSIGNED NOT NULL,
                     updated_at UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])

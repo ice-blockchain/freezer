@@ -6,7 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"io"
-	"time"
+	tm "time"
 
 	"github.com/framey-io/go-tarantool"
 	"github.com/pkg/errors"
@@ -14,6 +14,7 @@ import (
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 // Public API.
@@ -34,24 +35,26 @@ type (
 		Balance             Balance                             `json:"balance"`
 		CurrentTotalUsers   TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
 		Staking             Staking                             `json:"staking"`
-		HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
-		GlobalRank          uint64                              `json:"globalRank" example:"1000"`
+		// HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
+		HourlyMiningRate *coin.ICEFlake `json:"hourlyMiningRate" example:"232"`
+		GlobalRank       uint64         `json:"globalRank" example:"1000"`
 	}
 	EstimatedEarnings struct {
 		StandardHourlyMiningRate *coin.ICEFlake `json:"standardHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
 		StakingHourlyMiningRate  *coin.ICEFlake `json:"stakingHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
 	}
 	Staking struct {
-		Years      uint64  `json:"years" example:"1"`
-		Percentage float64 `json:"percentage" example:"25.0"`
+		Years      uint64 `json:"years" example:"1"`
+		Percentage uint64 `json:"percentage" example:"200"`
 	}
 	Balance struct {
-		Total     float64         `json:"total" example:"232.5"`
+		Total     *coin.ICEFlake  `json:"total" example:"232.5"`
 		Referrals ReferralBalance `json:"referrals"`
 	}
 	ReferralBalance struct {
-		T1 float64 `json:"t1" example:"232.5"`
-		T2 float64 `json:"t2" example:"232.5"`
+		// T0 *coin.ICEFlake `json:"t0" example:"232"`
+		T1 *coin.ICEFlake `json:"t1" example:"232"`
+		T2 *coin.ICEFlake `json:"t2" example:"232"`
 	}
 	GetEstimatedEarningsArg struct {
 		T1ActiveReferrals uint64 `form:"t1" example:"20"`
@@ -118,24 +121,28 @@ type (
 		StartStaking(context.Context, UserID, Staking) error
 	}
 
-	// | MiningStarted is structure to hold notification message.
+	// | MiningStarted is structure to deserialize from the DB and to hold notification message.
 	MiningStarted struct {
-		TS time.Time `json:"ts"`
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack            struct{}   `msgpack:",asArray"`
+		LastMiningStartedAt *time.Time `json:"ts"`
 	}
 
 	// | StakingEnabled is structure to hold notification message sent to message broker.
 	StakingEnabled struct {
-		TS time.Time `json:"ts"`
+		TS *time.Time `json:"ts"`
 		Staking
 	}
 )
 
 const (
-	applicationYamlKey = "economy"
-	base10             = 10
-	bitSize64          = 64
-	miningDuration     = 24 * time.Hour
-	secondsInDay       = 24 * 60 * 60
+	applicationYamlKey  = "economy"
+	balanceTypeStaking  = "staking"
+	balanceTypeStandard = "standard"
+	base10              = 10
+	bitSize64           = 64
+	miningDuration      = 24 * tm.Hour
+	secondsInDay        = 24 * 60 * 60
 )
 
 var (
@@ -151,56 +158,51 @@ type (
 	// !! Order of fields is crucial, so do not change it !!
 	userEconomySummary struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              string
-		Username            string
-		ProfilePictureURL   string
-		Adoptions           string
-		Balance             float64
-		StakingPercentage   float64
-		HashCode            uint64
-		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
-		T1Count             uint64
-		T2Count             uint64
-		GlobalRank          uint64
-		T1EarningsSum       float64
-		T2EarningsSum       float64
-		CurrentTotalUsers   uint64
+		_msgpack                    struct{} `msgpack:",asArray"`
+		LastMiningStartedAt         *time.Time
+		StakingBalanceUpdatedAt     *time.Time
+		Balance                     *coin.ICEFlake
+		StakingBalance              *coin.ICEFlake
+		BaseHourlyMiningRate        *coin.ICEFlake
+		UserID                      string
+		Username                    string
+		ProfilePictureURL           string
+		HashCode                    uint64
+		T0Count                     uint64
+		T1Count                     uint64
+		T2Count                     uint64
+		T0Amount                    string
+		T1Amount                    string
+		T2Amount                    string
+		Adoptions                   string
+		GlobalRank                  uint64
+		StakingPercentageAllocation uint64
+		StakingYears                uint64
+		CurrentTotalUsers           uint64
+		StakingPercentageBonus      uint64
 	}
 
 	userEconomy struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              UserID
-		Username            string
-		ProfilePictureURL   string
-		Balance             float64
-		StakingPercentage   float64
+		_msgpack          struct{} `msgpack:",asArray"`
+		UserID            UserID
+		Username          string
+		ProfilePictureURL string
+		Balance           *coin.ICEFlake
+		// StakingPercentage   float64
 		HashCode            uint64
 		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
+		// StakingYears        uint64
+		CreatedAt        uint64
+		UpdatedAt        uint64
+		BalanceUpdatedAt uint64
 	}
-
 	adoptionMilestone struct {
 		HourlyMiningRate *coin.ICEFlake
 		ActiveUsers      uint64
 		TotalUsers       uint64
 		Active           bool
 	}
-	// | userEconomyLastMining is the internal structure for deserialization from the DB.
-	userEconomyLastMining struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		LastMiningStartedAt uint64
-	}
-
 	// | stakingAlreadyEnabled is the internal structure for deserialization from the DB.
 	stakingAlreadyEnabled struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
@@ -218,6 +220,22 @@ type (
 		Active       uint64
 	}
 
+	// | userBalance is the internal structure for deserialization from the DB.
+	userBalance struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		Balance  *coin.ICEFlake
+	}
+
+	// | staking is the internal structure for deserialization from the DB.
+	staking struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack   struct{} `msgpack:",asArray"`
+		Percentage uint64
+		Years      uint64
+		UpdatedAt  *time.Time
+	}
+
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
@@ -228,6 +246,7 @@ type (
 		close func() error
 		ReadRepository
 		WriteRepository
+		mb messagebroker.Client
 	}
 	economy struct {
 		db tarantool.Connector
@@ -242,8 +261,9 @@ type (
 			} `yaml:"topics"`
 		} `yaml:"messageBroker"`
 		Rates struct {
-			Tier1 float64
-			Tier2 float64
+			Tier0 uint64
+			Tier1 uint64
+			Tier2 uint64
 		} `yaml:"rates"`
 		InactivityHoursDeadline uint64 `yaml:"inactivityHoursDeadline"`
 	}
