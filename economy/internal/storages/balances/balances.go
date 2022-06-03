@@ -127,7 +127,7 @@ func (b *balanceSource) calculate(ue []*userEconomy) {
 
 		// TODO: elapsedNanoseconds should be different for each balance. It is taken from balance struct.
 		// TODO: handle balances. All of them can have different elapsed time, so maybe we need to handle them separately.
-		for t, v := range bc {
+		for t, _ := range bc {
 			if t == "standard" {
 				if err := b.updateBalance(u.UserID, "standard", coin.UnsafeNew(balanceStandard.String())); err != nil {
 					// TODO: handle error.
@@ -270,7 +270,7 @@ func (b *balanceSource) updateBalance(userID UserID, balanceType string, balance
 				   updated_at = :updatedAt
 				WHERE user_id = :userId AND type = :type`
 
-	query, err := p.db.PrepareExecute(sql, params)
+	query, err := b.db.PrepareExecute(sql, params)
 
 	if err = storage.CheckSQLDMLErr(query, err); err != nil {
 		return errors.Wrapf(err, "failed to update balances with userID:%v and type:%v", userID, balanceType)

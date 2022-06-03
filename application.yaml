@@ -20,7 +20,7 @@ cmd/freezer-refrigerant:
   version: local
   defaultEndpointTimeout: 30s
   httpServer:
-    port: 1443
+    port: 2443
     certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
     keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
   defaultPagination:
@@ -43,7 +43,7 @@ economy:
       - STAKING_BONUS
       - BALANCES
     urls:
-      - localhost:3303
+      - localhost:3301
     user: admin
     password: pass
   messageBroker:
@@ -52,7 +52,7 @@ economy:
     consumerGroup: freezer-local
     createTopics: true
     urls:
-      - localhost:9094
+      - localhost:9092
     consumingTopics:
       - users-events
       - balances-update
