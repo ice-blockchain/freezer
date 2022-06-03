@@ -5,6 +5,7 @@ package usereconomy
 import (
 	"context"
 	"fmt"
+	"github.com/ice-blockchain/eskimo/users"
 	"math"
 	"strings"
 
@@ -26,13 +27,13 @@ func (s *userEconomySource) Process(ctx context.Context, m *messagebroker.Messag
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	u := new(userSnapshot)
+	u := new(users.UserSnapshot)
 	if err := json.Unmarshal(m.Value, u); err != nil {
 		return errors.Wrapf(err, "userEconomySource: cannot unmarshall %v into %#v", string(m.Value), u)
 	}
 
-	if !u.User.DeletedAt.IsZero() {
-		if err := s.deleteUserEconomy(u.User); err != nil {
+	if u.User == nil && u.Before != nil {
+		if err := s.deleteUserEconomy(u.Before); err != nil {
 			return errors.Wrapf(err, "unable to call deleteUserEconomy")
 		}
 
@@ -49,7 +50,7 @@ func (s *userEconomySource) Process(ctx context.Context, m *messagebroker.Messag
 	return errors.Wrap(s.createReferralEarnings(u.User), "unable to call createReferralEarnings")
 }
 
-func (s *userEconomySource) deleteUserEconomy(u *user) error {
+func (s *userEconomySource) deleteUserEconomy(u *users.User) error {
 	params := map[string]interface{}{
 		"userId": u.ID,
 	}
@@ -62,8 +63,6 @@ func (s *userEconomySource) deleteUserEconomy(u *user) error {
 
 func (s *userEconomySource) updateTotalUsers(diff int) error {
 	space := s.globalSpace()
-	ix := s.globalSpacePKIndex()
-	key := tarantool.StringKey{S: "TOTAL_USERS"}
 
 	op := "+"
 	if math.Signbit(float64(diff)) {
@@ -74,15 +73,15 @@ func (s *userEconomySource) updateTotalUsers(diff int) error {
 		{Op: op, Field: 1, Arg: diff},
 	}
 
-	return errors.Wrapf(s.db.UpdateTyped(space, ix, key, incrementOps, &[]*totalUsers{}),
+	return errors.Wrapf(s.db.UpsertAsync(space, &totalUsers{Value: 1, Key: "TOTAL_USERS"}, incrementOps).GetTyped(&[]*totalUsers{}),
 		"failed to update %v record the KEY = 'TOTAL_USERS'", space)
 }
 
-func (s *userEconomySource) createOrUpdateUserEconomy(u *user) error {
+func (s *userEconomySource) createOrUpdateUserEconomy(u *users.User) error {
 	ue, err := s.getUserEconomy(u.ID)
 	if err != nil {
 		tErr := new(tarantool.Error)
-		if errors.As(err, tErr) && tErr.Code == tarantool.ER_TUPLE_NOT_FOUND {
+		if errors.Is(err, storage.ErrNotFound) || (errors.As(err, tErr) && tErr.Code == tarantool.ER_TUPLE_NOT_FOUND) {
 			if err = s.updateTotalUsers(1); err != nil {
 				return errors.Wrapf(err, "unable to call updateTotalUsers")
 			}
@@ -103,15 +102,18 @@ func (s *userEconomySource) getUserEconomy(userID UserID) (*userEconomy, error) 
 	index := s.userEconomySpacePKIndex()
 	key := tarantool.StringKey{S: userID}
 
-	var res *userEconomy
+	var res userEconomy
 	if err := s.db.GetTyped(space, index, key, &res); err != nil {
 		return nil, errors.Wrapf(err, "unable to get %q record for userID:%v", space, userID)
 	}
+	if res.UserID == "" {
+		return nil, errors.Wrapf(storage.ErrNotFound, "not found user_economy %v", userID)
+	}
 
-	return res, nil
+	return &res, nil
 }
 
-func (s *userEconomySource) createUserEconomy(u *user) error {
+func (s *userEconomySource) createUserEconomy(u *users.User) error {
 	space := s.userEconomySpace()
 	nowT := time.Now()
 
@@ -145,7 +147,7 @@ func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
 		"failed to update user economy record for user.ID:%v", ue.UserID)
 }
 
-func (s *userEconomySource) createUserEarnings(u *user) error {
+func (s *userEconomySource) createUserEarnings(u *users.User) error {
 	var errs error
 	if err := s.initializeEarnings(u.ID, balanceTypeStandard); err != nil {
 		errs = multierror.Append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStandard, u.ID))
@@ -161,7 +163,7 @@ func (s *userEconomySource) createUserEarnings(u *user) error {
 }
 
 // TODO: check multierrors. Maybe it should be implemented by []error.
-func (s *userEconomySource) createReferralEarnings(u *user) error {
+func (s *userEconomySource) createReferralEarnings(u *users.User) error {
 	var errs error
 	if err := s.initializeReferralEarningsByLevel(u.ID, u.ReferredBy, tierLevel0); err != nil {
 		multierror.Append(errs, errors.Wrapf(err,
@@ -246,11 +248,11 @@ func generateBalanceType(balanceType string, tierLevel uint64) string {
 }
 
 func (s *userEconomySource) balancesSpace() string {
-	return "balances"
+	return "BALANCES"
 }
 
 func (s *userEconomySource) userEconomySpace() string {
-	return "user_economy"
+	return "USER_ECONOMY"
 }
 
 func (s *userEconomySource) userEconomySpacePKIndex() string {
@@ -258,7 +260,7 @@ func (s *userEconomySource) userEconomySpacePKIndex() string {
 }
 
 func (s *userEconomySource) globalSpace() string {
-	return "global"
+	return "GLOBAL"
 }
 
 func (s *userEconomySource) globalSpacePKIndex() string {
