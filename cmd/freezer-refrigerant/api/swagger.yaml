@@ -5,8 +5,8 @@ definitions:
   economy.Staking:
     properties:
       percentage:
-        example: 25
-        type: number
+        example: 200
+        type: integer
       years:
         example: 1
         type: integer

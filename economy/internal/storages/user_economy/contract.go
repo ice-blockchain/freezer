@@ -13,12 +13,12 @@ import (
 
 const (
 	tierLevel0 uint64 = 0
-	tierLevel1        = 1
-	tierLevel2        = 2
+	tierLevel1 uint64 = 1
+	tierLevel2 uint64 = 2
 
 	balanceTypeStandard string = "standard"
-	balanceTypeStaking         = "staking"
-	balanceTypeTotal           = "total"
+	balanceTypeStaking  string = "staking"
+	balanceTypeTotal    string = "total"
 )
 
 type (

@@ -303,10 +303,6 @@ func (s *userEconomySource) userEconomySpacePKIndex() string {
 	return fmt.Sprintf("pk_unnamed_%s_1", strings.ToUpper(s.userEconomySpace()))
 }
 
-func (s *userEconomySource) globalSpacePKIndex() string {
-	return fmt.Sprintf("pk_unnamed_%s_1", strings.ToUpper(s.globalSpace()))
-}
-
 func multiErr(errs []error) error {
 	if len(errs) > 0 {
 		nonNilErrs := make([]error, 0, len(errs))

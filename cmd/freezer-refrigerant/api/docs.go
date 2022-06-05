@@ -172,8 +172,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "percentage": {
-                    "type": "number",
-                    "example": 25
+                    "type": "integer",
+                    "example": 200
                 },
                 "years": {
                     "type": "integer",

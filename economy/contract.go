@@ -31,14 +31,12 @@ type (
 	BaseHourlyMiningRate = *coin.ICEFlake
 	UserEconomy          struct {
 		LastMiningStartedAt *time.Time                          `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
-		HourlyMiningRate    *coin.ICEFlake                      `json:"hourlyMiningRate" example:"232"`
+		HourlyMiningRate    *coin.ICEFlake                      `json:"hourlyMiningRate" swaggertype:"string" example:"232"`
 		Adoption            map[TotalUsers]BaseHourlyMiningRate `json:"adoption"`
 		Balance             Balance                             `json:"balance"`
 		CurrentTotalUsers   TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
 		Staking             Staking                             `json:"staking"`
-		// HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
-		HourlyMiningRate *coin.ICEFlake `json:"hourlyMiningRate" example:"232"`
-		GlobalRank       uint64         `json:"globalRank" example:"1000"`
+		GlobalRank          uint64                              `json:"globalRank" example:"1000"`
 	}
 	EstimatedEarnings struct {
 		StandardHourlyMiningRate *coin.ICEFlake `json:"standardHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
@@ -49,13 +47,13 @@ type (
 		Percentage uint64 `json:"percentage" example:"200"`
 	}
 	Balance struct {
-		Total     *coin.ICEFlake  `json:"total" example:"232"`
+		Total     *coin.ICEFlake  `json:"total" swaggertype:"string" example:"232"`
 		Referrals ReferralBalance `json:"referrals"`
 	}
 	ReferralBalance struct {
-		// T0 *coin.ICEFlake `json:"t0" example:"232"`
-		T1 *coin.ICEFlake `json:"t1" example:"232"`
-		T2 *coin.ICEFlake `json:"t2" example:"232"`
+		T0 *coin.ICEFlake `json:"t0" swaggertype:"string" example:"232"`
+		T1 *coin.ICEFlake `json:"t1" swaggertype:"string" example:"232"`
+		T2 *coin.ICEFlake `json:"t2" swaggertype:"string" example:"232"`
 	}
 	GetEstimatedEarningsArg struct {
 		T1ActiveReferrals uint64 `form:"t1" example:"20"`
