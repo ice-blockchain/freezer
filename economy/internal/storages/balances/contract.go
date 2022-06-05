@@ -1,9 +1,8 @@
 package balances
 
 import (
-	"time"
-
 	"github.com/framey-io/go-tarantool"
+
 	"github.com/ice-blockchain/wintr/coin"
 )
 
@@ -12,7 +11,7 @@ import (
 type (
 	UserID = string
 
-	// TODO: add description.
+	// | stakingInfo is the internal structure to parse balances.
 	stakingInfo struct {
 		Bonus      uint64
 		Allocation uint64
@@ -24,27 +23,26 @@ type (
 		cfg *config
 	}
 
-	// TODO: add description.
+	// | userEconomy is the internal structure for deserialization from the DB.
 	userEconomy struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack             struct{} `msgpack:",asArray"`
 		UserID               UserID
-		LastMiningStartedAt  *time.Time
-		ElapsedNanoseconds   uint64
-		T0Referrals          uint64
-		T1Referrals          uint64
-		T2Referrals          uint64
 		BaseHourlyMiningRate *coin.ICEFlake
 		StakingInfo          string
 		Balances             string
+		T0Referrals          uint64
+		T1Referrals          uint64
+		T2Referrals          uint64
 	}
 
-	// TODO: add description.
+	// | balance is the internal structure to parse balances information.
 	balance struct {
 		Amount    *coin.ICEFlake
 		UpdatedAt uint64
 	}
 
+	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {
 		MessageBroker struct {
 			Topics []struct {
@@ -63,7 +61,8 @@ type (
 )
 
 const (
-	applicationYamlKey = "economy"
-	base10             = 10
-	bitSize64          = 64
+	applicationYamlKey        = "economy"
+	base10                    = 10
+	bitSize64                 = 64
+	percentage100      uint64 = 100
 )

@@ -29,15 +29,15 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
-// @Param        userId         path      string  true  "ID of the user"
-// @Success      200            {object}  economy.UserEconomy
-// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
-// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
-// @Failure      404            {object}  server.ErrorResponse  "if not found"
-// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
-// @Failure      500            {object}  server.ErrorResponse
-// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        userId         	path      string  true  "ID of the user"
+// @Success      200            	{object}  economy.UserEconomy
+// @Failure      400                {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401                {object}  server.ErrorResponse  "if not authorized"
+// @Failure      404            	{object}  server.ErrorResponse  "if not found"
+// @Failure      422                {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500                {object}  server.ErrorResponse
+// @Failure      504                {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/user-economy/{userId} [GET].
 func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestGetUserEconomy)

@@ -7,8 +7,10 @@ require (
 	cosmossdk.io/math v1.0.0-beta.2
 	github.com/gin-gonic/gin v1.8.0
 	github.com/goccy/go-json v0.9.7
+	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ice-blockchain/wintr v1.12.0
+	github.com/ice-blockchain/eskimo v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/swaggo/swag v1.8.2
 )
@@ -41,11 +43,9 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/ice-blockchain/eskimo v1.4.0 // indirect
-	github.com/imroc/req/v3 v3.11.3 // indirect
+	github.com/imroc/req/v3 v3.12.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.6 // indirect

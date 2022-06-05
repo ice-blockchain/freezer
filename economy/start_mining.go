@@ -21,7 +21,7 @@ func (e *economy) StartMining(ctx context.Context, userID UserID) error {
 
 	miningInProgress, err := e.isMiningInProgress(userID)
 	if err != nil {
-		return errors.Wrap(err, "unable to check is mining in porgress")
+		return errors.Wrap(err, "unable to check is mining in progress")
 	}
 
 	if miningInProgress {
@@ -59,7 +59,7 @@ func (e *economy) notifyStartMining(ctx context.Context, userID UserID, startedA
 	return errors.Wrapf(<-responder, "[start-mining] failed to send message to broker")
 }
 
-func (e *economy) startMining(userID string, startTime *time.Time) error {
+func (e *economy) startMining(userID UserID, startTime *time.Time) error {
 	params := map[string]interface{}{
 		"userId": userID,
 		"now":    startTime,

@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
+	tm "time"
 
 	"cosmossdk.io/math"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/coin"
 	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (e *economy) GetUserEconomy(ctx context.Context, userID UserID, ownEconomy bool) (*UserEconomy, error) {
@@ -34,8 +35,8 @@ func (e *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEc
 	var result []*userEconomySummary
 	params := map[string]interface{}{
 		"userId":             userID,
-		"now":                time.Now().UTC().UnixNano(),
-		"inactivityDeadline": time.Duration(cfg.InactivityHoursDeadline) * time.Hour,
+		"now":                time.Now().UnixNano(),
+		"inactivityDeadline": tm.Duration(cfg.InactivityHoursDeadline) * tm.Hour,
 	}
 	if err := e.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
 		return nil, errors.Wrapf(err, "failed to get user economy for userID:%v", userID)
@@ -47,52 +48,59 @@ func (e *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEc
 	return result[0].toUserEconomySummary(), nil
 }
 
+//nolint:funlen // Because this is SQL, no sense to split it to different functions.
 func getUserEconomySQL() string {
-	// TODO: cut or move to views, or to think smth else.
 	return fmt.Sprintf(`SELECT
 		ue.last_mining_started_at,
 		s.updated_at AS staking_balance_updated_at,
 		b.amount AS balance,
-		(SELECT amount FROM balances WHERE user_id = :userId AND type = 'standard') AS staking_balance,
+		(SELECT amount FROM balances WHERE user_id = :userId AND type = 'staking') AS staking_balance,
 		(SELECT base_hourly_mining_rate
 			FROM adoption
 			WHERE active = true
 		) AS base_hourly_mining_rate,
+		(SELECT amount
+			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
+				WHERE type = 't0_referral_standard_earnings' AND b.user_id = :userId
+		) AS t0_amount,
+		(SELECT amount
+			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
+				WHERE type = 't1_referral_standard_earnings' AND b.user_id = :userId
+		) AS t1_amount,
+		(SELECT amount
+			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
+				WHERE type = 't2_referral_standard_earnings' AND b.user_id = :userId
+		) AS t2_amount,
 		ue.user_id,
 		ue.username,
 		ue.profile_picture_url,
+		(SELECT
+			GROUP_CONCAT(CAST(total_active_users AS string) || ':' || base_hourly_mining_rate || CAST(active AS string))
+			FROM adoption
+			ORDER BY total_active_users ASC
+		) AS adoptions,
 		ue.hash_code,
 		(SELECT count(1)
 			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
 				JOIN user_economy ue INDEXED BY "pk_unnamed_USER_ECONOMY_1"
 					ON b.user_id = ue.user_id
-			WHERE user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
-				  AND POSITION('t0_referral_standard_earnings~', lower(b.type)) || ue.user_id) AS t0_count,
+			WHERE b.user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
+				  AND POSITION('t0_referral_standard_earnings~', lower(b.type)) || ue.user_id
+		) AS t0_count,
 		(SELECT count(1)
 			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
 				JOIN user_economy ue INDEXED BY "pk_unnamed_USER_ECONOMY_1"
 					ON b.user_id = ue.user_id
-			WHERE user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
-				   AND POSITION('t1_referral_standard_earnings~', lower(b.type)) != 0) AS t1_count,
+			WHERE b.user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
+				   AND POSITION('t1_referral_standard_earnings~', lower(b.type)) != 0
+		) AS t1_count,
 		(SELECT count(1)
 			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
 				JOIN user_economy ue INDEXED BY "pk_unnamed_USER_ECONOMY_1"
 					ON b.user_id = ue.user_id
-			WHERE user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
-				   AND POSITION('t2_referral_standard_earnings~', lower(b.type)) AS t2_count,
-		(SELECT amount
-			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
-				WHERE type = 't0_referral_standard_earnings' AND b.user_id = :userId) AS t0_amount,
-		(SELECT amount
-			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
-				WHERE type = 't1_referral_standard_earnings' AND b.user_id = :userId) AS t1_amount,
-		(SELECT amount
-			FROM balances b INDEXED BY "pk_unnamed_BALANCES_1"
-				WHERE type = 't2_referral_standard_earnings' AND b.user_id = :userId) AS t2_amount,
-		(SELECT
-			GROUP_CONCAT(CAST(total_active_users AS string) || ':' || base_hourly_mining_rate || CAST(active AS string))
-			FROM adoption
-			ORDER BY total_active_users ASC) AS adoptions,
+			WHERE b.user_id = :userId AND :now - ue.last_mining_started_at < :inactivityDeadline
+				   AND POSITION('t2_referral_standard_earnings~', lower(b.type))
+		) AS t2_count,
 		(%[1]v) AS global_rank,
 		s.percentage AS staking_percentage_allocation,
 		s.years AS staking_years,
@@ -120,7 +128,6 @@ func (e *economy) getAnotherUserEconomy(ctx context.Context, userID UserID) (*Us
 }
 
 func getGlobalRankSQL() string {
-	// TODO: I assume count(1) should be instead of count(1) - 1 otherwise 0 value can be got here.
 	return fmt.Sprintf(`
 		SELECT count(1) - 1
 		FROM balances b_cmp
@@ -140,68 +147,48 @@ func getGlobalRankSQL() string {
 	`)
 }
 
-func parseAdoptions(adoptions string) map[uint64]float64 {
+func parseAdoptions(adoptions string) map[uint64]*coin.ICEFlake {
 	a := strings.Split(adoptions, ",")
-	res := make(map[uint64]float64, len(a))
+	res := make(map[uint64]*coin.ICEFlake, len(a))
 
 	for _, adoption := range a {
 		parts := strings.Split(adoption, ":")
 		totalUsers, err := strconv.ParseUint(parts[0], base10, bitSize64)
 		log.Panic(errors.Wrapf(err, "can't parse rate uint for adoption:%v", parts[0]))
 
-		rate, err := strconv.ParseFloat(parts[1], bitSize64)
-		log.Panic(errors.Wrapf(err, "can't parse baseHourlyMiningRate float64 %[1]v for adoption with total users:%[2]v", parts[1], parts[0]))
-
-		res[totalUsers] = rate
+		res[totalUsers] = coin.UnsafeNewAmount(parts[1])
 	}
 
 	return res
 }
 
-// TODO: add new fields to the structure?
 func (u *userEconomySummary) toUserEconomySummary() *UserEconomy {
 	adoptions := parseAdoptions(u.Adoptions)
 	hmr := u.calculateHourlyMiningRate()
-	//nhmr := u.calculateNormalHourlyMiningRate(hmr)
 
 	return &UserEconomy{
+		LastMiningStartedAt: u.LastMiningStartedAt,
+		HourlyMiningRate:    hmr,
+		Adoption:            adoptions,
 		Balance: Balance{
 			Total: u.Balance,
 			Referrals: ReferralBalance{
-				//T0: coin.UnsafeNewAmount(u.T0Amount),
-				T1: calculateTierIceFlakeSum(u.T1Amount),
-				T2: calculateTierIceFlakeSum(u.T2Amount),
+				T1: u.T1Amount,
+				T2: u.T2Amount,
 			},
 		},
-		HourlyMiningRate:    hmr,
-		GlobalRank:          u.GlobalRank,
-		CurrentTotalUsers:   u.CurrentTotalUsers,
-		Adoption:            adoptions,
-		LastMiningStartedAt: *u.LastMiningStartedAt,
+		CurrentTotalUsers: u.CurrentTotalUsers,
 		Staking: Staking{
 			Years:      u.StakingYears,
 			Percentage: u.StakingPercentageAllocation,
-			// PercentageBonus: u.StakingPercentageBonus,
-			// PercentageAllocation: u.StakingPercentageAllocation
 		},
+		GlobalRank: u.GlobalRank,
 	}
 }
 
 func (u *userEconomySummary) calculateHourlyMiningRate() *coin.ICEFlake {
-	tierCountPart := (u.T0Count*cfg.Rates.Tier0 + u.T1Count*cfg.Rates.Tier1 + u.T2Count*cfg.Rates.Tier2 + 100)
-	hmr := u.BaseHourlyMiningRate.Mul(math.NewUint(tierCountPart)).Quo(math.NewUint(100))
+	tierCountPart := (u.T0Count*cfg.Rates.Tier0 + u.T1Count*cfg.Rates.Tier1 + u.T2Count*cfg.Rates.Tier2 + percentage100)
+	hmr := u.BaseHourlyMiningRate.Mul(math.NewUint(tierCountPart)).Quo(math.NewUint(percentage100))
 
 	return &coin.ICEFlake{Uint: hmr}
-}
-
-func calculateTierIceFlakeSum(amount string) *coin.ICEFlake {
-	sum := math.ZeroUint()
-	if amount != "" {
-		earnings := strings.Split(amount, ",")
-		for _, v := range earnings {
-			sum = sum.Add(math.NewUintFromString(v))
-		}
-	}
-
-	return &coin.ICEFlake{Uint: sum}
 }

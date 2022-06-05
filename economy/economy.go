@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/framey-io/go-tarantool"
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
@@ -75,11 +76,19 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	mbProcessors := processors(context.Background(), db)
 	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey, mbProcessors)
 
+	tm := tickerManager{
+		closed: false,
+		mb:     mbProducer,
+		cfg:    &cfg,
+	}
+	go tm.startTicker()
+
 	return &processor{
 		close:           closeAll(db, mbProducer, mbConsumer),
 		ReadRepository:  &economy{db: db},
 		WriteRepository: &economy{db: db, mb: mbProducer},
 		mb:              mbProducer,
+		ticker:          &tm,
 	}
 }
 
@@ -101,19 +110,29 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	return nil
 }
 
-func (p *processor) startTicker() {
-	ticker := time.NewTicker(100 * time.Millisecond)
+func (t *tickerManager) startTicker() {
+	ticker := time.NewTicker(balancesUpdateMillisecondsTicker)
 	defer ticker.Stop()
 
-	// TODO: implement me.
-	for {
+	for !t.closed {
 		<-ticker.C
-		p.produceUpdateBalanceMessage()
+		t.produceUpdateBalancesMessage()
 	}
 }
 
-// TODO: implement me.
-func (p *processor) produceUpdateBalanceMessage() {
-	// Sending message with nil value and key = uuid
-	// p.mb.SendMessage()
+func (t *tickerManager) produceUpdateBalancesMessage() {
+	ctx, cancel := context.WithTimeout(context.Background(), sendUpdateBalancesMessageDeadline)
+	defer cancel()
+
+	responder := make(chan error, 1)
+	m := &messagebroker.Message{
+		Headers: map[string]string{"producer": "freezer"},
+		Key:     uuid.NewString(),
+		Topic:   t.cfg.MessageBroker.Topics[3].Name,
+		Value:   nil,
+	}
+
+	defer close(responder)
+	t.mb.SendMessage(ctx, m, responder)
+	log.Error(errors.Wrapf(<-responder, "failed to send update balances message: %#v", m))
 }
