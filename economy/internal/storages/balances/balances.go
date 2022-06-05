@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BUSL-1.1
+
 package balances
 
 import (
@@ -117,9 +119,8 @@ func (b *balanceSource) calculateUpdateBalances(ctx context.Context, ue []*userE
 	var errs []error
 	wg := new(sync.WaitGroup)
 	for _, u := range ue {
+		wg.Add(1)
 		go func(u *userEconomy) {
-			wg.Add(1)
-
 			si := u.parseUserStakingInfo()
 			balances := u.parseUserBalances()
 			errs = append(errs, errors.Wrap(b.handleGeneralBalances(ctx, u, balances, si), "can't handle general balances"),

@@ -27,8 +27,10 @@ definitions:
       referrals:
         $ref: '#/definitions/economy.ReferralBalance'
       total:
-        example: 232.5
-        type: number
+        example: "232"
+        type: string
+    type: object
+  economy.BaseHourlyMiningRate:
     type: object
   economy.DailyUserGrowth:
     properties:
@@ -55,18 +57,21 @@ definitions:
     type: object
   economy.ReferralBalance:
     properties:
+      t0:
+        example: "232"
+        type: string
       t1:
-        example: 232.5
-        type: number
+        example: "232"
+        type: string
       t2:
-        example: 232.5
-        type: number
+        example: "232"
+        type: string
     type: object
   economy.Staking:
     properties:
       percentage:
-        example: 25
-        type: number
+        example: 200
+        type: integer
       years:
         example: 1
         type: integer
@@ -99,7 +104,7 @@ definitions:
     properties:
       adoption:
         additionalProperties:
-          type: number
+          $ref: '#/definitions/economy.BaseHourlyMiningRate'
         type: object
       balance:
         $ref: '#/definitions/economy.Balance'
@@ -110,8 +115,8 @@ definitions:
         example: 1000
         type: integer
       hourlyMiningRate:
-        example: 232.5
-        type: number
+        example: "232"
+        type: string
       lastMiningStartedAt:
         example: "2022-01-03T16:20:52.156534Z"
         type: string

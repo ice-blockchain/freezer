@@ -128,7 +128,7 @@ func (e *economy) getAnotherUserEconomy(ctx context.Context, userID UserID) (*Us
 }
 
 func getGlobalRankSQL() string {
-	return fmt.Sprintf(`
+	return `
 		SELECT count(1) - 1
 		FROM balances b_cmp
 		WHERE CASE
@@ -144,7 +144,7 @@ func getGlobalRankSQL() string {
 					END)
 				ELSE b_cmp.amount_w3 > b.amount_w3
 			END
-	`)
+	`
 }
 
 func parseAdoptions(adoptions string) map[uint64]*coin.ICEFlake {
