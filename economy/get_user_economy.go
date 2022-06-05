@@ -161,7 +161,6 @@ func parseAdoptions(adoptions string) map[uint64]*coin.ICEFlake {
 	return res
 }
 
-// TODO: add new fields to the structure?
 func (u *userEconomySummary) toUserEconomySummary() *UserEconomy {
 	adoptions := parseAdoptions(u.Adoptions)
 	hmr := u.calculateHourlyMiningRate()
