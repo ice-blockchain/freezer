@@ -75,4 +75,4 @@ economy:
         partition: 1
         replicationFactor: 1
         retention: 1000h
-        cleanupPolicy: compact # TODO: check if it the right key-value.
+        cleanupPolicy: compact

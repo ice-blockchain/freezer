@@ -44,13 +44,13 @@ box.execute([[CREATE TABLE IF NOT EXISTS adoption_history  (
 -- hour_timestamp = minute_timestamp/60
 
 box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
+                    last_mining_started_at UNSIGNED DEFAULT 0,
+                    created_at UNSIGNED NOT NULL,
+                    updated_at UNSIGNED NOT NULL,
                     user_id STRING primary key,
                     username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
-                    hash_code UNSIGNED NOT NULL UNIQUE,
-                    last_mining_started_at UNSIGNED DEFAULT 0,
-                    created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL
+                    hash_code UNSIGNED NOT NULL UNIQUE
                     ) WITH ENGINE = 'vinyl';]])
 -- balance is in ice flakes
 -- if staking is enabled for the user, and the percentage is 100%, balances.amount{type=standard} is gonna always be 0.
@@ -58,15 +58,17 @@ box.execute([[CREATE INDEX IF NOT EXISTS user_economy_last_mining_started_at_ix 
 box.execute([[CREATE INDEX IF NOT EXISTS user_economy_username_ix ON user_economy (username);]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS staking  (
+                    created_at UNSIGNED NOT NULL,
+                    updated_at UNSIGNED NOT NULL,
                     user_id STRING primary key REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     percentage UNSIGNED NOT NULL,
-                    years UNSIGNED NOT NULL,
-                    created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL
+                    years UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 -- When staking happens, you move staking.percentage*balances.amount{type=standard}/100 to balances.amount{type=staking}, for that user_id
 
 box.execute([[CREATE TABLE IF NOT EXISTS balances (
+                    updated_at UNSIGNED NOT NULL,
+                    amount STRING NOT NULL DEFAULT '0',
                     user_id STRING NOT NULL REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     type STRING NOT NULL
                         CHECK (
@@ -86,12 +88,11 @@ box.execute([[CREATE TABLE IF NOT EXISTS balances (
                             lower(type) == 't2_referral_staking_earnings' or
                             POSITION('t2_referral_staking_earnings~', lower(type)) != 0
                         ),
-                    amount STRING NOT NULL DEFAULT '0',
                     amount_w0 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w1 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w2 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w3 UNSIGNED NOT NULL DEFAULT 0,
-                    updated_at UNSIGNED NOT NULL,
+                    
                     primary key (user_id, type)) WITH ENGINE = 'vinyl';]])
 box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (amount_w3, amount_w2, amount_w1, amount_w0);]])
 -- amount is in ice flakes

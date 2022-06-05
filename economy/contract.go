@@ -28,9 +28,10 @@ var (
 type (
 	UserID               = string
 	TotalUsers           = uint64
-	BaseHourlyMiningRate = float64
+	BaseHourlyMiningRate = *coin.ICEFlake
 	UserEconomy          struct {
-		LastMiningStartedAt time.Time                           `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
+		LastMiningStartedAt *time.Time                          `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
+		HourlyMiningRate    *coin.ICEFlake                      `json:"hourlyMiningRate" example:"232"`
 		Adoption            map[TotalUsers]BaseHourlyMiningRate `json:"adoption"`
 		Balance             Balance                             `json:"balance"`
 		CurrentTotalUsers   TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
@@ -48,7 +49,7 @@ type (
 		Percentage uint64 `json:"percentage" example:"200"`
 	}
 	Balance struct {
-		Total     *coin.ICEFlake  `json:"total" example:"232.5"`
+		Total     *coin.ICEFlake  `json:"total" example:"232"`
 		Referrals ReferralBalance `json:"referrals"`
 	}
 	ReferralBalance struct {
@@ -136,13 +137,16 @@ type (
 )
 
 const (
-	applicationYamlKey  = "economy"
-	balanceTypeStaking  = "staking"
-	balanceTypeStandard = "standard"
-	base10              = 10
-	bitSize64           = 64
-	miningDuration      = 24 * tm.Hour
-	secondsInDay        = 24 * 60 * 60
+	applicationYamlKey                = "economy"
+	balanceTypeStaking                = "staking"
+	balanceTypeStandard               = "standard"
+	base10                            = 10
+	bitSize64                         = 64
+	miningDuration                    = 24 * tm.Hour
+	percentage100                     = 100
+	balancesUpdateMillisecondsTicker  = 100 * tm.Millisecond
+	sendUpdateBalancesMessageDeadline = 30 * tm.Second
+	secondsInDay                      = 24 * 60 * 60
 )
 
 var (
@@ -164,17 +168,17 @@ type (
 		Balance                     *coin.ICEFlake
 		StakingBalance              *coin.ICEFlake
 		BaseHourlyMiningRate        *coin.ICEFlake
+		T0Amount                    *coin.ICEFlake
+		T1Amount                    *coin.ICEFlake
+		T2Amount                    *coin.ICEFlake
 		UserID                      string
 		Username                    string
 		ProfilePictureURL           string
+		Adoptions                   string
 		HashCode                    uint64
 		T0Count                     uint64
 		T1Count                     uint64
 		T2Count                     uint64
-		T0Amount                    string
-		T1Amount                    string
-		T2Amount                    string
-		Adoptions                   string
 		GlobalRank                  uint64
 		StakingPercentageAllocation uint64
 		StakingYears                uint64
@@ -182,21 +186,6 @@ type (
 		StakingPercentageBonus      uint64
 	}
 
-	userEconomy struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack          struct{} `msgpack:",asArray"`
-		UserID            UserID
-		Username          string
-		ProfilePictureURL string
-		Balance           *coin.ICEFlake
-		// StakingPercentage   float64
-		HashCode            uint64
-		LastMiningStartedAt uint64
-		// StakingYears        uint64
-		CreatedAt        uint64
-		UpdatedAt        uint64
-		BalanceUpdatedAt uint64
-	}
 	adoptionMilestone struct {
 		HourlyMiningRate *coin.ICEFlake
 		ActiveUsers      uint64
@@ -231,9 +220,11 @@ type (
 	staking struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack   struct{} `msgpack:",asArray"`
+		CreatedAt  *time.Time
+		UpdatedAt  *time.Time
+		UserID     UserID
 		Percentage uint64
 		Years      uint64
-		UpdatedAt  *time.Time
 	}
 
 	// | repository implements the public API that this package exposes.
@@ -246,11 +237,18 @@ type (
 		close func() error
 		ReadRepository
 		WriteRepository
-		mb messagebroker.Client
+		mb     messagebroker.Client
+		ticker *tickerManager
 	}
 	economy struct {
 		db tarantool.Connector
 		mb messagebroker.Client
+	}
+	// | ticker manager allows gracefully close the ticker.
+	tickerManager struct {
+		mb     messagebroker.Client
+		cfg    *config
+		closed bool
 	}
 	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {

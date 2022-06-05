@@ -4,6 +4,8 @@ package usereconomy
 
 import (
 	"github.com/framey-io/go-tarantool"
+
+	"github.com/ice-blockchain/wintr/coin"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -20,18 +22,32 @@ const (
 )
 
 type (
-	UserID = string
+	UserID      = string
+	BalanceType = string
+	TierLevel   = uint64
 
+	// | userEconomy is the internal structure for deserialization from the DB.
 	userEconomy struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
+		LastMiningStartedAt *time.Time
+		CreatedAt           *time.Time
+		UpdatedAt           *time.Time
 		UserID              UserID
 		Username            string
 		ProfilePictureURL   string
 		HashCode            uint64
-		LastMiningStartedAt *time.Time
-		CreatedAt           *time.Time
-		UpdatedAt           *time.Time
+	}
+
+	// | staking is the internal structure for deserialization from the DB.
+	staking struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack   struct{} `msgpack:",asArray"`
+		CreatedAt  *time.Time
+		UpdatedAt  *time.Time
+		UserID     UserID
+		Percentage uint64
+		Years      uint64
 	}
 
 	// | userEconomySource is responsible for processing new messages of sourceUser type, transforming it and storing it in the db as user type.
@@ -52,11 +68,16 @@ type (
 		Value    uint64
 	}
 
-	referralEarnings struct {
+	balances struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack  struct{} `msgpack:",asArray"`
+		UpdatedAt *time.Time
+		Amount    *coin.ICEFlake
 		UserID    UserID
 		Type      string
-		UpdatedAt *time.Time
+		AmountW0  uint64
+		AmountW1  uint64
+		AmountW2  uint64
+		AmountW3  uint64
 	}
 )

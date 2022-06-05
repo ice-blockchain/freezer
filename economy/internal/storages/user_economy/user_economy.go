@@ -5,7 +5,6 @@ package usereconomy
 import (
 	"context"
 	"fmt"
-	"github.com/ice-blockchain/eskimo/users"
 	"math"
 	"strings"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/eskimo/users"
+	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
 	"github.com/ice-blockchain/wintr/time"
@@ -34,20 +35,27 @@ func (s *userEconomySource) Process(ctx context.Context, m *messagebroker.Messag
 
 	if u.User == nil && u.Before != nil {
 		if err := s.deleteUserEconomy(u.Before); err != nil {
-			return errors.Wrapf(err, "unable to call deleteUserEconomy")
+			return errors.Wrap(err, "unable to call deleteUserEconomy")
 		}
 
-		return errors.Wrapf(s.updateTotalUsers(-1), "unable to call updateTotalUsers")
+		return errors.Wrap(s.updateTotalUsers(-1), "unable to call updateTotalUsers")
 	}
 
-	if err := s.createOrUpdateUserEconomy(u.User); err != nil {
-		return errors.Wrapf(err, "unable to call createOrUpdateUserEconomy")
+	return errors.Wrap(s.initializeEconomy(u.User), "unable to call initializeTables")
+}
+
+func (s *userEconomySource) initializeEconomy(u *users.User) error {
+	if err := s.createOrUpdateUserEconomy(u); err != nil {
+		return errors.Wrap(err, "unable to call createOrUpdateUserEconomy")
 	}
-	if err := s.createUserEarnings(u.User); err != nil {
+	if err := s.createUserStaking(u); err != nil {
+		return errors.Wrap(err, "unable to call createUserStaking")
+	}
+	if err := s.createUserEarnings(u); err != nil {
 		return errors.Wrap(err, "unable to call createUserEarnings")
 	}
 
-	return errors.Wrap(s.createReferralEarnings(u.User), "unable to call createReferralEarnings")
+	return errors.Wrap(s.createReferralEarnings(u), "unable to call createReferralEarnings")
 }
 
 func (s *userEconomySource) deleteUserEconomy(u *users.User) error {
@@ -58,7 +66,7 @@ func (s *userEconomySource) deleteUserEconomy(u *users.User) error {
 	sql := fmt.Sprintf("DELETE FROM %[1]v WHERE user_id = :userId", s.userEconomySpace())
 
 	return errors.Wrapf(storage.CheckSQLDMLErr(s.db.PrepareExecute(sql, params)),
-		"failed to delete user economy record for user.ID:%v", u.ID)
+		"failed to delete user economy record for u.ID:%v", u.ID)
 }
 
 func (s *userEconomySource) updateTotalUsers(diff int) error {
@@ -82,11 +90,11 @@ func (s *userEconomySource) createOrUpdateUserEconomy(u *users.User) error {
 	if err != nil {
 		tErr := new(tarantool.Error)
 		if errors.Is(err, storage.ErrNotFound) || (errors.As(err, tErr) && tErr.Code == tarantool.ER_TUPLE_NOT_FOUND) {
-			if err = s.updateTotalUsers(1); err != nil {
-				return errors.Wrapf(err, "unable to call updateTotalUsers")
+			if err = s.createUserEconomy(u); err != nil {
+				return errors.Wrapf(err, "unable to call createUserEconomy")
 			}
 
-			return errors.Wrapf(s.createUserEconomy(u), "unable to call createUserEconomy")
+			return errors.Wrapf(s.updateTotalUsers(1), "unable to call updateTotalUsers")
 		}
 
 		return errors.Wrapf(err, "unable to call getUserEconomy")
@@ -118,29 +126,45 @@ func (s *userEconomySource) createUserEconomy(u *users.User) error {
 	nowT := time.Now()
 
 	ue := &userEconomy{
+		CreatedAt:         nowT,
+		UpdatedAt:         nowT,
 		UserID:            u.ID,
 		Username:          u.Username,
 		ProfilePictureURL: u.ProfilePictureURL,
 		HashCode:          u.HashCode,
-		CreatedAt:         nowT,
-		UpdatedAt:         nowT,
 	}
 
 	return errors.Wrapf(s.db.InsertTyped(space, ue, &[]*userEconomy{}),
 		"failed to insert user economy record for user.ID:%v", u.ID)
 }
 
+func (s *userEconomySource) createUserStaking(u *users.User) error {
+	space := s.stakingSpace()
+	nowT := time.Now()
+
+	ue := &staking{
+		CreatedAt:  nowT,
+		UpdatedAt:  nowT,
+		UserID:     u.ID,
+		Percentage: 0,
+		Years:      0,
+	}
+
+	return errors.Wrapf(s.db.InsertTyped(space, ue, &[]*staking{}),
+		"failed to insert user economy record for user.ID:%v", u.ID)
+}
+
 func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
-	nowT := uint64(time.Now().UTC().UnixNano())
+	nowT := time.Now()
 	space := s.userEconomySpace()
 	index := s.userEconomySpacePKIndex()
 	key := tarantool.StringKey{S: ue.UserID}
 
 	//nolint:gomnd // Those are not magic numbers, those are the indexes of the fields.
 	ops := []tarantool.Op{
-		{Op: "=", Field: 2, Arg: ue.Username},
-		{Op: "=", Field: 3, Arg: ue.ProfilePictureURL},
-		{Op: "=", Field: 5, Arg: nowT},
+		{Op: "=", Field: 2, Arg: nowT},
+		{Op: "=", Field: 4, Arg: ue.Username},
+		{Op: "=", Field: 5, Arg: ue.ProfilePictureURL},
 	}
 
 	return errors.Wrapf(s.db.UpdateTyped(space, index, key, ops, &[]*userEconomy{}),
@@ -148,52 +172,60 @@ func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
 }
 
 func (s *userEconomySource) createUserEarnings(u *users.User) error {
-	var errs error
+	var errs []error
 	if err := s.initializeEarnings(u.ID, balanceTypeStandard); err != nil {
-		errs = multierror.Append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStandard, u.ID))
+		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStandard, u.ID))
 	}
 	if err := s.initializeEarnings(u.ID, balanceTypeStaking); err != nil {
-		errs = multierror.Append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStaking, u.ID))
+		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStaking, u.ID))
 	}
 	if err := s.initializeEarnings(u.ID, balanceTypeTotal); err != nil {
-		errs = multierror.Append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeTotal, u.ID))
+		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeTotal, u.ID))
 	}
 
-	return errors.Wrapf(errs, "unable to initialize user earnings")
+	return errors.Wrapf(multiErr(errs), "unable to initialize user earnings")
 }
 
-// TODO: check multierrors. Maybe it should be implemented by []error.
 func (s *userEconomySource) createReferralEarnings(u *users.User) error {
-	var errs error
-	if err := s.initializeReferralEarningsByLevel(u.ID, u.ReferredBy, tierLevel0); err != nil {
-		multierror.Append(errs, errors.Wrapf(err,
+	var errs []error
+	if err := s.initializeReferralEarnings(u.ID, u.ReferredBy, tierLevel0); err != nil {
+		errs = append(errs, errors.Wrapf(err,
 			"unable to initialize T0 referral earnings for userID:%v and type~[userID]:%v", u.ReferredBy, u.ID))
 	}
 
-	rID := u.ReferredBy
-	for _, level := range []uint64{tierLevel1, tierLevel2} {
-		balanceType := generateBalanceTypeWithUserID(rID, balanceTypeStandard, tierLevel0)
-		rID, err := s.findReferralOf(balanceType)
+	nextRID := u.ReferredBy
+	for _, level := range []TierLevel{tierLevel1, tierLevel2} {
+		balanceType := generateUserBalanceType(nextRID, balanceTypeStandard, tierLevel0)
+		referralID, err := s.findReferralOf(balanceType)
 		if err != nil {
-			return errors.Wrapf(errs, "unable to find referral for type:%v", balanceType)
+			return errors.Wrapf(multiErr(errs), "unable to find referral for type:%v", balanceType)
 		}
-		if err := s.initializeReferralEarningsByLevel(u.ID, rID, level); err != nil {
-			multierror.Append(errs, errors.Wrapf(err,
-				"unable to initialize T%v referral earnings for userID:%v and type~[userID]:%v", level, rID, u.ID))
+		if referralID == "" {
+			break
 		}
+		if err := s.initializeReferralEarnings(u.ID, referralID, level); err != nil {
+			errs = append(errs, errors.Wrapf(err,
+				"unable to initialize T%v referral earnings for userID:%v and type~[userID]:%v", level, referralID, u.ID))
+		}
+		nextRID = referralID
 	}
 
-	return errors.Wrapf(errs, "unable to create referral earnings")
+	return errors.Wrapf(multiErr(errs), "unable to create referral earnings")
 }
 
-func (s *userEconomySource) initializeReferralEarningsByLevel(userID, referredBy UserID, tierLevel uint64) error {
-	types := []string{generateBalanceTypeWithUserID(userID, balanceTypeStandard, tierLevel),
-		generateBalanceTypeWithUserID(userID, balanceTypeStaking, tierLevel),
-		generateBalanceType(balanceTypeStandard, tierLevel),
-		generateBalanceType(balanceTypeStaking, tierLevel)}
+func (s *userEconomySource) initializeReferralEarnings(userID, referredBy UserID, tierLevel TierLevel) error {
+	types := []string{
+		generateUserBalanceType(userID, balanceTypeStandard, tierLevel),
+		generateUserBalanceType(userID, balanceTypeStaking, tierLevel),
+		generateGeneralBalanceType(balanceTypeStandard, tierLevel),
+		generateGeneralBalanceType(balanceTypeStaking, tierLevel),
+	}
 
 	for _, t := range types {
-		if err := s.initializeEarnings(referredBy, t); err != nil {
+		tErr := new(tarantool.Error)
+		if err := s.initializeEarnings(referredBy, t); err != nil &&
+			// Because t[level>0]_referral_[standard/staking]_earnings can already exist when another t[level>0]...~[userID] record was created.
+			(!strings.Contains(t, "~") && errors.As(err, tErr) && tErr.Code != tarantool.ER_TUPLE_FOUND) {
 			return errors.Wrapf(err,
 				"unable to initialize earnings for userID:%[1]v and type:%[2]v", referredBy, t)
 		}
@@ -202,7 +234,7 @@ func (s *userEconomySource) initializeReferralEarningsByLevel(userID, referredBy
 	return nil
 }
 
-func (s *userEconomySource) findReferralOf(balanceType string) (UserID, error) {
+func (s *userEconomySource) findReferralOf(balanceType BalanceType) (UserID, error) {
 	space := s.balancesSpace()
 	params := map[string]interface{}{
 		"type": balanceType,
@@ -215,7 +247,7 @@ func (s *userEconomySource) findReferralOf(balanceType string) (UserID, error) {
 
 	var res []*tier
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
-		return "", errors.Wrapf(err, "failed to get %q record for type:%v", balanceType)
+		return "", errors.Wrapf(err, "failed to get %q record for type:%v", space, balanceType)
 	}
 
 	if len(res) == 0 {
@@ -226,24 +258,28 @@ func (s *userEconomySource) findReferralOf(balanceType string) (UserID, error) {
 	return res[0].UserID, nil
 }
 
-func (s *userEconomySource) initializeEarnings(referredBy, balanceType string) error {
+func (s *userEconomySource) initializeEarnings(referredBy, balanceType BalanceType) error {
 	space := s.balancesSpace()
-	nowT := time.Now()
-	earning := &referralEarnings{
+	earning := &balances{
+		UpdatedAt: time.Now(),
+		Amount:    coin.NewAmountUint64(0),
 		UserID:    referredBy,
 		Type:      balanceType,
-		UpdatedAt: nowT,
+		AmountW0:  0,
+		AmountW1:  0,
+		AmountW2:  0,
+		AmountW3:  0,
 	}
 
-	return errors.Wrapf(s.db.InsertTyped(space, earning, &[]*referralEarnings{}),
+	return errors.Wrapf(s.db.InsertTyped(space, earning, &[]*balances{}),
 		"failed to create %s record for user.ID:%v", space, referredBy)
 }
 
-func generateBalanceTypeWithUserID(userID UserID, balanceType string, tierLevel uint64) string {
-	return fmt.Sprintf("%v~%v", generateBalanceType(balanceType, tierLevel), userID)
+func generateUserBalanceType(userID UserID, balanceType BalanceType, tierLevel TierLevel) string {
+	return fmt.Sprintf("%v~%v", generateGeneralBalanceType(balanceType, tierLevel), userID)
 }
 
-func generateBalanceType(balanceType string, tierLevel uint64) string {
+func generateGeneralBalanceType(balanceType BalanceType, tierLevel TierLevel) string {
 	return fmt.Sprintf("t%v_referral_%v_earnings", tierLevel, balanceType)
 }
 
@@ -255,14 +291,34 @@ func (s *userEconomySource) userEconomySpace() string {
 	return "USER_ECONOMY"
 }
 
-func (s *userEconomySource) userEconomySpacePKIndex() string {
-	return fmt.Sprintf("pk_unnamed_%s_1", strings.ToUpper(s.userEconomySpace()))
-}
-
 func (s *userEconomySource) globalSpace() string {
 	return "GLOBAL"
 }
 
+func (s *userEconomySource) stakingSpace() string {
+	return "STAKING"
+}
+
+func (s *userEconomySource) userEconomySpacePKIndex() string {
+	return fmt.Sprintf("pk_unnamed_%s_1", strings.ToUpper(s.userEconomySpace()))
+}
+
 func (s *userEconomySource) globalSpacePKIndex() string {
 	return fmt.Sprintf("pk_unnamed_%s_1", strings.ToUpper(s.globalSpace()))
+}
+
+func multiErr(errs []error) error {
+	if len(errs) > 0 {
+		nonNilErrs := make([]error, 0, len(errs))
+		for _, e := range errs {
+			if e != nil {
+				nonNilErrs = append(nonNilErrs, e)
+			}
+		}
+		if len(nonNilErrs) > 0 {
+			return multierror.Append(nil, nonNilErrs...)
+		}
+	}
+
+	return nil
 }
