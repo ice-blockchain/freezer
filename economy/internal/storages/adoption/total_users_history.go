@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BUSL-1.1
+
 package adoption
 
 import (
@@ -18,13 +20,13 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
 					minute_timestamp,
                     hour_timestamp,
                     day_timestamp,
-                    date_val,
+                    date_,
                     total_users
 ) VALUES(
 					:minuteTS,
                     :hourTS,
                     :dayTS,
-                    :dateVal,
+                    :date_,
 					(SELECT value FROM global WHERE key = 'TOTAL_USERS')
 );`
 	now := time.Now().UTC()
@@ -32,7 +34,7 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
 		"minuteTS": now.Unix() / secsInMinute,
 		"hourTS":   now.Unix() / secsInHour,
 		"dayTS":    now.Unix() / (hoursInDay * secsInHour),
-		"dateVal":  now.Format("2006-01-02"),
+		"date_":    now.Format("2006-01-02"),
 	}
 
 	return errors.Wrapf(storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)), "failed to add total_users_history %v", params)

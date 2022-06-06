@@ -73,38 +73,26 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 
 	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
 	mbProducer := messagebroker.MustConnect(ctx, applicationYamlKey)
-	mbProcessors := processors(context.Background(), db)
+	mbProcessors := processors(context.Background(), db, mbProducer)
 	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey, mbProcessors)
 
-	balanceTicker := tickerManager{
-		closed: false,
-		mb:     mbProducer,
-		cfg:    &cfg,
-		period: balancesUpdateMillisecondsTicker,
-	}
-	go balanceTicker.startTicker(balanceTicker.produceUpdateBalancesMessage)
-
-	adoptionTicker := tickerManager{
-		closed: false,
-		mb:     mbProducer,
-		cfg:    &cfg,
-		period: adoptionUpdateTicker,
-	}
-	go adoptionTicker.startTicker(adoptionTicker.produceUpdateAdoptionMessage)
-
-	return &processor{
+	p := processor{
 		close:           closeAll(db, mbProducer, mbConsumer),
 		ReadRepository:  &economy{db: db},
 		WriteRepository: &economy{db: db, mb: mbProducer},
 		mb:              mbProducer,
-		tickers:         []*tickerManager{&balanceTicker, &adoptionTicker},
 	}
+
+	go p.startProcessingStreamTicker(ctx, cancel, p.produceBalanceDistributedBatchProcessingStreamMessages, balanceDistributedBatchProcessingStreamMessagesPeriod)
+	go p.startProcessingStreamTicker(ctx, cancel, p.produceUpdateAdoptionsStreamMessages, adoptionUpdateTicker)
+
+	return &p
 }
 
-func processors(ctx context.Context, db tarantool.Connector) map[messagebroker.Topic]messagebroker.Processor {
+func processors(ctx context.Context, db tarantool.Connector, mb messagebroker.Client) map[messagebroker.Topic]messagebroker.Processor {
 	return map[messagebroker.Topic]messagebroker.Processor{
 		cfg.MessageBroker.ConsumingTopics[0]: usereconomy.New(db),
-		cfg.MessageBroker.ConsumingTopics[1]: balances.New(db),
+		cfg.MessageBroker.ConsumingTopics[1]: balances.New(db, mb),
 		cfg.MessageBroker.ConsumingTopics[2]: adoption.New(db),
 	}
 }
@@ -120,46 +108,51 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	return nil
 }
 
-func (t *tickerManager) startTicker(callback func()) {
-	ticker := time.NewTicker(t.period)
+func (p *processor) startProcessingStreamTicker(ctx context.Context, cancel context.CancelFunc, callback func(), period time.Duration) {
+	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
-	for !t.closed {
-		<-ticker.C
-		callback()
+	for {
+		select {
+		case <-ctx.Done():
+
+			return
+		default:
+			<-ticker.C
+			callback()
+		}
 	}
 }
 
-func (t *tickerManager) produceUpdateBalancesMessage() {
-	ctx, cancel := context.WithTimeout(context.Background(), sendUpdateBalancesMessageDeadline)
+func (p *processor) produceBalanceDistributedBatchProcessingStreamMessages() {
+	ctx, cancel := context.WithTimeout(context.Background(), produceBalanceDistributedBatchProcessingStreamMessagesDeadline)
+	defer cancel()
+	responder := make(chan error, 1)
+	m := &messagebroker.Message{
+		Headers: map[string]string{"producer": "freezer"},
+		Key:     uuid.NewString(),
+		Topic:   cfg.MessageBroker.Topics[3].Name,
+		Value:   nil,
+	}
+
+	defer close(responder)
+	p.mb.SendMessage(ctx, m, responder)
+	log.Error(errors.Wrapf(<-responder, "failed to send update balances message: %#v", m))
+}
+
+func (p *processor) produceUpdateAdoptionsStreamMessages() {
+	ctx, cancel := context.WithTimeout(context.Background(), produceUpdateAdoptionMessageDeadline)
 	defer cancel()
 
 	responder := make(chan error, 1)
 	m := &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     uuid.NewString(),
-		Topic:   t.cfg.MessageBroker.Topics[3].Name,
+		Topic:   cfg.MessageBroker.Topics[4].Name,
 		Value:   nil,
 	}
 
 	defer close(responder)
-	t.mb.SendMessage(ctx, m, responder)
-	log.Error(errors.Wrapf(<-responder, "failed to send update balances message: %#v", m))
-}
-
-func (t *tickerManager) produceUpdateAdoptionMessage() {
-	ctx, cancel := context.WithTimeout(context.Background(), sendUpdateBalancesMessageDeadline)
-	defer cancel()
-
-	responder := make(chan error, 1)
-	m := &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
-		Key:     uuid.NewString(),
-		Topic:   t.cfg.MessageBroker.Topics[4].Name,
-		Value:   nil,
-	}
-
-	defer close(responder)
-	t.mb.SendMessage(ctx, m, responder)
-	log.Error(errors.Wrapf(<-responder, "failed to send update balances message: %#v", m))
+	p.mb.SendMessage(ctx, m, responder)
+	log.Error(errors.Wrapf(<-responder, "failed to send update adoption message: %#v", m))
 }

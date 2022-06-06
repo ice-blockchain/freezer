@@ -9,7 +9,6 @@ import (
 	"strings"
 	tm "time"
 
-	"cosmossdk.io/math"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/coin"
@@ -35,7 +34,7 @@ func (e *economy) getOwnUserEconomy(ctx context.Context, userID UserID) (*UserEc
 	var result []*userEconomySummary
 	params := map[string]interface{}{
 		"userId":             userID,
-		"now":                time.Now().UnixNano(),
+		"now":                time.Now(),
 		"inactivityDeadline": tm.Duration(cfg.InactivityHoursDeadline) * tm.Hour,
 	}
 	if err := e.db.PrepareExecuteTyped(getUserEconomySQL(), params, &result); err != nil {
@@ -188,7 +187,7 @@ func (u *userEconomySummary) toUserEconomySummary() *UserEconomy {
 
 func (u *userEconomySummary) calculateHourlyMiningRate() *coin.ICEFlake {
 	tierCountPart := (u.T0Count*cfg.Rates.Tier0 + u.T1Count*cfg.Rates.Tier1 + u.T2Count*cfg.Rates.Tier2 + percentage100)
-	hmr := u.BaseHourlyMiningRate.Mul(math.NewUint(tierCountPart)).Quo(math.NewUint(percentage100))
+	hmr := u.BaseHourlyMiningRate.MulUint64(tierCountPart).QuoUint64(percentage100)
 
 	return &coin.ICEFlake{Uint: hmr}
 }

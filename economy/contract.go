@@ -134,16 +134,19 @@ type (
 	}
 )
 
+// Private API.
+
 const (
-	applicationYamlKey                = "economy"
-	balanceTypeStaking                = "staking"
-	balanceTypeStandard               = "standard"
-	base10                            = 10
-	bitSize64                         = 64
-	miningDuration                    = 24 * tm.Hour
-	percentage100                     = 100
-	balancesUpdateMillisecondsTicker  = 100 * tm.Millisecond
-	sendUpdateBalancesMessageDeadline = 30 * tm.Second
+	applicationYamlKey                                             = "economy"
+	balanceTypeStaking                                             = "staking"
+	balanceTypeStandard                                            = "standard"
+	base10                                                         = 10
+	bitSize64                                                      = 64
+	miningDuration                                                 = 24 * tm.Hour
+	percentage100                                                  = 100
+	balanceDistributedBatchProcessingStreamMessagesPeriod          = 100 * tm.Millisecond
+	produceBalanceDistributedBatchProcessingStreamMessagesDeadline = 30 * tm.Second
+	produceUpdateAdoptionMessageDeadline                           = 30 * tm.Second
 
 	adoptionUpdateTicker = 60 * tm.Second
 	secondsInDay         = 24 * 60 * 60
@@ -237,19 +240,11 @@ type (
 		close func() error
 		ReadRepository
 		WriteRepository
-		mb      messagebroker.Client
-		tickers []*tickerManager
+		mb messagebroker.Client
 	}
 	economy struct {
 		db tarantool.Connector
 		mb messagebroker.Client
-	}
-	// | ticker manager allows gracefully close the ticker.
-	tickerManager struct {
-		mb     messagebroker.Client
-		cfg    *config
-		closed bool
-		period tm.Duration
 	}
 	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {

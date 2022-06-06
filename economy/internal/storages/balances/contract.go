@@ -3,26 +3,27 @@
 package balances
 
 import (
+	"time"
+
 	"github.com/framey-io/go-tarantool"
 
 	"github.com/ice-blockchain/wintr/coin"
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 )
 
 // Private API.
 
-type (
-	UserID = string
+//nolint:gochecknoglobals // Because its loaded once, at runtime.
+var cfg config
 
-	// | stakingInfo is the internal structure to parse balances.
-	stakingInfo struct {
-		Bonus      uint64
-		Allocation uint64
-	}
+type (
+	UserID      = string
+	BalanceType = string
 
 	// | balanceSource is responsible for processing messages from balance update topic, updating balance information at database.
-	balanceSource struct {
-		db  tarantool.Connector
-		cfg *config
+	balanceDistributedBatchProcessingStreamSource struct {
+		db tarantool.Connector
+		mb messagebroker.Client
 	}
 
 	// | userEconomy is the internal structure for deserialization from the DB.
@@ -31,8 +32,9 @@ type (
 		_msgpack             struct{} `msgpack:",asArray"`
 		UserID               UserID
 		BaseHourlyMiningRate *coin.ICEFlake
-		StakingInfo          string
 		Balances             string
+		Bonus                uint64
+		Allocation           uint64
 		T0Referrals          uint64
 		T1Referrals          uint64
 		T2Referrals          uint64
@@ -67,4 +69,15 @@ const (
 	base10                    = 10
 	bitSize64                 = 64
 	percentage100      uint64 = 100
+
+	generalBalanceDivider         uint64 = 3600000000000
+	stakedHourlyMiningRateDivider uint64 = 10000
+	t0StandardDivider             uint64 = 1440000000000000
+	t1StandardDivider             uint64 = 1440000000000000
+	t2StandardDivider             uint64 = 7200000000000000
+	t0StakingDivider              uint64 = 144000000000000000
+	t1StakingDivider              uint64 = 144000000000000000
+	t2StakingDivider              uint64 = 720000000000000000
+
+	userBalanceMessageDeadline = 30 * time.Second
 )
