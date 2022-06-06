@@ -5,7 +5,8 @@ go 1.18
 require (
 	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
 	cosmossdk.io/math v1.0.0-beta.2
-	github.com/gin-gonic/gin v1.8.0
+	github.com/framey-io/go-tarantool v0.0.0-20220317175443-747a509561d8
+	github.com/gin-gonic/gin v1.8.1
 	github.com/goccy/go-json v0.9.7
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-multierror v1.1.1

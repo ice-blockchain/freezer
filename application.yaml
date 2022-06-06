@@ -20,7 +20,7 @@ cmd/freezer-refrigerant:
   version: local
   defaultEndpointTimeout: 30s
   httpServer:
-    port: 2443
+    port: 8085
     certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
     keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
   defaultPagination:
@@ -79,7 +79,10 @@ economy:
         cleanupPolicy: compact
       - name: adoption-update
         partitions: 10
-        partition: 1
         replicationFactor: 1
         retention: 1000h
         cleanupPolicy: compact
+      - name: balances-events
+        partitions: 10
+        replicationFactor: 1
+        retention: 1000h

@@ -92,7 +92,6 @@ box.execute([[CREATE TABLE IF NOT EXISTS balances (
                     amount_w1 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w2 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w3 UNSIGNED NOT NULL DEFAULT 0,
-
                     primary key (user_id, type)) WITH ENGINE = 'vinyl';]])
 box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (amount_w3, amount_w2, amount_w1, amount_w0);]])
 -- amount is in ice flakes
