@@ -144,7 +144,9 @@ const (
 	percentage100                     = 100
 	balancesUpdateMillisecondsTicker  = 100 * tm.Millisecond
 	sendUpdateBalancesMessageDeadline = 30 * tm.Second
-	secondsInDay                      = 24 * 60 * 60
+
+	adoptionUpdateTicker = 60 * tm.Second
+	secondsInDay         = 24 * 60 * 60
 )
 
 var (
@@ -235,8 +237,8 @@ type (
 		close func() error
 		ReadRepository
 		WriteRepository
-		mb     messagebroker.Client
-		ticker *tickerManager
+		mb      messagebroker.Client
+		tickers []*tickerManager
 	}
 	economy struct {
 		db tarantool.Connector
@@ -247,6 +249,7 @@ type (
 		mb     messagebroker.Client
 		cfg    *config
 		closed bool
+		period tm.Duration
 	}
 	// | config holds the configuration of this package mounted from `application.yaml`.
 	config struct {

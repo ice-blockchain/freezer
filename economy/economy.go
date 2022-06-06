@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/freezer/economy/internal/storages/adoption"
 	"github.com/ice-blockchain/freezer/economy/internal/storages/balances"
 	usereconomy "github.com/ice-blockchain/freezer/economy/internal/storages/user_economy"
 	appCfg "github.com/ice-blockchain/wintr/config"
@@ -72,23 +73,31 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 
 	db := storage.MustConnect(ctx, cancel, ddl, applicationYamlKey)
 	mbProducer := messagebroker.MustConnect(ctx, applicationYamlKey)
-
 	mbProcessors := processors(context.Background(), db)
 	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey, mbProcessors)
 
-	tm := tickerManager{
+	balanceTicker := tickerManager{
 		closed: false,
 		mb:     mbProducer,
 		cfg:    &cfg,
+		period: balancesUpdateMillisecondsTicker,
 	}
-	go tm.startTicker()
+	go balanceTicker.startTicker(balanceTicker.produceUpdateBalancesMessage)
+
+	adoptionTicker := tickerManager{
+		closed: false,
+		mb:     mbProducer,
+		cfg:    &cfg,
+		period: adoptionUpdateTicker,
+	}
+	go adoptionTicker.startTicker(adoptionTicker.produceUpdateAdoptionMessage)
 
 	return &processor{
 		close:           closeAll(db, mbProducer, mbConsumer),
 		ReadRepository:  &economy{db: db},
 		WriteRepository: &economy{db: db, mb: mbProducer},
 		mb:              mbProducer,
-		ticker:          &tm,
+		tickers:         []*tickerManager{&balanceTicker, &adoptionTicker},
 	}
 }
 
@@ -96,6 +105,7 @@ func processors(ctx context.Context, db tarantool.Connector) map[messagebroker.T
 	return map[messagebroker.Topic]messagebroker.Processor{
 		cfg.MessageBroker.ConsumingTopics[0]: usereconomy.New(db),
 		cfg.MessageBroker.ConsumingTopics[1]: balances.New(db),
+		cfg.MessageBroker.ConsumingTopics[2]: adoption.New(db),
 	}
 }
 
@@ -110,13 +120,13 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	return nil
 }
 
-func (t *tickerManager) startTicker() {
-	ticker := time.NewTicker(balancesUpdateMillisecondsTicker)
+func (t *tickerManager) startTicker(callback func()) {
+	ticker := time.NewTicker(t.period)
 	defer ticker.Stop()
 
 	for !t.closed {
 		<-ticker.C
-		t.produceUpdateBalancesMessage()
+		callback()
 	}
 }
 
@@ -129,6 +139,23 @@ func (t *tickerManager) produceUpdateBalancesMessage() {
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     uuid.NewString(),
 		Topic:   t.cfg.MessageBroker.Topics[3].Name,
+		Value:   nil,
+	}
+
+	defer close(responder)
+	t.mb.SendMessage(ctx, m, responder)
+	log.Error(errors.Wrapf(<-responder, "failed to send update balances message: %#v", m))
+}
+
+func (t *tickerManager) produceUpdateAdoptionMessage() {
+	ctx, cancel := context.WithTimeout(context.Background(), sendUpdateBalancesMessageDeadline)
+	defer cancel()
+
+	responder := make(chan error, 1)
+	m := &messagebroker.Message{
+		Headers: map[string]string{"producer": "freezer"},
+		Key:     uuid.NewString(),
+		Topic:   t.cfg.MessageBroker.Topics[4].Name,
 		Value:   nil,
 	}
 
