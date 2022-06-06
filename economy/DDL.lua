@@ -5,7 +5,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS global  (
                     value SCALAR NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 -- (key,value) : ('TOTAL_USERS', 10000) -----> ++ or -- when user registers/deletes account
--- (key,value) : ('TOTAL_ACTIVE_USERS', 10) -----> you reset this with `select count(1) from user_economy where last_mining_started_at < 24h` and you do that in the same logic you populate adoption_history in
+-- (key,value) : ('TOTAL_ACTIVE_USERS', 10) -----> you reset this with `select count(1) from user_economy where last_mining_started_at > now-24h` and you do that in the same logic you populate adoption_history in
 
 box.execute([[CREATE TABLE IF NOT EXISTS total_users_history  (
                     minute_timestamp UNSIGNED primary key,
@@ -92,7 +92,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS balances (
                     amount_w1 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w2 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w3 UNSIGNED NOT NULL DEFAULT 0,
-                    
+
                     primary key (user_id, type)) WITH ENGINE = 'vinyl';]])
 box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (amount_w3, amount_w2, amount_w1, amount_w0);]])
 -- amount is in ice flakes

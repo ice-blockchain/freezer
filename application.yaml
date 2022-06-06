@@ -3,7 +3,7 @@
 development: true
 logger:
   encoder: console
-  level: debug
+  level: info
 cmd/freezer:
   host: localhost
   version: local
@@ -56,6 +56,7 @@ economy:
     consumingTopics:
       - users-events
       - balances-update
+      - adoption-update
     topics:
       - name: economy-mining
         partitions: 10
@@ -71,6 +72,12 @@ economy:
         replicationFactor: 1
         retention: 1000h
       - name: balances-update
+        partitions: 10
+        partition: 1
+        replicationFactor: 1
+        retention: 1000h
+        cleanupPolicy: compact
+      - name: adoption-update
         partitions: 10
         partition: 1
         replicationFactor: 1
