@@ -1,6 +1,10 @@
 package adoption
 
-import "github.com/framey-io/go-tarantool"
+import (
+	"github.com/framey-io/go-tarantool"
+
+	"github.com/ice-blockchain/wintr/coin"
+)
 
 // Public API.
 
@@ -30,6 +34,22 @@ type (
 		HoursTimestamp   uint64
 		TotalActiveUsers uint64
 	}
+	adoption struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		// Mining rate, iceflakes/hr.
+		BaseHourlyMiningRate *coin.ICEFlake
+		// Active users count required to achieve, to apply such  BaseHourlyMiningRate .
+		TotalActiveUsers uint64
+		// Flag if it is currently active adoption/mining rate.
+		Active bool
+	}
+	adoptionWithHistory struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack      struct{} `msgpack:",asArray"`
+		HistoryByHour string
+		adoption
+	}
 
 	global struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
@@ -48,4 +68,8 @@ const (
 	secsInMinute         = 60
 	minsInHour           = 60
 	secsInHour           = secsInMinute * minsInHour
+	base10               = 10
+	bitSize64            = 64
+
+	adoptionSwitchRequirementsDuration = 168 // Hours.
 )
