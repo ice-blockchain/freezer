@@ -19,10 +19,11 @@ box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_date_ix ON total_us
 -- every minute, total_users_history.total_users = global.value where global.key = 'TOTAL_USERS'
 
 box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
-                    total_active_users UNSIGNED primary key,
                     base_hourly_mining_rate STRING NOT NULL,
+                    total_active_users UNSIGNED primary key,
                     active BOOLEAN NOT NULL DEFAULT false
                     ) WITH ENGINE = 'vinyl';]])
+
 box.execute([[INSERT INTO adoption (total_active_users, base_hourly_mining_rate, active)
                           VALUES (0, '16000000000', true),
                                  (50000, '8000000000', false),

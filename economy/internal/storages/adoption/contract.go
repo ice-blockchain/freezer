@@ -3,6 +3,8 @@
 package adoption
 
 import (
+	"time"
+
 	"github.com/framey-io/go-tarantool"
 
 	"github.com/ice-blockchain/wintr/coin"
@@ -46,12 +48,6 @@ type (
 		// Flag if it is currently active adoption/mining rate.
 		Active bool
 	}
-	adoptionWithHistory struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack      struct{} `msgpack:",asArray"`
-		HistoryByHour string
-		adoption
-	}
 
 	global struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
@@ -70,8 +66,7 @@ const (
 	secsInMinute         = 60
 	minsInHour           = 60
 	secsInHour           = secsInMinute * minsInHour
-	base10               = 10
-	bitSize64            = 64
 
+	inactivityDeadline                 = 24 * time.Hour
 	adoptionSwitchRequirementsDuration = 168 // Hours.
 )
