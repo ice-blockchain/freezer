@@ -4,10 +4,11 @@ package adoption
 
 import (
 	"context"
-	"time"
 
 	"github.com/framey-io/go-tarantool"
 	"github.com/pkg/errors"
+
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func newRepository(db tarantool.Connector) Repository {
@@ -37,16 +38,16 @@ func (r *repository) updateActiveUsers(ctx context.Context) error {
 	return errors.Wrapf(r.updateGlobalActiveUsersCount(ctx, activeUsersCount), "failed to update global total users count")
 }
 
-func (r *repository) getActiveUsersCount(ctx context.Context) (uint64, time.Time, error) {
-	now := time.Now().UTC()
+func (r *repository) getActiveUsersCount(ctx context.Context) (uint64, *time.Time, error) {
+	now := time.Now()
 	if ctx.Err() != nil {
 		return 0, now, errors.Wrap(ctx.Err(), "failed to get count of active users because of context failed")
 	}
-	ago24Hours := now.Add(-hoursInDay * time.Hour)
 	var queryResult []*withCount
-	sql := `SELECT count(1) AS c FROM user_economy WHERE last_mining_started_at > :timeBefore24Hours`
+	sql := `SELECT count(1) AS c FROM user_economy WHERE :now - last_mining_started_at < :inactivityDeadline`
 	params := map[string]interface{}{
-		"timeBefore24Hours": uint64(ago24Hours.UnixNano()),
+		"now":                time.Now(),
+		"inactivityDeadline": inactivityDeadline,
 	}
 	if err := r.db.PrepareExecuteTyped(sql, params, &queryResult); err != nil {
 		return 0, now, errors.Wrap(err, "failed to get count of active users")
