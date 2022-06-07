@@ -114,27 +114,3 @@ func (r *repository) setActiveAdoption(ctx context.Context, newAdoption *adoptio
 
 	return errors.Wrapf(storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)), "failed to set current active adoption %#v", newAdoption)
 }
-
-//func parseHistory(historyValue string) []uint64 {
-//	values := strings.Split(historyValue, ",")
-//	uints := make([]uint64, len(values))
-//	for i, val := range values {
-//		//nolint:errcheck // There is UNSIGNED field in db, no chance if we can get error here.
-//		uints[i], _ = strconv.ParseUint(val, base10, bitSize64)
-//	}
-//
-//	return uints
-//}
-//
-//func isAllHistoryAboveAdoptionRequirements(historyValues []uint64, adoptionValue *adoptionWithHistory) bool {
-//	allHistoryAboveAdoptionLimit := len(historyValues) > 0 // Default = true.
-//	for _, history := range historyValues {
-//		if history < adoptionValue.TotalActiveUsers { // And we switch it to false on first non-fitting history entry.
-//			allHistoryAboveAdoptionLimit = false
-//
-//			break
-//		}
-//	}
-//
-//	return allHistoryAboveAdoptionLimit
-//}
