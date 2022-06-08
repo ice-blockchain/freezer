@@ -15,7 +15,6 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "failed to get count of active users because of context failed")
 	}
-	// Using sql here to get value from global by one query.
 	sql := `REPLACE INTO total_users_history (
 					minute_timestamp,
                     hour_timestamp,
@@ -27,14 +26,14 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
                     :hourTS,
                     :dayTS,
                     :date_,
-					(SELECT value FROM global WHERE key = 'TOTAL_USERS')
+					(SELECT CAST(value AS unsigned) FROM global WHERE key = 'TOTAL_USERS')
 				)`
 	now := time.Now()
 	params := map[string]interface{}{
 		"minuteTS": now.Unix() / secsInMinute,
 		"hourTS":   now.Unix() / secsInHour,
 		"dayTS":    now.Unix() / (hoursInDay * secsInHour),
-		"date_":    now.Format("2006-01-02"),
+		"date_":    now.Format(dateFormat),
 	}
 
 	return errors.Wrapf(storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)), "failed to update total_users_history %v", params)

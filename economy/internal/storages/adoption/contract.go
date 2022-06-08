@@ -69,4 +69,6 @@ const (
 
 	inactivityDeadline                 = 24 * time.Hour
 	adoptionSwitchRequirementsDuration = 168 // Hours.
+
+	dateFormat = "2006-01-02"
 )
