@@ -51,8 +51,8 @@ func (s *userEconomySource) initializeEconomy(u *users.User) error {
 	if err := s.createUserStaking(u); err != nil {
 		return errors.Wrap(err, "unable to call createUserStaking")
 	}
-	if err := s.createUserEarnings(u); err != nil {
-		return errors.Wrap(err, "unable to call createUserEarnings")
+	if err := s.createGeneralEarnings(u); err != nil {
+		return errors.Wrap(err, "unable to call createGeneralEarnings")
 	}
 
 	return errors.Wrap(s.createReferralEarnings(u), "unable to call createReferralEarnings")
@@ -171,16 +171,21 @@ func (s *userEconomySource) updateUserEconomy(ue *userEconomy) error {
 		"failed to update user economy record for user.ID:%v", ue.UserID)
 }
 
-func (s *userEconomySource) createUserEarnings(u *users.User) error {
+func (s *userEconomySource) createGeneralEarnings(u *users.User) error {
 	var errs []error
-	if err := s.initializeEarnings(u.ID, balanceTypeStandard); err != nil {
-		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStandard, u.ID))
+	types := []string{balanceTypeStandard, balanceTypeStaking, balanceTypeTotal}
+	for _, level := range []uint8{tierLevel0, tierLevel1, tierLevel2} {
+		standard := generateGeneralBalanceType(balanceTypeStandard, level)
+		staking := generateGeneralBalanceType(balanceTypeStaking, level)
+
+		for _, t := range []string{standard, staking} {
+			types = append(types, t)
+		}
 	}
-	if err := s.initializeEarnings(u.ID, balanceTypeStaking); err != nil {
-		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeStaking, u.ID))
-	}
-	if err := s.initializeEarnings(u.ID, balanceTypeTotal); err != nil {
-		errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", balanceTypeTotal, u.ID))
+	for _, t := range types {
+		if err := s.initializeEarnings(u.ID, t); err != nil {
+			errs = append(errs, errors.Wrapf(err, "unable to initialize %v balance for userID:%v", t, u.ID))
+		}
 	}
 
 	return errors.Wrapf(multiErr(errs), "unable to initialize user earnings")
@@ -217,17 +222,10 @@ func (s *userEconomySource) initializeReferralEarnings(userID, referredBy UserID
 	types := []string{
 		generateUserBalanceType(userID, balanceTypeStandard, tierLevel),
 		generateUserBalanceType(userID, balanceTypeStaking, tierLevel),
-		generateGeneralBalanceType(balanceTypeStandard, tierLevel),
-		generateGeneralBalanceType(balanceTypeStaking, tierLevel),
 	}
-
 	for _, t := range types {
-		tErr := new(tarantool.Error)
-		if err := s.initializeEarnings(referredBy, t); err != nil &&
-			// Because t[level>0]_referral_[standard/staking]_earnings can already exist when another t[level>0]...~[userID] record was created.
-			(!strings.Contains(t, "~") && errors.As(err, tErr) && tErr.Code != tarantool.ER_TUPLE_FOUND) {
-			return errors.Wrapf(err,
-				"unable to initialize earnings for userID:%[1]v and type:%[2]v", referredBy, t)
+		if err := s.initializeEarnings(referredBy, t); err != nil {
+			return errors.Wrapf(err, "unable to initialize earnings for userID:%[1]v and type:%[2]v", referredBy, t)
 		}
 	}
 

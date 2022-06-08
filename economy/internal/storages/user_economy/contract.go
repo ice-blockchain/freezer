@@ -12,9 +12,9 @@ import (
 // Private API.
 
 const (
-	tierLevel0 uint64 = 0
-	tierLevel1 uint64 = 1
-	tierLevel2 uint64 = 2
+	tierLevel0 uint8 = 0
+	tierLevel1 uint8 = 1
+	tierLevel2 uint8 = 2
 
 	balanceTypeStandard string = "standard"
 	balanceTypeStaking  string = "staking"
@@ -24,7 +24,7 @@ const (
 type (
 	UserID      = string
 	BalanceType = string
-	TierLevel   = uint64
+	TierLevel   = uint8
 
 	// | userEconomy is the internal structure for deserialization from the DB.
 	userEconomy struct {
@@ -55,12 +55,14 @@ type (
 		db tarantool.Connector
 	}
 
+	// | tier is the internal structure for deserialization from the DB.
 	tier struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		UserID   UserID
 	}
 
+	// | totalUsers is the internal structure for deserialization from the DB.
 	totalUsers struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
@@ -68,6 +70,7 @@ type (
 		Value    uint64
 	}
 
+	// | balances is the internal structure for deserialization from the DB.
 	balances struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack  struct{} `msgpack:",asArray"`
