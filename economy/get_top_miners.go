@@ -23,8 +23,8 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 		FROM BALANCES b
 				JOIN USER_ECONOMY u
 					on lower(u.username) LIKE :keyword ESCAPE '\'
-					on b.user_id = u.user_id
-					and lower(b.type) = 'total'
+					AND b.user_id = u.user_id
+					AND lower(b.type) = 'total'
 		ORDER BY b.amount_w3 DESC,
 				 b.amount_w2 DESC,
 				 b.amount_w1 DESC,
@@ -41,7 +41,7 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 
 func (arg *GetTopMinersArg) params() map[string]interface{} {
 	return map[string]interface{}{
-		"offset":         arg.Offset,
+		"offset":  arg.Offset,
 		"keyword": fmt.Sprintf("%%%v%%", strings.ReplaceAll(strings.ToLower(arg.Keyword), "_", "\\_")),
 	}
 }
