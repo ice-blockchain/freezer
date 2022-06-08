@@ -22,7 +22,7 @@ func (r *repository) updateActiveUsers(ctx context.Context) error {
 	// Get it with another query because we're reusing its value in adoption_history and global (key = TOTAL_ACTIVE_USERS).
 	activeUsersCount, timestamp, err := r.getActiveUsersCount(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update active users count because of count failed")
+		return errors.Wrap(err, "failed to update active users count because of count failed")
 	}
 	mins := uint64(timestamp.Unix()) / secsInMinute
 	hours := mins / minsInHour
@@ -39,14 +39,14 @@ func (r *repository) updateActiveUsers(ctx context.Context) error {
 }
 
 func (r *repository) getActiveUsersCount(ctx context.Context) (uint64, *time.Time, error) {
-	now := time.Now()
 	if ctx.Err() != nil {
-		return 0, now, errors.Wrap(ctx.Err(), "failed to get count of active users because of context failed")
+		return 0, nil, errors.Wrap(ctx.Err(), "failed to get count of active users because of context failed")
 	}
 	var queryResult []*withCount
+	now := time.Now()
 	sql := `SELECT count(1) AS c FROM user_economy WHERE :now - last_mining_started_at < :inactivityDeadline`
 	params := map[string]interface{}{
-		"now":                time.Now(),
+		"now":                now,
 		"inactivityDeadline": inactivityDeadline,
 	}
 	if err := r.db.PrepareExecuteTyped(sql, params, &queryResult); err != nil {

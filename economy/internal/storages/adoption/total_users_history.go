@@ -4,11 +4,11 @@ package adoption
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
@@ -22,14 +22,14 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
                     day_timestamp,
                     date_,
                     total_users
-) VALUES(
+				) VALUES(
 					:minuteTS,
                     :hourTS,
                     :dayTS,
                     :date_,
 					(SELECT value FROM global WHERE key = 'TOTAL_USERS')
-);`
-	now := time.Now().UTC()
+				)`
+	now := time.Now()
 	params := map[string]interface{}{
 		"minuteTS": now.Unix() / secsInMinute,
 		"hourTS":   now.Unix() / secsInHour,
@@ -37,5 +37,5 @@ func (r *repository) updateTotalUsersHistory(ctx context.Context) error {
 		"date_":    now.Format("2006-01-02"),
 	}
 
-	return errors.Wrapf(storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)), "failed to add total_users_history %v", params)
+	return errors.Wrapf(storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)), "failed to update total_users_history %v", params)
 }
