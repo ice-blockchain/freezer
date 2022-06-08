@@ -22,13 +22,13 @@ func (a *adoptionSource) Process(ctx context.Context, _ *messagebroker.Message) 
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
 	if err := a.r.updateActiveUsers(ctx); err != nil {
-		return errors.Wrapf(err, "adoption/adoptionSource: failed to update active users")
+		return errors.Wrap(err, "adoption/adoptionSource: failed to update active users")
 	}
 	if err := a.switchActiveAdoption(ctx); err != nil {
-		return errors.Wrapf(err, "adoption/adoptionSource: failed to switch active adoption/mining rate")
+		return errors.Wrap(err, "adoption/adoptionSource: failed to switch active adoption/mining rate")
 	}
 
-	return errors.Wrapf(a.r.updateTotalUsersHistory(ctx), "adoption/adoptionSource: failed to update total users history")
+	return errors.Wrap(a.r.updateTotalUsersHistory(ctx), "adoption/adoptionSource: failed to update total users history")
 }
 
 func (a *adoptionSource) switchActiveAdoption(ctx context.Context) error {
@@ -36,7 +36,7 @@ func (a *adoptionSource) switchActiveAdoption(ctx context.Context) error {
 	// then adoption.active of that entry becomes true and the previous active adoption entry becomes false.
 	adoptionChangedByHour, err := a.r.getAdoptionsChangedByHoursLastWeek(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "failed to switch active adoption, reading adoptions failed")
+		return errors.Wrap(err, "failed to switch active adoption, reading adoptions failed")
 	}
 
 	newActiveAdoption := a.calculateNextAdoption(adoptionChangedByHour)
@@ -49,27 +49,41 @@ func (a *adoptionSource) switchActiveAdoption(ctx context.Context) error {
 }
 
 func (a *adoptionSource) calculateNextAdoption(adoptionsHistory []*adoption) *adoption {
+	// We're looking for next  adoption - it will be adoption with minimal count of TotalActiveUsers but greater than current.
 	var newActiveAdoption *adoption
-	adoptionChanged := false
-	if len(adoptionsHistory) > 0 {
-		newActiveAdoption = adoptionsHistory[0]
-	} else {
-		newActiveAdoption = &adoption{TotalActiveUsers: 0}
-	}
-	// Check if all hours during the week (last 168 hours) was the same next adoption.
-	for _, currentAdoption := range adoptionsHistory {
-		if currentAdoption.TotalActiveUsers != newActiveAdoption.TotalActiveUsers {
-			adoptionChanged = true
+	currentActiveAdoption := adoptionsHistory[0] // We'll get current at first because of UNION... And ORDER BY adoptions.active DESC.
+	for _, ad := range adoptionsHistory {
+		if ad.Active {
+			currentActiveAdoption = ad
 
-			break
+			continue
+		}
+		// If in our history by hours if presented any adoption less than current
+		// it means that hour has not enough users to switch adoption - no need to switch.
+		if ad.TotalActiveUsers < currentActiveAdoption.TotalActiveUsers {
+			return nil
+		}
+		if newActiveAdoption == nil {
+			newActiveAdoption = ad
+		}
+		// Less than minimal but more than currently active.
+		if a.checkForMinimalAdoption(ad, newActiveAdoption, currentActiveAdoption) {
+			newActiveAdoption = ad
 		}
 	}
-	// If it was changed - it means NOT ALL hours had enough users to switch the adoption, so no need to switch.
-	if adoptionChanged {
+	// If new is current or less - no need to switch anything.
+	if newActiveAdoption.TotalActiveUsers <= currentActiveAdoption.TotalActiveUsers {
 		return nil
 	}
 
 	return newActiveAdoption
+}
+
+func (a *adoptionSource) checkForMinimalAdoption(ad, minimal, currentlyActive *adoption) bool {
+	lessOrEqToMinimal := ad.TotalActiveUsers <= minimal.TotalActiveUsers
+	moreThanCurrent := ad.TotalActiveUsers > currentlyActive.TotalActiveUsers
+
+	return lessOrEqToMinimal && moreThanCurrent
 }
 
 func (r *repository) getAdoptionsChangedByHoursLastWeek(ctx context.Context) ([]*adoption, error) {
@@ -78,16 +92,18 @@ func (r *repository) getAdoptionsChangedByHoursLastWeek(ctx context.Context) ([]
 	}
 	sql := `
 	SELECT adoption.base_hourly_mining_rate, adoption.total_active_users, adoption.active FROM (
-      SELECT MIN(total_active_users) AS users_count, -- They are stored for minutes, we take minimum value for each hour --Я
-             adoption_history.hour_timestamp
-      FROM adoption_history
-      WHERE :nowHourTimestamp - hour_timestamp < :oneWeek
-      GROUP BY adoption_history.hour_timestamp
-  	) as history
-      JOIN ADOPTION
-           ON users_count >= adoption.total_active_users
-	GROUP BY HOUR_TIMESTAMP
-`
+      	SELECT MIN(total_active_users) AS users_count, -- They are stored for minutes, we take minimum value for each hour --
+            adoption_history.hour_timestamp
+      	FROM adoption_history
+      	WHERE :nowHourTimestamp - hour_timestamp < :oneWeek
+      	GROUP BY adoption_history.hour_timestamp
+  	) AS history
+    	JOIN ADOPTION
+           ON history.users_count >= adoption.total_active_users
+	GROUP BY hour_timestamp
+	UNION SELECT ADOPTION.* from ADOPTION WHERE ACTIVE = true -- We need current to compare with --
+	ORDER BY adoption.active DESC`
+
 	params := map[string]interface{}{
 		"oneWeek":          adoptionSwitchRequirementsDuration,
 		"nowHourTimestamp": time.Now().Unix() / secsInHour,
@@ -105,9 +121,9 @@ func (r *repository) setActiveAdoption(ctx context.Context, newAdoption *adoptio
 		return errors.Wrapf(ctx.Err(), "failed to set active adoption to %#v because of context failed", newAdoption)
 	}
 	sql := `
-	UPDATE adoption 
-		SET active = adoption.total_active_users = :newAdoptionTotalUsers
-	WHERE 1 = 1;`
+		UPDATE adoption 
+			SET active = adoption.total_active_users = :newAdoptionTotalUsers
+		WHERE 1 = 1`
 	params := map[string]interface{}{
 		"newAdoptionTotalUsers": newAdoption.TotalActiveUsers,
 	}
