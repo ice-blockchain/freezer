@@ -149,6 +149,8 @@ const (
 	produceUpdateAdoptionMessageDeadline                           = 30 * tm.Second
 
 	adoptionUpdateTicker = 60 * tm.Second
+
+	stakedHourlyMiningRateDivider uint64 = 10000
 )
 
 var (
@@ -211,6 +213,17 @@ type (
 		UserID     UserID
 		Percentage uint64
 		Years      uint64
+	}
+	// | estimatedEarningsCalculationData is the internal structure for deserialization from the DB.
+	estimatedEarningsCalculationData struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		BaseHourlyMiningRate BaseHourlyMiningRate
+		Bonus                uint64
+	}
+
+	calculateEstimatedEarningsArg struct {
+		*GetEstimatedEarningsArg
+		*estimatedEarningsCalculationData
 	}
 
 	// | repository implements the public API that this package exposes.
