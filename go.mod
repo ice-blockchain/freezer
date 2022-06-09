@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
 	cosmossdk.io/math v1.0.0-beta.2
-	github.com/framey-io/go-tarantool v0.0.0-20220317175443-747a509561d8
+	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
 	github.com/gin-gonic/gin v1.8.1
 	github.com/goccy/go-json v0.9.7
 	github.com/google/uuid v1.3.0
@@ -46,7 +46,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/imroc/req/v3 v3.12.0 // indirect
+	github.com/imroc/req/v3 v3.13.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.6 // indirect
