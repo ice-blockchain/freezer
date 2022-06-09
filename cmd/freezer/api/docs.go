@@ -50,12 +50,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/economy.Adoption"
                         }
                     },
-                    "400": {
-                        "description": "if validations fail",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
                     "401": {
                         "description": "if not authorized",
                         "schema": {
