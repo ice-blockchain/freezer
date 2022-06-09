@@ -177,10 +177,7 @@ func (s *userEconomySource) createGeneralEarnings(u *users.User) error {
 	for _, level := range []uint8{tierLevel0, tierLevel1, tierLevel2} {
 		standard := generateGeneralBalanceType(balanceTypeStandard, level)
 		staking := generateGeneralBalanceType(balanceTypeStaking, level)
-
-		for _, t := range []string{standard, staking} {
-			types = append(types, t)
-		}
+		types = append(types, []string{standard, staking}...)
 	}
 	for _, t := range types {
 		if err := s.initializeEarnings(u.ID, t); err != nil {
