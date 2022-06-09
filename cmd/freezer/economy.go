@@ -29,7 +29,7 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
 // @Failure      400            {object}  server.ErrorResponse  "if validations fail"
