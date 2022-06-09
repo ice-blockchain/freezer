@@ -11,11 +11,11 @@ box.execute([[CREATE TABLE IF NOT EXISTS total_users_history  (
                     minute_timestamp UNSIGNED primary key,
                     hour_timestamp UNSIGNED NOT NULL CHECK (minute_timestamp >= hour_timestamp*60 and minute_timestamp < (hour_timestamp+1)*60),
                     day_timestamp UNSIGNED NOT NULL CHECK (hour_timestamp >= day_timestamp*24 and hour_timestamp < (day_timestamp+1)*24),
-                    date STRING NOT NULL,
+                    date_ STRING NOT NULL,
                     total_users UNSIGNED NOT NULL DEFAULT 0
                     ) WITH ENGINE = 'vinyl';]])
 box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_day_timestamp_ix ON total_users_history (day_timestamp);]])
-box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_date_ix ON total_users_history (date);]])
+box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_date_ix ON total_users_history (date_);]])
 -- every minute, total_users_history.total_users = global.value where global.key = 'TOTAL_USERS'
 
 box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
