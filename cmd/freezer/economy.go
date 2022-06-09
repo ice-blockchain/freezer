@@ -84,7 +84,7 @@ func (req *RequestGetUserEconomy) Bindings(c *gin.Context) []func(obj interface{
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        keyword        query     string  false  "a keyword to look for"
 // @Param        limit          query     uint64  false  "max number of elements to return"
 // @Param        offset         query     uint64  false  "number of elements to skip before starting to fetch data"
@@ -274,6 +274,9 @@ func (req *RequestGetUserStats) GetAuthenticatedUser() server.AuthenticatedUser 
 func (req *RequestGetUserStats) Validate() *server.Response {
 	if req.LastNoOfDays == 0 {
 		req.LastNoOfDays = defaultLastNoOfDays
+	}
+	if req.LastNoOfDays > maximumLastNoOfDays {
+		return server.BadRequest(errors.Errorf("lastNoOfDays has to be within [0,30], %v is invalid", req.LastNoOfDays), "MISSING_PROPERTIES")
 	}
 
 	return nil
