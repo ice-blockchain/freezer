@@ -59,7 +59,7 @@ func (e *economy) calculateEstimatedEarnings(arg *calculateEstimatedEarningsArg)
 	hmr := arg.BaseHourlyMiningRate.MulUint64(rateMultiplier).QuoUint64(percentage100)
 
 	normalHMR := math.NewUint(percentage100 - uint64(arg.StakingAllocation)).Mul(hmr).QuoUint64(percentage100)
-	stakedHMR := math.NewUint(arg.Bonus).Mul(hmr).Mul(math.NewUint(uint64(arg.StakingAllocation))).QuoUint64(stakedHourlyMiningRateDivider)
+	stakedHMR := math.NewUint(arg.StakingPercentageBonus).Mul(hmr).Mul(math.NewUint(uint64(arg.StakingAllocation))).QuoUint64(stakedHourlyMiningRateDivider)
 
 	return &EstimatedEarnings{
 		StandardHourlyMiningRate: &coin.ICEFlake{Uint: normalHMR},

@@ -217,9 +217,9 @@ type (
 	// | estimatedEarningsCalculationData is the internal structure for deserialization from the DB.
 	estimatedEarningsCalculationData struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack             struct{} `msgpack:",asArray"`
-		BaseHourlyMiningRate BaseHourlyMiningRate
-		Bonus                uint64
+		_msgpack               struct{} `msgpack:",asArray"`
+		BaseHourlyMiningRate   BaseHourlyMiningRate
+		StakingPercentageBonus uint64
 	}
 
 	calculateEstimatedEarningsArg struct {
