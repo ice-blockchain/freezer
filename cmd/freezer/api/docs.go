@@ -592,6 +592,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "SOMETHING_NOT_FOUND"
                 },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
                 "error": {
                     "type": "string",
                     "example": "something is missing"

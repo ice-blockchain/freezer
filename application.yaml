@@ -33,11 +33,14 @@ economy:
   inactivityHoursDeadline: 24
   db:
     spaces:
-      - TOTAL_USERS
+      - GLOBAL
+      - TOTAL_USERS_HISTORY
       - ADOPTION
+      - ADOPTION_HISTORY
       - USER_ECONOMY
-      - T1_REFERRAL_EARNINGS
-      - T2_REFERRAL_EARNINGS
+      - STAKING
+      - STAKING_BONUS
+      - BALANCES
     urls:
       - localhost:3303
     user: admin

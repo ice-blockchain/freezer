@@ -29,15 +29,15 @@ func (s *service) setupEconomyRoutes(router *gin.Engine) {
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        userId         path      string  true  "ID of the user"
 // @Success      200            {object}  economy.UserEconomy
-// @Failure      400                {object}  server.ErrorResponse  "if validations fail"
-// @Failure      401                {object}  server.ErrorResponse  "if not authorized"
+// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
 // @Failure      404            {object}  server.ErrorResponse  "if not found"
-// @Failure      422                {object}  server.ErrorResponse  "if syntax fails"
-// @Failure      500                {object}  server.ErrorResponse
-// @Failure      504                {object}  server.ErrorResponse  "if request times out"
+// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500            {object}  server.ErrorResponse
+// @Failure      504            {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/user-economy/{userId} [GET].
 func (s *service) GetUserEconomy(ctx context.Context, r server.ParsedRequest) server.Response {
 	req := r.(*RequestGetUserEconomy)
@@ -140,18 +140,18 @@ func (req *RequestGetTopMiners) Bindings(c *gin.Context) []func(obj interface{})
 // @Tags         Economy
 // @Accept       json
 // @Produce      json
-// @Param        Authorization  header    string  true  "Insert your access token"  default(Bearer <Add access token here>)
+// @Param        Authorization      header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Param        t0                 query     bool    false  "if the user that referred you should be active or not"
 // @Param        t1                 query     uint64  false  "number of t1 active referrals you desire"
 // @Param        t2                 query     uint64  false  "number of t2 active referrals you desire"
 // @Param        stakingYears       query     uint8   false  "number of years you want to enable staking for"
 // @Param        stakingAllocation  query     uint8   false  "the percentage [0..100] of your balance you want to stake"
 // @Success      200                {object}  economy.EstimatedEarnings
-// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
-// @Failure      401            {object}  server.ErrorResponse  "if not authorized"
-// @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
-// @Failure      500            {object}  server.ErrorResponse
-// @Failure      504            {object}  server.ErrorResponse  "if request times out"
+// @Failure      400                {object}  server.ErrorResponse  "if validations fail"
+// @Failure      401                {object}  server.ErrorResponse  "if not authorized"
+// @Failure      422                {object}  server.ErrorResponse  "if syntax fails"
+// @Failure      500                {object}  server.ErrorResponse
+// @Failure      504                {object}  server.ErrorResponse  "if request times out"
 // @Router       /economy/estimated-earnings [GET].
 func (s *service) GetEstimatedEarnings(ctx context.Context, r server.ParsedRequest) server.Response {
 	resp, err := s.economyRepository.GetEstimatedEarnings(ctx, &r.(*RequestGetEstimatedEarnings).GetEstimatedEarningsArg)

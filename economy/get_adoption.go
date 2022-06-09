@@ -5,6 +5,6 @@ package economy
 import "context"
 
 func (e *economy) GetAdoption(ctx context.Context) (*Adoption, error) {
-	// TODO implement me
+	//nolint:nolintlint,gocritic // TODO implement me.
 	panic("implement me")
 }
