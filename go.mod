@@ -3,15 +3,14 @@ module github.com/ice-blockchain/freezer
 go 1.18
 
 require (
-	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
 	cosmossdk.io/math v1.0.0-beta.2
 	github.com/framey-io/go-tarantool v0.0.0-20220608172348-c90aee3317cb
 	github.com/gin-gonic/gin v1.8.1
 	github.com/goccy/go-json v0.9.7
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/wintr v1.12.0
 	github.com/ice-blockchain/eskimo v1.4.0
+	github.com/ice-blockchain/wintr v1.12.0
 	github.com/pkg/errors v0.9.1
 	github.com/swaggo/swag v1.8.2
 )
