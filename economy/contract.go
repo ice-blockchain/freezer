@@ -61,10 +61,10 @@ type (
 		StakingAllocation uint8  `form:"stakingAllocation" example:"100"`
 	}
 	TopMiner struct {
+		Balance           *coin.ICEFlake `json:"balance" swaggertype:"string" example:"12.123456789"`
 		UserID            string         `json:"userId" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		Username          string         `json:"username" example:"jdoe"`
 		ProfilePictureURL string         `json:"profilePictureURL" example:"https://somecdn.com/p1.jpg"`
-		Balance           *coin.ICEFlake `json:"balance" swaggertype:"string" example:"12.123456789"`
 	}
 	AdoptionMilestone struct {
 		HourlyMiningRate *coin.ICEFlake `json:"hourlyMiningRate" swaggertype:"string" example:"12.123456789"`

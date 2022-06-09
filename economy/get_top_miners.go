@@ -16,10 +16,10 @@ func (e *economy) GetTopMiners(ctx context.Context, arg *GetTopMinersArg) ([]*To
 	}
 
 	sql := fmt.Sprintf(`
-		SELECT  u.user_id,
+		SELECT  b.amount,
+				u.user_id,
 				u.username, 
-				u.profile_picture_url, 
-				b.amount 
+				u.profile_picture_url
 		FROM BALANCES b
 				JOIN USER_ECONOMY u
 					on lower(u.username) LIKE :keyword ESCAPE '\'

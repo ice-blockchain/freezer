@@ -16,6 +16,9 @@ definitions:
       code:
         example: SOMETHING_NOT_FOUND
         type: string
+      data:
+        additionalProperties: true
+        type: object
       error:
         example: something is missing
         type: string

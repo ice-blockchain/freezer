@@ -5,6 +5,6 @@ package economy
 import "context"
 
 func (e *economy) GetEstimatedEarnings(ctx context.Context, arg *GetEstimatedEarningsArg) (*EstimatedEarnings, error) {
-	// TODO implement me
+	//nolint:nolintlint,gocritic // TODO implement me.
 	panic("implement me")
 }
