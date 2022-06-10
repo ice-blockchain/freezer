@@ -4,9 +4,11 @@ package economy
 
 import (
 	"context"
-	"time"
+	stdlibtime "time"
 
 	"github.com/pkg/errors"
+
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (e *economy) GetUserStats(ctx context.Context, days Days) (*UserStats, error) {
@@ -38,13 +40,13 @@ func (e *economy) getDailyUserGrowth(ctx context.Context, days Days) (map[uint64
 	}
 	sql := `
 	SELECT 
-		(:nowDayTS - days.COLUMN_31) as day_ts, -- days.COLUMN_31 = count of values below --
+		(:now / 86400000000000 - days.COLUMN_31) as day_ts, -- days.COLUMN_31 = count of values below --
 		COALESCE(MIN(total.total_users),0) as total,
 		COALESCE(MIN(active.total_active_users),0) as active 
 	FROM (VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),
 				 (13),(14),(15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29),(30)) days
 	LEFT JOIN total_users_history AS total ON
-		total.DAY_TIMESTAMP = :nowDayTS - days.COLUMN_31
+		total.DAY_TIMESTAMP = :now / 86400000000000 - days.COLUMN_31
 	LEFT JOIN adoption_history AS active ON 
 		total.hour_timestamp = active.hour_timestamp
 		AND total.MINUTE_TIMESTAMP = active.MINUTE_TIMESTAMP
@@ -53,10 +55,11 @@ func (e *economy) getDailyUserGrowth(ctx context.Context, days Days) (map[uint64
 	GROUP BY days.COLUMN_31 
     UNION SELECT 0 as day_ts, -- zero day timestamp == current total / active --
            COALESCE((SELECT value FROM GLOBAL WHERE KEY = 'TOTAL_USERS'),0) as total,
-           COALESCE((SELECT value FROM GLOBAL WHERE KEY = 'TOTAL_ACTIVE_USERS'),0) as active;
+           COALESCE((SELECT value FROM GLOBAL WHERE KEY = 'TOTAL_ACTIVE_USERS'),0) as active
+	ORDER BY day_ts;
 `
 	params := map[string]interface{}{
-		"nowDayTS":  time.Now().UTC().Unix() / secondsInDay,
+		"now":       time.Now(),
 		"daysCount": days,
 	}
 	var queryResult []*dailyUserGrowth
@@ -72,7 +75,7 @@ func (e *economy) getDailyUserGrowth(ctx context.Context, days Days) (map[uint64
 }
 
 func (d *dailyUserGrowth) DailyUserGrowth() *DailyUserGrowth {
-	t := time.Unix(int64(d.DayTimestamp*secondsInDay), 0)
+	t := stdlibtime.Unix(int64(d.DayTimestamp*secondsInDay), 0)
 
 	return &DailyUserGrowth{
 		Year:  t.Year(),

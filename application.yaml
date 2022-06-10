@@ -42,7 +42,7 @@ economy:
       - STAKING_BONUS
       - BALANCES
     urls:
-      - localhost:3301
+      - localhost:3303
     user: admin
     password: pass
   messageBroker:
