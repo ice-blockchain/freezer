@@ -434,10 +434,13 @@ const docTemplate = `{
                     "$ref": "#/definitions/economy.ReferralBalance"
                 },
                 "total": {
-                    "type": "number",
-                    "example": 232.5
+                    "type": "string",
+                    "example": "232"
                 }
             }
+        },
+        "economy.BaseHourlyMiningRate": {
+            "type": "object"
         },
         "economy.DailyUserGrowth": {
             "type": "object",
@@ -475,13 +478,17 @@ const docTemplate = `{
         "economy.ReferralBalance": {
             "type": "object",
             "properties": {
+                "t0": {
+                    "type": "string",
+                    "example": "232"
+                },
                 "t1": {
-                    "type": "number",
-                    "example": 232.5
+                    "type": "string",
+                    "example": "232"
                 },
                 "t2": {
-                    "type": "number",
-                    "example": 232.5
+                    "type": "string",
+                    "example": "232"
                 }
             }
         },
@@ -489,8 +496,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "percentage": {
-                    "type": "number",
-                    "example": 25
+                    "type": "integer",
+                    "example": 200
                 },
                 "years": {
                     "type": "integer",
@@ -538,7 +545,7 @@ const docTemplate = `{
                 "adoption": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "number"
+                        "$ref": "#/definitions/economy.BaseHourlyMiningRate"
                     }
                 },
                 "balance": {
@@ -553,8 +560,8 @@ const docTemplate = `{
                     "example": 1000
                 },
                 "hourlyMiningRate": {
-                    "type": "number",
-                    "example": 232.5
+                    "type": "string",
+                    "example": "232"
                 },
                 "lastMiningStartedAt": {
                     "type": "string",

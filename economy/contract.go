@@ -6,7 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"io"
-	"time"
+	tm "time"
 
 	"github.com/framey-io/go-tarantool"
 	"github.com/pkg/errors"
@@ -14,6 +14,7 @@ import (
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 // Public API.
@@ -27,14 +28,14 @@ var (
 type (
 	UserID               = string
 	TotalUsers           = uint64
-	BaseHourlyMiningRate = float64
+	BaseHourlyMiningRate = *coin.ICEFlake
 	UserEconomy          struct {
-		LastMiningStartedAt time.Time                           `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
+		LastMiningStartedAt *time.Time                          `json:"lastMiningStartedAt" example:"2022-01-03T16:20:52.156534Z"`
+		HourlyMiningRate    *coin.ICEFlake                      `json:"hourlyMiningRate" swaggertype:"string" example:"232"`
 		Adoption            map[TotalUsers]BaseHourlyMiningRate `json:"adoption"`
 		Balance             Balance                             `json:"balance"`
 		CurrentTotalUsers   TotalUsers                          `json:"currentTotalUsers" example:"1000000"`
 		Staking             Staking                             `json:"staking"`
-		HourlyMiningRate    float64                             `json:"hourlyMiningRate" example:"232.5"`
 		GlobalRank          uint64                              `json:"globalRank" example:"1000"`
 	}
 	EstimatedEarnings struct {
@@ -42,16 +43,17 @@ type (
 		StakingHourlyMiningRate  *coin.ICEFlake `json:"stakingHourlyMiningRate" swaggertype:"string" example:"12.123456789"`
 	}
 	Staking struct {
-		Years      uint64  `json:"years" example:"1"`
-		Percentage float64 `json:"percentage" example:"25.0"`
+		Years      uint64 `json:"years" example:"1"`
+		Percentage uint64 `json:"percentage" example:"200"`
 	}
 	Balance struct {
-		Total     float64         `json:"total" example:"232.5"`
+		Total     *coin.ICEFlake  `json:"total" swaggertype:"string" example:"232"`
 		Referrals ReferralBalance `json:"referrals"`
 	}
 	ReferralBalance struct {
-		T1 float64 `json:"t1" example:"232.5"`
-		T2 float64 `json:"t2" example:"232.5"`
+		T0 *coin.ICEFlake `json:"t0" swaggertype:"string" example:"232"`
+		T1 *coin.ICEFlake `json:"t1" swaggertype:"string" example:"232"`
+		T2 *coin.ICEFlake `json:"t2" swaggertype:"string" example:"232"`
 	}
 	GetEstimatedEarningsArg struct {
 		T1ActiveReferrals uint64 `form:"t1" example:"20"`
@@ -118,24 +120,38 @@ type (
 		StartStaking(context.Context, UserID, Staking) error
 	}
 
-	// | MiningStarted is structure to hold notification message.
+	// | MiningStarted is structure to deserialize from the DB and to hold notification message.
 	MiningStarted struct {
-		TS time.Time `json:"ts"`
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack            struct{}   `msgpack:",asArray"`
+		LastMiningStartedAt *time.Time `json:"ts"`
 	}
 
 	// | StakingEnabled is structure to hold notification message sent to message broker.
 	StakingEnabled struct {
-		TS time.Time `json:"ts"`
+		TS *time.Time `json:"ts"`
 		Staking
 	}
 )
 
+// Private API.
+
 const (
-	applicationYamlKey = "economy"
-	base10             = 10
-	bitSize64          = 64
-	miningDuration     = 24 * time.Hour
-	secondsInDay       = 24 * 60 * 60
+	applicationYamlKey                                             = "economy"
+	balanceTypeStaking                                             = "staking"
+	balanceTypeStandard                                            = "standard"
+	base10                                                         = 10
+	bitSize64                                                      = 64
+	miningDuration                                                 = 24 * tm.Hour
+	percentage100                                                  = 100
+	balanceDistributedBatchProcessingStreamMessagesPeriod          = 100 * tm.Millisecond
+	produceBalanceDistributedBatchProcessingStreamMessagesDeadline = 30 * tm.Second
+	produceUpdateAdoptionMessageDeadline                           = 30 * tm.Second
+
+	adoptionUpdateTicker = 60 * tm.Second
+	secondsInDay         = 24 * 60 * 60
+
+	stakedHourlyMiningRateDivider uint64 = 10000
 )
 
 var (
@@ -151,41 +167,28 @@ type (
 	// !! Order of fields is crucial, so do not change it !!
 	userEconomySummary struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              string
-		Username            string
-		ProfilePictureURL   string
-		Adoptions           string
-		Balance             float64
-		StakingPercentage   float64
-		HashCode            uint64
-		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
-		T1Count             uint64
-		T2Count             uint64
-		GlobalRank          uint64
-		T1EarningsSum       float64
-		T2EarningsSum       float64
-		CurrentTotalUsers   uint64
-	}
-
-	userEconomy struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		UserID              UserID
-		Username            string
-		ProfilePictureURL   string
-		Balance             float64
-		StakingPercentage   float64
-		HashCode            uint64
-		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
+		_msgpack                    struct{} `msgpack:",asArray"`
+		LastMiningStartedAt         *time.Time
+		StakingBalanceUpdatedAt     *time.Time
+		Balance                     *coin.ICEFlake
+		StakingBalance              *coin.ICEFlake
+		BaseHourlyMiningRate        *coin.ICEFlake
+		T0Amount                    *coin.ICEFlake
+		T1Amount                    *coin.ICEFlake
+		T2Amount                    *coin.ICEFlake
+		UserID                      string
+		Username                    string
+		ProfilePictureURL           string
+		Adoptions                   string
+		HashCode                    uint64
+		T0Count                     uint64
+		T1Count                     uint64
+		T2Count                     uint64
+		GlobalRank                  uint64
+		StakingPercentageAllocation uint64
+		StakingYears                uint64
+		CurrentTotalUsers           uint64
+		StakingPercentageBonus      uint64
 	}
 
 	adoptionMilestone struct {
@@ -194,13 +197,6 @@ type (
 		TotalUsers       uint64
 		Active           bool
 	}
-	// | userEconomyLastMining is the internal structure for deserialization from the DB.
-	userEconomyLastMining struct {
-		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack            struct{} `msgpack:",asArray"`
-		LastMiningStartedAt uint64
-	}
-
 	// | stakingAlreadyEnabled is the internal structure for deserialization from the DB.
 	stakingAlreadyEnabled struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
@@ -218,6 +214,36 @@ type (
 		Active       uint64
 	}
 
+	// | userBalance is the internal structure for deserialization from the DB.
+	userBalance struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		Balance  *coin.ICEFlake
+	}
+
+	// | staking is the internal structure for deserialization from the DB.
+	staking struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack   struct{} `msgpack:",asArray"`
+		CreatedAt  *time.Time
+		UpdatedAt  *time.Time
+		UserID     UserID
+		Percentage uint64
+		Years      uint64
+	}
+	// | estimatedEarningsCalculationData is the internal structure for deserialization from the DB.
+	estimatedEarningsCalculationData struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack               struct{} `msgpack:",asArray"`
+		BaseHourlyMiningRate   BaseHourlyMiningRate
+		StakingPercentageBonus uint64
+	}
+
+	calculateEstimatedEarningsArg struct {
+		*GetEstimatedEarningsArg
+		*estimatedEarningsCalculationData
+	}
+
 	// | repository implements the public API that this package exposes.
 	repository struct {
 		close func() error
@@ -228,6 +254,7 @@ type (
 		close func() error
 		ReadRepository
 		WriteRepository
+		mb messagebroker.Client
 	}
 	economy struct {
 		db tarantool.Connector
@@ -242,8 +269,9 @@ type (
 			} `yaml:"topics"`
 		} `yaml:"messageBroker"`
 		Rates struct {
-			Tier1 float64
-			Tier2 float64
+			Tier0 uint64
+			Tier1 uint64
+			Tier2 uint64
 		} `yaml:"rates"`
 		InactivityHoursDeadline uint64 `yaml:"inactivityHoursDeadline"`
 	}

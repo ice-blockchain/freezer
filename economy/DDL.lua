@@ -5,7 +5,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS global  (
                     value SCALAR NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 -- (key,value) : ('TOTAL_USERS', 10000) -----> ++ or -- when user registers/deletes account
--- (key,value) : ('TOTAL_ACTIVE_USERS', 10) -----> you reset this with `select count(1) from user_economy where last_mining_started_at < 24h` and you do that in the same logic you populate adoption_history in
+-- (key,value) : ('TOTAL_ACTIVE_USERS', 10) -----> you reset this with `select count(1) from user_economy where last_mining_started_at > now-24h` and you do that in the same logic you populate adoption_history in
 
 box.execute([[CREATE TABLE IF NOT EXISTS total_users_history  (
                     minute_timestamp UNSIGNED primary key,
@@ -19,10 +19,11 @@ box.execute([[CREATE INDEX IF NOT EXISTS total_users_history_date_ix ON total_us
 -- every minute, total_users_history.total_users = global.value where global.key = 'TOTAL_USERS'
 
 box.execute([[CREATE TABLE IF NOT EXISTS adoption  (
-                    total_active_users UNSIGNED primary key,
                     base_hourly_mining_rate STRING NOT NULL,
+                    total_active_users UNSIGNED primary key,
                     active BOOLEAN NOT NULL DEFAULT false
                     ) WITH ENGINE = 'vinyl';]])
+
 box.execute([[INSERT INTO adoption (total_active_users, base_hourly_mining_rate, active)
                           VALUES (0, '16000000000', true),
                                  (50000, '8000000000', false),
@@ -44,13 +45,13 @@ box.execute([[CREATE TABLE IF NOT EXISTS adoption_history  (
 -- hour_timestamp = minute_timestamp/60
 
 box.execute([[CREATE TABLE IF NOT EXISTS user_economy  (
+                    last_mining_started_at UNSIGNED DEFAULT 0,
+                    created_at UNSIGNED NOT NULL,
+                    updated_at UNSIGNED NOT NULL,
                     user_id STRING primary key,
                     username STRING NOT NULL UNIQUE,
                     profile_picture_url STRING,
-                    hash_code UNSIGNED NOT NULL UNIQUE,
-                    last_mining_started_at UNSIGNED,
-                    created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL
+                    hash_code UNSIGNED NOT NULL UNIQUE
                     ) WITH ENGINE = 'vinyl';]])
 -- balance is in ice flakes
 -- if staking is enabled for the user, and the percentage is 100%, balances.amount{type=standard} is gonna always be 0.
@@ -58,15 +59,17 @@ box.execute([[CREATE INDEX IF NOT EXISTS user_economy_last_mining_started_at_ix 
 box.execute([[CREATE INDEX IF NOT EXISTS user_economy_username_ix ON user_economy (username);]])
 
 box.execute([[CREATE TABLE IF NOT EXISTS staking  (
+                    created_at UNSIGNED NOT NULL,
+                    updated_at UNSIGNED NOT NULL,
                     user_id STRING primary key REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     percentage UNSIGNED NOT NULL,
-                    years UNSIGNED NOT NULL,
-                    created_at UNSIGNED NOT NULL,
-                    updated_at UNSIGNED NOT NULL
+                    years UNSIGNED NOT NULL
                     ) WITH ENGINE = 'vinyl';]])
 -- When staking happens, you move staking.percentage*balances.amount{type=standard}/100 to balances.amount{type=staking}, for that user_id
 
 box.execute([[CREATE TABLE IF NOT EXISTS balances (
+                    updated_at UNSIGNED NOT NULL,
+                    amount STRING NOT NULL DEFAULT '0',
                     user_id STRING NOT NULL REFERENCES user_economy(user_id) ON DELETE CASCADE,
                     type STRING NOT NULL
                         CHECK (
@@ -86,12 +89,10 @@ box.execute([[CREATE TABLE IF NOT EXISTS balances (
                             lower(type) == 't2_referral_staking_earnings' or
                             POSITION('t2_referral_staking_earnings~', lower(type)) != 0
                         ),
-                    amount STRING NOT NULL DEFAULT '0',
                     amount_w0 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w1 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w2 UNSIGNED NOT NULL DEFAULT 0,
                     amount_w3 UNSIGNED NOT NULL DEFAULT 0,
-                    updated_at UNSIGNED NOT NULL,
                     primary key (user_id, type)) WITH ENGINE = 'vinyl';]])
 box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (amount_w3, amount_w2, amount_w1, amount_w0);]])
 -- amount is in ice flakes

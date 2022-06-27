@@ -3,30 +3,51 @@
 package usereconomy
 
 import (
-	"time"
-
 	"github.com/framey-io/go-tarantool"
+
+	"github.com/ice-blockchain/wintr/coin"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 // Private API.
 
-type (
-	UserID = string
+const (
+	tierLevel0 uint8 = 0
+	tierLevel1 uint8 = 1
+	tierLevel2 uint8 = 2
 
+	balanceTypeStandard string = "standard"
+	balanceTypeStaking  string = "staking"
+	balanceTypeTotal    string = "total"
+)
+
+type (
+	UserID      = string
+	BalanceType = string
+	TierLevel   = uint8
+
+	// | userEconomy is the internal structure for deserialization from the DB.
 	userEconomy struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack            struct{} `msgpack:",asArray"`
+		LastMiningStartedAt *time.Time
+		CreatedAt           *time.Time
+		UpdatedAt           *time.Time
 		UserID              UserID
 		Username            string
 		ProfilePictureURL   string
-		Balance             float64
-		StakingPercentage   float64
 		HashCode            uint64
-		LastMiningStartedAt uint64
-		StakingYears        uint64
-		CreatedAt           uint64
-		UpdatedAt           uint64
-		BalanceUpdatedAt    uint64
+	}
+
+	// | staking is the internal structure for deserialization from the DB.
+	staking struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack   struct{} `msgpack:",asArray"`
+		CreatedAt  *time.Time
+		UpdatedAt  *time.Time
+		UserID     UserID
+		Percentage uint64
+		Years      uint64
 	}
 
 	// | userEconomySource is responsible for processing new messages of sourceUser type, transforming it and storing it in the db as user type.
@@ -34,12 +55,14 @@ type (
 		db tarantool.Connector
 	}
 
-	referredBy struct {
+	// | tier is the internal structure for deserialization from the DB.
+	tier struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		UserID   UserID
 	}
 
+	// | totalUsers is the internal structure for deserialization from the DB.
 	totalUsers struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
@@ -47,34 +70,17 @@ type (
 		Value    uint64
 	}
 
-	referralEarnings struct {
+	// | balances is the internal structure for deserialization from the DB.
+	balances struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
-		_msgpack       struct{} `msgpack:",asArray"`
-		UserID         UserID
-		ReferralUserID UserID
-		Earnings       float64
-		CreatedAt      uint64
-		UpdatedAt      uint64
-	}
-
-	userSnapshot struct {
-		User   *user
-		Before *user
-	}
-
-	user struct {
-		CreatedAt         time.Time  `json:"createdAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		UpdatedAt         time.Time  `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		DeletedAt         *time.Time `json:"deletedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		ID                string     `json:"id,omitempty" example:"226fcb86-fcce-458e-95f0-867e09c8c274"`
-		Email             string     `form:"email,omitempty" json:"email" example:"jdoe@gmail.com"`
-		FullName          string     `form:"fullName,omitempty" json:"fullName" example:"John Doe"`
-		PhoneNumber       string     `form:"phoneNumber,omitempty" json:"phoneNumber" example:"+12099216581"`
-		Username          string     `form:"username,omitempty" json:"username" example:"jdoe"`
-		ReferredBy        string     `form:"referredBy,omitempty" json:"referredBy" example:"billy112"`
-		ProfilePictureURL string     `json:"profilePictureURL,omitempty" example:"https://somecdn.com/p1.jpg"`
-		// ISO 3166 country code.
-		Country  string `json:"country" example:"us"`
-		HashCode uint64 `json:"hashCode"`
+		_msgpack  struct{} `msgpack:",asArray"`
+		UpdatedAt *time.Time
+		Amount    *coin.ICEFlake
+		UserID    UserID
+		Type      string
+		AmountW0  uint64
+		AmountW1  uint64
+		AmountW2  uint64
+		AmountW3  uint64
 	}
 )

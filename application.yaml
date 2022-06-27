@@ -3,7 +3,7 @@
 development: true
 logger:
   encoder: console
-  level: debug
+  level: info
 cmd/freezer:
   host: localhost
   version: local
@@ -20,7 +20,7 @@ cmd/freezer-refrigerant:
   version: local
   defaultEndpointTimeout: 30s
   httpServer:
-    port: 1443
+    port: 8085
     certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
     keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
   defaultPagination:
@@ -28,8 +28,9 @@ cmd/freezer-refrigerant:
     maxLimit: 1000
 economy:
   rates:
-    tier1: 0.25
-    tier2: 0.05
+    tier0: 25
+    tier1: 25
+    tier2: 5
   inactivityHoursDeadline: 24
   db:
     spaces:
@@ -42,7 +43,7 @@ economy:
       - STAKING_BONUS
       - BALANCES
     urls:
-      - localhost:3303
+      - localhost:3301
     user: admin
     password: pass
   messageBroker:
@@ -51,9 +52,11 @@ economy:
     consumerGroup: freezer-local
     createTopics: true
     urls:
-      - localhost:9094
+      - localhost:9092
     consumingTopics:
       - users-events
+      - balances-update
+      - adoption-update
     topics:
       - name: economy-mining
         partitions: 10
@@ -65,6 +68,21 @@ economy:
         retention: 1000h
         ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
       - name: users-events
+        partitions: 10
+        replicationFactor: 1
+        retention: 1000h
+      - name: balances-update
+        partitions: 10
+        partition: 1
+        replicationFactor: 1
+        retention: 1000h
+        cleanupPolicy: compact
+      - name: adoption-update
+        partitions: 10
+        replicationFactor: 1
+        retention: 1000h
+        cleanupPolicy: compact
+      - name: balances-events
         partitions: 10
         replicationFactor: 1
         retention: 1000h
