@@ -197,7 +197,6 @@ func (req *RequestGetEstimatedEarnings) Bindings(c *gin.Context) []func(obj inte
 // @Produce      json
 // @Param        Authorization  header    string  true   "Insert your access token"  default(Bearer <Add access token here>)
 // @Success      200            {object}  economy.Adoption
-// @Failure      400            {object}  server.ErrorResponse  "if validations fail"
 // @Failure      401            {object}  server.ErrorResponse  "if not authorized"
 // @Failure      422            {object}  server.ErrorResponse  "if syntax fails"
 // @Failure      500            {object}  server.ErrorResponse

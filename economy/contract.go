@@ -72,8 +72,8 @@ type (
 		Achieved         bool           `json:"achieved" example:"true"`
 	}
 	UserCounter struct {
-		Total  uint64 `json:"total,omitempty" example:"1000000000"`
-		Active uint64 `json:"active,omitempty" example:"1000000000"`
+		Total  uint64 `json:"total" example:"1000000000"`
+		Active uint64 `json:"active" example:"1000000000"`
 	}
 	Adoption struct {
 		Adoption []*AdoptionMilestone `json:"adoption"`
@@ -187,6 +187,12 @@ type (
 		BalanceUpdatedAt    uint64
 	}
 
+	adoptionMilestone struct {
+		HourlyMiningRate *coin.ICEFlake
+		ActiveUsers      uint64
+		TotalUsers       uint64
+		Active           bool
+	}
 	// | userEconomyLastMining is the internal structure for deserialization from the DB.
 	userEconomyLastMining struct {
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
