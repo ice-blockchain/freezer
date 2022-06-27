@@ -275,6 +275,9 @@ func (req *RequestGetUserStats) Validate() *server.Response {
 	if req.LastNoOfDays == 0 {
 		req.LastNoOfDays = defaultLastNoOfDays
 	}
+	if req.LastNoOfDays > maximumLastNoOfDays {
+		return server.BadRequest(errors.Errorf("lastNoOfDays has to be within [0,30], %v is invalid", req.LastNoOfDays), "MISSING_PROPERTIES")
+	}
 
 	return nil
 }

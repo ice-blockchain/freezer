@@ -27,7 +27,7 @@ type (
 	}
 	RequestGetUserStats struct {
 		AuthenticatedUser server.AuthenticatedUser `json:"authenticatedUser" swaggerignore:"true"`
-		// Default is `7`.
+		// Default is `7`, limited to 30.
 		LastNoOfDays uint16 `form:"lastNoOfDays" example:"7"`
 	}
 )
@@ -37,6 +37,7 @@ type (
 const (
 	applicationYamlKey  = "cmd/freezer"
 	defaultLastNoOfDays = 7
+	maximumLastNoOfDays = 30
 )
 
 //nolint:gochecknoglobals // Because its loaded once, at runtime.

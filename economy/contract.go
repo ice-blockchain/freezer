@@ -135,6 +135,7 @@ const (
 	base10             = 10
 	bitSize64          = 64
 	miningDuration     = 24 * time.Hour
+	secondsInDay       = 24 * 60 * 60
 )
 
 var (
@@ -205,6 +206,16 @@ type (
 		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
 		_msgpack struct{} `msgpack:",asArray"`
 		Value    bool
+	}
+
+	// | dailyUserGrowth is the internal structure to handle database response for fetching user stats (economy.GetUserStats).
+	dailyUserGrowth struct {
+		//nolint:unused // Because it is used by the msgpack library for marshalling/unmarshalling.
+		_msgpack struct{} `msgpack:",asArray"`
+		// | time.Unix() / (24(hours) * 60 (mins) * 60 (secs)).
+		DayTimestamp uint64
+		Total        uint64
+		Active       uint64
 	}
 
 	// | repository implements the public API that this package exposes.
