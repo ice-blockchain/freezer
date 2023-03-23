@@ -1,0 +1,337 @@
+# SPDX-License-Identifier: ice License 1.0
+
+basePath: /v1w
+definitions:
+  main.StartNewMiningSessionRequestBody:
+    properties:
+      resurrect:
+        description: |-
+          Specify this if you want to resurrect the user.
+          `true` recovers all the lost balance, `false` deletes it forever, `null/undefined` does nothing. Default is `null/undefined`.
+        example: true
+        type: boolean
+    type: object
+  main.StartOrUpdatePreStakingRequestBody:
+    properties:
+      allocation:
+        example: 100
+        maximum: 100
+        type: integer
+      years:
+        example: 1
+        maximum: 5
+        type: integer
+    type: object
+  server.ErrorResponse:
+    properties:
+      code:
+        example: SOMETHING_NOT_FOUND
+        type: string
+      data:
+        additionalProperties: {}
+        type: object
+      error:
+        example: something is missing
+        type: string
+    type: object
+  tokenomics.ExtraBonusSummary:
+    properties:
+      availableExtraBonus:
+        example: 2
+        type: integer
+    type: object
+  tokenomics.MiningRateBonuses:
+    properties:
+      extra:
+        example: 300
+        type: integer
+      preStaking:
+        example: 300
+        type: integer
+      t1:
+        example: 100
+        type: integer
+      t2:
+        example: 200
+        type: integer
+      total:
+        example: 300
+        type: integer
+    type: object
+  tokenomics.MiningRateSummary-coin_ICE:
+    properties:
+      amount:
+        example: 1,234,232.001
+        type: string
+      bonuses:
+        $ref: '#/definitions/tokenomics.MiningRateBonuses'
+    type: object
+  tokenomics.MiningRateType:
+    enum:
+    - positive
+    - negative
+    - none
+    type: string
+    x-enum-varnames:
+    - PositiveMiningRateType
+    - NegativeMiningRateType
+    - NoneMiningRateType
+  tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE:
+    properties:
+      base:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      positiveTotalNoPreStakingBonus:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      preStaking:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      standard:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      total:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      totalNoPreStakingBonus:
+        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+      type:
+        $ref: '#/definitions/tokenomics.MiningRateType'
+    type: object
+  tokenomics.MiningSession:
+    properties:
+      endedAt:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+      free:
+        example: true
+        type: boolean
+      resettableStartingAt:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+      startedAt:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+      warnAboutExpirationStartingAt:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+    type: object
+  tokenomics.MiningSummary:
+    properties:
+      availableExtraBonus:
+        example: 2
+        type: integer
+      miningRates:
+        $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE'
+      miningSession:
+        $ref: '#/definitions/tokenomics.MiningSession'
+      miningStreak:
+        example: 2
+        type: integer
+      remainingFreeMiningSessions:
+        example: 1
+        type: integer
+    type: object
+  tokenomics.PreStakingSummary:
+    properties:
+      allocation:
+        example: 100
+        type: integer
+      bonus:
+        example: 100
+        type: integer
+      years:
+        example: 1
+        type: integer
+    type: object
+info:
+  contact:
+    name: ice.io
+    url: https://ice.io
+  description: API that handles everything related to write-only operations for user's
+    tokenomics.
+  title: Tokenomics API
+  version: latest
+paths:
+  /tokenomics/{userId}/extra-bonus-claims:
+    post:
+      consumes:
+      - application/json
+      description: Claims an extra bonus for the user.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the user
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tokenomics.ExtraBonusSummary'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: if not allowed
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: if user not found or no extra bonus available
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: if already claimed
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Tokenomics
+  /tokenomics/{userId}/mining-sessions:
+    post:
+      consumes:
+      - application/json
+      description: Starts a new mining session for the user, if not already in progress
+        with another one.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the user
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Request params
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.StartNewMiningSessionRequestBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tokenomics.MiningSummary'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: if not allowed
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: if user not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "409":
+          description: if mining is in progress or if a decision about negative mining
+            progress is required
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Tokenomics
+  /tokenomics/{userId}/pre-staking:
+    put:
+      consumes:
+      - application/json
+      description: Starts or updates pre-staking for the user.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the user
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Request params
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.StartOrUpdatePreStakingRequestBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tokenomics.PreStakingSummary'
+        "400":
+          description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: if not allowed
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: user not found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Tokenomics
+schemes:
+- https
+swagger: "2.0"
