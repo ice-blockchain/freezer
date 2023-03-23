@@ -1,0 +1,573 @@
+# SPDX-License-Identifier: ice License 1.0
+
+name: CI/CD
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  verify-licensing:
+    name: Verify Licensing
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Check License
+        run: make checkLicense
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  verify-latest-versions-used:
+    name: Verify Latest Versions
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Check If We're Up to Date with Everything
+        run: make checkModVersion checkIfAllDependenciesAreUpToDate
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  verify-auto-generated:
+    name: Verify Auto Generated
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Check Auto Generated Files
+        run: make checkGenerated
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  lint:
+    name: Lint
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  build:
+    name: Build
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Build all
+        run: make build-all@ci/cd
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  test:
+    name: Test
+    strategy:
+      matrix:
+        package: [ "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    #    runs-on: self-hosted-ubuntu-latest-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Test ${{ matrix.package }}
+        env:
+          SMS_CLIENT_USER: ${{ secrets.SMS_CLIENT_USER }}
+          SMS_CLIENT_PASSWORD: ${{ secrets.SMS_CLIENT_PASSWORD }}
+          EMAIL_CLIENT_APIKEY: ${{ secrets.EMAIL_CLIENT_APIKEY }}
+          PICTURE_STORAGE_ACCESS_KEY: ${{ secrets.PICTURE_STORAGE_ACCESS_KEY }}
+          INAPP_NOTIFICATIONS_CLIENT_KEY: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_KEY }}
+          INAPP_NOTIFICATIONS_CLIENT_SECRET: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_SECRET }}
+          INAPP_NOTIFICATIONS_CLIENT_APP_ID: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_APP_ID }}
+          TRANSLATIONS_CLIENT_APIKEY: ${{ secrets.TRANSLATIONS_CLIENT_APIKEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          GCP_FIREBASE_AUTH_API_KEY: ${{ secrets.GCP_FIREBASE_AUTH_API_KEY }}
+        run: |
+          cd ${{ matrix.package }}
+          make -f ${{ github.workspace }}/Makefile test@ci/cd
+          make -f ${{ github.workspace }}/Makefile coverage
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            freezer/${{ matrix.package }}
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  benchmark:
+    name: Benchmark
+    strategy:
+      matrix:
+        package: [ "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    #    runs-on: self-hosted-ubuntu-latest-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Benchmark ${{ matrix.package }}
+        env:
+          SMS_CLIENT_USER: ${{ secrets.SMS_CLIENT_USER }}
+          SMS_CLIENT_PASSWORD: ${{ secrets.SMS_CLIENT_PASSWORD }}
+          EMAIL_CLIENT_APIKEY: ${{ secrets.EMAIL_CLIENT_APIKEY }}
+          PICTURE_STORAGE_ACCESS_KEY: ${{ secrets.PICTURE_STORAGE_ACCESS_KEY }}
+          INAPP_NOTIFICATIONS_CLIENT_KEY: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_KEY }}
+          INAPP_NOTIFICATIONS_CLIENT_SECRET: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_SECRET }}
+          INAPP_NOTIFICATIONS_CLIENT_APP_ID: ${{ secrets.INAPP_NOTIFICATIONS_CLIENT_APP_ID }}
+          TRANSLATIONS_CLIENT_APIKEY: ${{ secrets.TRANSLATIONS_CLIENT_APIKEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          GCP_FIREBASE_AUTH_API_KEY: ${{ secrets.GCP_FIREBASE_AUTH_API_KEY }}
+        run: |
+          cd ${{ matrix.package }}
+          make -f ${{ github.workspace }}/Makefile benchmark@ci/cd
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            freezer/${{ matrix.package }}
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  dockerfile:
+    name: Verify Dockerfile
+    strategy:
+      matrix:
+        service: [ "freezer", "freezer-refrigerant"]
+        #those are not supported by golang docker image: linux/riscv64
+        #platforms: linux/s390x,linux/arm64,linux/amd64,linux/ppc64le
+        #commented because build takes too damn much with the other 3 platforms (~10 mins for each!!!) and we don`t need them atm
+        platform: ["linux/amd64"]
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+    runs-on: ubuntu-latest
+    #    runs-on: self-hosted-ubuntu-latest-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - id: buildx
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+          install: true
+      - name: Build Image Information
+        id: build-image-info
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          SERVICE_NAME: ${{ matrix.service }}
+        run: |
+          echo "::set-output name=tags::registry.digitalocean.com/ice-io/$SERVICE_NAME:pr$PR_NUMBER"
+          echo "::set-output name=dockerFileLocation::./cmd/$SERVICE_NAME/Dockerfile"
+      - name: Build ${{ matrix.platform }} ${{ matrix.service }} docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ${{ steps.build-image-info.outputs.dockerFileLocation }}
+          platforms: ${{ matrix.platform }}
+          push: false
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+          tags: ${{ steps.build-image-info.outputs.tags }}
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            ${{ matrix.service }}
+  PR:
+    needs: [verify-licensing, verify-latest-versions-used, verify-auto-generated, lint, build, test, benchmark, dockerfile]
+    name: PR
+    if: ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking if all previous jobs were successful
+        env:
+          ALL_SUCCESSFUL: ${{ contains(join(needs.*.result, ','), 'failure') == false && contains(join(needs.*.result, ','), 'cancelled') == false && contains(join(needs.*.result, ','), 'skipped') == false }}
+        run: |
+          if [ $ALL_SUCCESSFUL == 'true' ]
+            then
+              exit 0
+            else
+              exit 1
+          fi
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  release:
+    needs: [PR]
+    name: Release
+    outputs:
+      nextTag: ${{ steps.check_tag.outputs.next_tag }}
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Compute new Tag version
+        id: compute_tag
+        uses: craig-day/compute-tag@v14
+        with:
+          github_token: ${{ github.token }}
+          version_type: minor
+      - id: check_tag
+        name: Check new computed Tag version
+        run: |
+          NEW_TAG_VERSION=$(echo "$NEW_TAG_VERSION" | sed 's/.\{2\}$//')
+          if [ $NEW_TAG_VERSION == 'v1.0.0' ]
+          then
+              echo "::set-output name=next_tag::$NEW_TAG_VERSION"
+          else
+              echo "::set-output name=next_tag::${NEW_TAG_VERSION}.0"
+          fi
+        env:
+          NEW_TAG_VERSION: ${{ steps.compute_tag.outputs.next_tag }}
+      - name: Create Release
+        id: create_release
+        #TODO This needs to be replaced ASAP! https://github.com/actions/create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.check_tag.outputs.next_tag }}
+          release_name: ${{ steps.check_tag.outputs.next_tag }}
+          draft: false
+          prerelease: false
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+  push_docker:
+    needs: [ release ]
+    name: Push Docker
+    strategy:
+      matrix:
+        service: [ "freezer", "freezer-refrigerant"]
+        #those are not supported by golang docker image: linux/riscv64
+        #platforms: linux/s390x,linux/arm64,linux/amd64,linux/ppc64le
+        #commented because build takes too damn much with the other 3 platforms (~10 mins for each!!!) and we don`t need them atm
+        platform: ["linux/amd64"]
+    outputs:
+      nextTag: ${{ steps.build-image-info.outputs.nextTag }}
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    #    runs-on: self-hosted-ubuntu-latest-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Find latest Go Version
+        id: findLatestGoVersion
+        run: |
+          LATEST_GO_VERSION=$(make latestGoVersion)
+          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+      - name: Setup GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - id: buildx
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+          install: true
+      - name: Login to Digital Ocean Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DO_CONTAINER_REGISTRY_TOKEN }}
+          password: ${{ secrets.DO_CONTAINER_REGISTRY_TOKEN }}
+      - name: Build Image Information
+        id: build-image-info
+        env:
+          VERSION: ${{needs.release.outputs.nextTag}}
+          SERVICE_NAME: ${{ matrix.service }}
+        run: |
+          LATEST_TAG=registry.digitalocean.com/ice-io/$SERVICE_NAME:latest
+          NEXT_VERSION_TAG=registry.digitalocean.com/ice-io/$SERVICE_NAME:$VERSION
+          echo "::set-output name=nextTag::$VERSION"
+          echo "::set-output name=tags::${LATEST_TAG},${NEXT_VERSION_TAG}"
+          echo "::set-output name=dockerFileLocation::./cmd/$SERVICE_NAME/Dockerfile"
+      - name: Build ${{ matrix.platform }} ${{ matrix.service }} docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ${{ steps.build-image-info.outputs.dockerFileLocation }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+          tags: ${{ steps.build-image-info.outputs.tags }}
+      - name: Slack Notification For Failure/Cancellation
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            ${{ matrix.platform }} ${{ matrix.service }}
+  trigger_deployment:
+    needs: [ push_docker ]
+    name: Trigger Deployment
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setting ENV variables for deployment
+        run: | 
+          echo "APP_TAG=${{needs.push_docker.outputs.nextTag}}" >> $GITHUB_ENV
+      - name: Checkout the target `master` branch of `secret-infrastructure`
+        uses: actions/checkout@v3
+        with:
+          repository: ice-blockchain/secret-infrastructure
+          ref: master
+          token: ${{ secrets.ICE_CI_CD_BOT_GH_PAT }}
+          path: secret-infrastructure
+          fetch-depth: 0
+      - name: Update [staging] application tag version in helm/freezer/staging/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            cd secret-infrastructure
+            yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer/staging/common-values.yaml
+      - name: Update [production] application tag version in helm/freezer/production/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            cd secret-infrastructure
+            yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer/production/common-values.yaml
+      - name: Update [staging] application tag version in helm/freezer-refrigerant/staging/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            cd secret-infrastructure
+            yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer-refrigerant/staging/common-values.yaml
+      - name: Update [production] application tag version in helm/freezer-refrigerant/production/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            cd secret-infrastructure
+            yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer-refrigerant/production/common-values.yaml
+      - name: Commit and Push Changes to Application Tag Version
+        run: |
+          cd secret-infrastructure
+          git config user.name "ice CI/CD Bot"
+          git config user.email ice-cicd-bot@ice.vip
+          git add helm/freezer/staging/common-values.yaml 
+          git add helm/freezer/production/common-values.yaml
+          git add helm/freezer-refrigerant/staging/common-values.yaml 
+          git add helm/freezer-refrigerant/production/common-values.yaml
+          git commit -m "Updated 'freezer' & 'freezer-refrigerant' tag version (${{env.APP_TAG}}) in application helm chart deployment manifests"
+          git push --set-upstream origin master
+      - name: Slack Notification For Success
+        if: ${{ success() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Succeeded, Waiting for Deployment Status Notification...
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':rocket:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://staging.r.api.ice.io/tokenomics/r
+            https://staging.w.api.ice.io/tokenomics/w
+      - name: Slack Notification For Failure
+        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+          SLACK_TITLE: CI Failed> ${{ job.status }}
+          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+          SLACK_ICON_EMOJI: ':sob:'
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: |
+            https://staging.r.api.ice.io/tokenomics/r
+            https://staging.w.api.ice.io/tokenomics/w

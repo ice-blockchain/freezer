@@ -1,0 +1,189 @@
+# SPDX-License-Identifier: ice License 1.0
+
+development: true
+logger:
+  encoder: console
+  level: info
+cmd/freezer:
+  host: localhost:2443
+  version: local
+  defaultEndpointTimeout: 30s
+  httpServer:
+    port: 2443
+    certPath: cmd/freezer/.testdata/localhost.crt
+    keyPath: cmd/freezer/.testdata/localhost.key
+  defaultPagination:
+    limit: 20
+    maxLimit: 1000
+cmd/freezer-refrigerant:
+  host: localhost:3443
+  version: local
+  defaultEndpointTimeout: 30s
+  httpServer:
+    port: 3443
+    certPath: cmd/freezer-refrigerant/.testdata/localhost.crt
+    keyPath: cmd/freezer-refrigerant/.testdata/localhost.key
+  defaultPagination:
+    limit: 20
+    maxLimit: 1000
+tokenomics: &tokenomics
+  db: &tokenomicsDatabase
+    urls:
+      - localhost:3401
+    user: admin
+    password: pass
+  messageBroker: &tokenomicsMessageBroker
+    consumerGroup: freezer-local
+    createTopics: true
+    urls:
+      - localhost:9092
+    topics: &tokenomicsMessageBrokerTopics
+      - name: freezer-health-check
+        partitions: 1
+        replicationFactor: 1
+        retention: 10s
+      - name: adoption-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: mining-sessions-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: mining-rates-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: balances-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: add-balance-commands
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: pre-stakings-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: available-daily-bonuses
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: started-days-off
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: balance-recalculation-trigger-stream
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: mining-rates-recalculation-trigger-stream
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: blockchain-balance-synchronization-trigger-stream
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: extra-bonus-processing-trigger-stream
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
+      - name: users-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: global-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: viewed-news
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: user-device-metadata-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+    consumingTopics:
+      - name: users-table
+      - name: global-table
+      - name: mining-sessions-table
+      - name: add-balance-commands
+      - name: viewed-news
+      - name: user-device-metadata-table
+      - name: balance-recalculation-trigger-stream
+        oneGoroutinePerPartition: true
+      - name: mining-rates-recalculation-trigger-stream
+        oneGoroutinePerPartition: true
+      - name: blockchain-balance-synchronization-trigger-stream
+        oneGoroutinePerPartition: true
+      - name: extra-bonus-processing-trigger-stream
+        oneGoroutinePerPartition: true
+  wintr/multimedia/picture:
+    urlDownload: https://ice-staging.b-cdn.net/profile
+  workerCount: 10
+  referralBonusMiningRates:
+    t0: 25
+    t1: 25
+    t2: 5
+  rollbackNegativeMining:
+    aggressiveDegradationStartsAfter: 30m
+    lastXMiningSessionsCollectingInterval: 1m
+    available:
+      after: 5m
+      until: 60m
+  miningSessionDuration:
+    min: 30s
+    max: 1m
+    warnAboutExpirationAfter: 50s
+  consecutiveNaturalMiningSessionsRequiredFor1ExtraFreeArtificialMiningSession:
+    min: 12
+    max: 6
+  globalAggregationInterval:
+    parent: 60m
+    child: 1m
+  adoptionMilestoneSwitch:
+    duration: 60s
+    consecutiveDurationsRequired: 7
+    activeUserMilestones:
+      - 2
+      - 4
+      - 6
+      - 8
+      - 10
+  extraBonuses:
+    duration: 24m
+    utcOffsetDuration: 6s
+    claimWindow: 1m
+    delayedClaimPenaltyWindow: 15s
+    availabilityWindow: 10m
+    timeToAvailabilityWindow: 10m
+    flatValues:
+      - 2
+      - 4
+      - 6
+      - 8
+      - 10
+    newsSeenValues:
+      - 0
+      - 6
+      - 15
+      - 54
+      - 90
+    miningStreakValues:
+      - 0
+      - 2
+      - 5
+      - 9
+      - 20
+tokenomics_test:
+  <<: *tokenomics
+  messageBroker:
+    <<: *tokenomicsMessageBroker
+    consumingTopics: *tokenomicsMessageBrokerTopics
+    consumerGroup: freezer-local-test
+  db:
+    <<: *tokenomicsDatabase
