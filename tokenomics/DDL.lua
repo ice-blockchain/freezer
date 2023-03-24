@@ -93,28 +93,28 @@ box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (a
 --************************************************************************************************************************************
 -- processed_add_balance_commands
 box.execute([[CREATE TABLE IF NOT EXISTS processed_add_balance_commands (
-                                                 user_id STRING NOT NULL,
+                                                 user_id STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                                                  key     STRING NOT NULL,
                                                  PRIMARY KEY (user_id, key)
                                                 )
-                                                 WITH ENGINE = 'vinyl';]])
+                                                 WITH ENGINE = 'memtx';]])
 --************************************************************************************************************************************
 -- processed_seen_news
 box.execute([[CREATE TABLE IF NOT EXISTS processed_seen_news (
-                                                 user_id STRING NOT NULL,
+                                                 user_id STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                                                  news_id STRING NOT NULL,
                                                  PRIMARY KEY (user_id, news_id)
                                                 )
-                                                 WITH ENGINE = 'vinyl';]])
+                                                 WITH ENGINE = 'memtx';]])
 --************************************************************************************************************************************
 -- mining_sessions_dlq
 for worker_index=0,%[2]v do
         box.execute([[CREATE TABLE IF NOT EXISTS mining_sessions_dlq_]] .. worker_index .. [[ (
                                id              STRING NOT NULL PRIMARY KEY,
-                               user_id         STRING NOT NULL,
+                               user_id         STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
                                message         STRING NOT NULL
                               )
-                            WITH ENGINE = 'vinyl';]])
+                            WITH ENGINE = 'memtx';]])
 end
 --************************************************************************************************************************************
 -- extra_bonuses

@@ -57,21 +57,6 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
 		return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
 	}
-	sql = `DELETE FROM processed_add_balance_commands
- 			WHERE user_id = :user_id`
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to delete processed_add_balance_commands userID:%v", usr.ID)
-	}
-	sql = `DELETE FROM processed_seen_news
- 			WHERE user_id = :user_id`
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to delete processed_seen_news userID:%v", usr.ID)
-	}
-	sql = fmt.Sprintf(`DELETE FROM mining_sessions_dlq_%v
- 					   WHERE user_id = :user_id`, usr.HashCode%s.cfg.WorkerCount)
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to delete mining_sessions_dlq_%v userID:%v", usr.HashCode%s.cfg.WorkerCount, usr.ID)
-	}
 
 	return nil
 }
