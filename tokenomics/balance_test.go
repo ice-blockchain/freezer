@@ -106,12 +106,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(-24 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -250,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.In(location).Add(-30 * stdlibtime.Minute),
@@ -161,16 +161,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -300,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
-			Negative: true,
-			Bonus:    -350,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
@@ -196,10 +187,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 	expected = []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
@@ -209,16 +200,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.Add(-24 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -302,10 +284,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 	expected = []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(120000000000),
+			Amount:   coin.NewAmountUint64(192000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(192000000000),
 			Negative: true,
-			Bonus:    -3100,
+			Bonus:    -4900,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
@@ -315,16 +297,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -3100,
 			},
-		}},
-	}, {
-		Time: now.Add(-24 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(72000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(72000000000),
-			Negative: true,
-			Bonus:    -1900,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(96000000000).UnsafeICE(),
@@ -472,10 +445,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 	expected := []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -250,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.In(location).Add(-30 * stdlibtime.Minute),
@@ -525,16 +498,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -300,
 			},
-		}},
-	}, {
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
-			Negative: true,
-			Bonus:    -350,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
@@ -557,12 +521,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
@@ -572,16 +536,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -663,12 +618,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
@@ -678,16 +633,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-30 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -833,12 +779,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(-24 * stdlibtime.Hour).In(location).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -250,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.In(location).Add(-15 * stdlibtime.Minute),
@@ -888,16 +834,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -300,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-15 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
-			Negative: true,
-			Bonus:    -350,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
@@ -909,6 +846,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 	}}
 	actual := repo.processBalanceHistory(balances, true, utcOffset, adoptions, preStakingSummaries)
 	assert.EqualValues(t, expected, actual)
+
 	adoptions = []*Adoption[coin.ICEFlake]{{
 		AchievedAt:     time.New(now.Add(-24 * stdlibtime.Hour)),
 		BaseMiningRate: coin.UnsafeParseAmount("16000000000"),
@@ -921,10 +859,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 	expected = []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
@@ -934,16 +872,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.Add(-24 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -995,6 +924,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 	}}
 	actual = repo.processBalanceHistory(balances, false, utcOffset, adoptions, preStakingSummaries)
 	assert.EqualValues(t, expected, actual)
+
 	adoptions = []*Adoption[coin.ICEFlake]{{
 		AchievedAt:     time.New(now.Add(-24 * stdlibtime.Hour)),
 		BaseMiningRate: coin.UnsafeParseAmount("16000000000"),
@@ -1026,10 +956,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 	expected = []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(120000000000),
+			Amount:   coin.NewAmountUint64(192000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(192000000000),
 			Negative: true,
-			Bonus:    -3100,
+			Bonus:    -4900,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
@@ -1039,16 +969,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 				Negative: true,
 				Bonus:    -3100,
 			},
-		}},
-	}, {
-		Time: now.Add(-24 * stdlibtime.Hour).In(location).Add(-15 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(72000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(72000000000),
-			Negative: true,
-			Bonus:    -1900,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-15 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(96000000000).UnsafeICE(),
@@ -1196,10 +1117,10 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 	expected := []*BalanceHistoryEntry{{
 		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -250,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.In(location).Add(-45 * stdlibtime.Minute),
@@ -1249,16 +1170,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -300,
 			},
-		}},
-	}, {
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-45 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
-			Negative: true,
-			Bonus:    -350,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-45 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
@@ -1281,12 +1193,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-45 * stdlibtime.Minute),
@@ -1296,16 +1208,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-45 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-45 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -1387,12 +1290,12 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(24 * stdlibtime.Hour).In(location).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(40000000000),
+			Amount:   coin.NewAmountUint64(64000000000).UnsafeICE(),
+			amount:   coin.NewAmountUint64(64000000000),
 			Negative: true,
-			Bonus:    -350,
+			Bonus:    -500,
 		},
 		TimeSeries: []*BalanceHistoryEntry{{
 			Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-45 * stdlibtime.Minute),
@@ -1402,16 +1305,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 				Negative: true,
 				Bonus:    -350,
 			},
-		}},
-	}, {
-		Time: now.In(location).Add(-45 * stdlibtime.Minute),
-		Balance: &BalanceHistoryBalanceDiff{
-			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
-			amount:   coin.NewAmountUint64(24000000000),
-			Negative: true,
-			Bonus:    -250,
-		},
-		TimeSeries: []*BalanceHistoryEntry{{
+		}, {
 			Time: now.Add(5 * repo.cfg.GlobalAggregationInterval.Child).In(location).Add(-45 * stdlibtime.Minute),
 			Balance: &BalanceHistoryBalanceDiff{
 				Amount:   coin.NewAmountUint64(32000000000).UnsafeICE(),
@@ -1557,7 +1451,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(-15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -1614,7 +1508,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(4040000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(4040000000000),
@@ -1644,7 +1538,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(4040000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(4040000000000),
@@ -1661,7 +1555,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.Add(-15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -1750,7 +1644,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(120000000000),
@@ -1767,7 +1661,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.Add(-15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(72000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(72000000000),
@@ -1920,7 +1814,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -1977,7 +1871,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.Add(26 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(40000000000),
@@ -2007,7 +1901,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(26 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * stdlibtime.Hour).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(40000000000),
@@ -2024,7 +1918,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2113,7 +2007,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.Add(26 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.Add(15 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(120000000000),
@@ -2130,7 +2024,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-30 * stdlibtime.Minute),
+		Time: now.In(location).Add(-30 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2283,7 +2177,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(-12 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2340,7 +2234,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.In(location).Add(3 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(4040000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(4040000000000),
@@ -2370,7 +2264,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(3 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(4040000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(4040000000000),
@@ -2387,7 +2281,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.Add(-12 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2476,7 +2370,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(3 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(120000000000),
@@ -2493,7 +2387,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 			},
 		}},
 	}, {
-		Time: now.Add(-12 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-15 * stdlibtime.Minute),
+		Time: now.In(location).Add(-15 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(72000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(72000000000),
@@ -2646,7 +2540,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 		},
 	}
 	expected := []*BalanceHistoryEntry{{
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2703,7 +2597,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.In(location).Add(26 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(40000000000),
@@ -2733,7 +2627,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 		Milestone:      2,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(26 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(40000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(40000000000),
@@ -2750,7 +2644,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
@@ -2839,7 +2733,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 		Bonus: 200,
 	}}
 	expected = []*BalanceHistoryEntry{{
-		Time: now.In(location).Add(26 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(15 * repo.cfg.GlobalAggregationInterval.Parent).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(120000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(120000000000),
@@ -2856,7 +2750,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t
 			},
 		}},
 	}, {
-		Time: now.Add(11 * repo.cfg.GlobalAggregationInterval.Parent).In(location).Add(-45 * stdlibtime.Minute),
+		Time: now.In(location).Add(-45 * stdlibtime.Minute),
 		Balance: &BalanceHistoryBalanceDiff{
 			Amount:   coin.NewAmountUint64(24000000000).UnsafeICE(),
 			amount:   coin.NewAmountUint64(24000000000),
