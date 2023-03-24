@@ -93,7 +93,7 @@ box.execute([[CREATE INDEX IF NOT EXISTS balances_amount_words_ix ON balances (a
 --************************************************************************************************************************************
 -- processed_add_balance_commands
 box.execute([[CREATE TABLE IF NOT EXISTS processed_add_balance_commands (
-                                                 user_id STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                                                 user_id STRING NOT NULL,
                                                  key     STRING NOT NULL,
                                                  PRIMARY KEY (user_id, key)
                                                 )
@@ -101,7 +101,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS processed_add_balance_commands (
 --************************************************************************************************************************************
 -- processed_seen_news
 box.execute([[CREATE TABLE IF NOT EXISTS processed_seen_news (
-                                                 user_id STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                                                 user_id STRING NOT NULL,
                                                  news_id STRING NOT NULL,
                                                  PRIMARY KEY (user_id, news_id)
                                                 )
@@ -111,7 +111,7 @@ box.execute([[CREATE TABLE IF NOT EXISTS processed_seen_news (
 for worker_index=0,%[2]v do
         box.execute([[CREATE TABLE IF NOT EXISTS mining_sessions_dlq_]] .. worker_index .. [[ (
                                id              STRING NOT NULL PRIMARY KEY,
-                               user_id         STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                               user_id         STRING NOT NULL,
                                message         STRING NOT NULL
                               )
                             WITH ENGINE = 'vinyl';]])
