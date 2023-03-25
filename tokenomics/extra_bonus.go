@@ -26,7 +26,11 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	now := time.Now()
+	before := time.Now()
 	bonus, err := r.getAvailableExtraBonus(ctx, now, ebs.UserID)
+	if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
+		log.Info("[response]getAvailableExtraBonus SQL took: %v", elapsed)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to getAvailableExtraBonus for userID:%v", ebs.UserID)
 	}
@@ -42,6 +46,12 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		      extra_bonus_ended_at = :now_nanos + :duration
           WHERE user_id = :user_id
             AND :now_nanos - IFNULL(extra_bonus_started_at,0) > :claim_window`, r.workerIndex(ctx))
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]ClaimExtraBonus SQL took: %v", elapsed)
+		}
+	}()
 	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			err = ErrDuplicate

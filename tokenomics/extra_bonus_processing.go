@@ -143,6 +143,12 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 		UserID                                                         string
 		NewsSeen, FlatBonus, BonusPercentageRemaining, ExtraBonusIndex uint64
 	}, 0, extraBonusProcessingBatchSize)
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]stream:getAvailableExtraBonuses SQL took: %v", elapsed)
+		}
+	}()
 	if err = s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return 0, nil, errors.Wrapf(err, "failed to select for availableExtraBonuses for workerIndex:%v", workerIndex)
 	}

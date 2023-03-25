@@ -202,6 +202,12 @@ FROM (SELECT COUNT(t1.user_id) AS t1,
 	params["previousDurationTypeDetail"] = fmt.Sprintf("/%v", now.Add(-1*s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())) //nolint:lll // .
 	const estimatedBalancesPerUser = 14
 	resp := make([]*balanceRecalculationRow, 0, balanceRecalculationBatchSize*estimatedBalancesPerUser)
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]balanceRecalculation SQL took: %v", elapsed)
+		}
+	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,params:%#v", workerIndex, params)
 	}

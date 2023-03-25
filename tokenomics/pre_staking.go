@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
@@ -13,6 +14,7 @@ import (
 	"github.com/ice-blockchain/go-tarantool-client"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -33,6 +35,12 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 	params := make(map[string]any, 1)
 	params["user_id"] = userID
 	resp := make([]*PreStakingSummary, 0, 1)
+	before := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]GetPreStakingSummary SQL took: %v", elapsed)
+		}
+	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select for pre-staking summary for userID:%v", userID)
 	}
@@ -58,6 +66,12 @@ func (r *repository) getAllPreStakingSummaries(ctx context.Context, userID strin
 						ORDER BY st.created_at`, r.workerIndex(ctx))
 	params := make(map[string]any, 1)
 	params["user_id"] = userID
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]getAllPreStakingSummaries SQL took: %v", elapsed)
+		}
+	}()
 	err = errors.Wrapf(r.db.PrepareExecuteTyped(sql, params, &resp), "failed to select all pre-staking summaries for userID:%v", userID)
 
 	return
@@ -90,6 +104,12 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	params["user_id"] = st.UserID
 	params["years"] = st.Years
 	params["allocation"] = st.Allocation
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]StartOrUpdatePreStaking SQL took: %v", elapsed)
+		}
+	}()
 	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {
 		return errors.Wrapf(err, "failed to insertNewPreStaking:%#v", st)
 	}

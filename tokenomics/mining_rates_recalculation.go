@@ -250,6 +250,12 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	params := make(map[string]any, 1)
 	params["now_nanos"] = now
 	res := make([]*latestMiningRateCalculationSQLRow, 0, miningRatesRecalculationBatchSize)
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]stream:miningRates SQL took: %v", elapsed)
+		}
+	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
 	}

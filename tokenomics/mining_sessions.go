@@ -15,6 +15,7 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/terror"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -26,7 +27,11 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	userID := *ms.MiningSession.UserID
+	before := time.Now()
 	old, err := r.getInternalMiningSummary(ctx, userID)
+	if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
+		log.Info("[response]getInternalMiningSummary SQL took: %v", elapsed)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
 	}
@@ -42,6 +47,12 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return err
 	}
 	newMS := r.newMiningSummary(old, now)
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info("[response]insertNewMiningSession SQL took: %v", elapsed)
+		}
+	}()
 	if err = r.insertNewMiningSession(ctx, userID, old, newMS, shouldRollback); err != nil {
 		return errors.Wrapf(err,
 			"failed to insertNewMiningSession:%#v,userID:%v,rollbackNegativeMiningProgress:%v", newMS, userID, shouldRollback)
