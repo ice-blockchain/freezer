@@ -7,7 +7,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.101.0
+	github.com/ice-blockchain/eskimo v1.103.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230322193140-81ac2079df0c
 	github.com/ice-blockchain/wintr v1.101.0
 	github.com/pkg/errors v0.9.1

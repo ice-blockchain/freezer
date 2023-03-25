@@ -73,6 +73,10 @@ func (s *miningRatesRecalculationTriggerStreamSource) Process(ignoredCtx context
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
+	before2 := time.Now()
+	defer func() {
+		log.Info(fmt.Sprintf("[response]miningRatesRecalculationTriggerStreamSource.Process[%v] took: %v", uint64(msg.Partition), stdlibtime.Since(*before2.Time)))
+	}()
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
