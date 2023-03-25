@@ -208,10 +208,10 @@ const (
 	balanceRecalculationBatchSize                              = 100
 	extraBonusProcessingBatchSize                              = 500
 	maxICEBlockchainConcurrentOperations                       = 100000
-	balanceCalculationProcessingSeedingStreamEmitFrequency     = 30 * stdlibtime.Second
-	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 30 * stdlibtime.Second
-	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 30 * stdlibtime.Second
-	extraBonusProcessingSeedingStreamEmitFrequency             = 30 * stdlibtime.Second
+	balanceCalculationProcessingSeedingStreamEmitFrequency     = 300 * stdlibtime.Second
+	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 300 * stdlibtime.Second
+	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 300 * stdlibtime.Second
+	extraBonusProcessingSeedingStreamEmitFrequency             = 300 * stdlibtime.Second
 	requestDeadline                                            = 25 * stdlibtime.Second
 )
 
