@@ -76,6 +76,9 @@ func (s *balanceRecalculationTriggerStreamSource) Process(ignoredCtx context.Con
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
+	if true {
+		return nil
+	}
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
