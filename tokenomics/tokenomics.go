@@ -41,33 +41,44 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { //nolint:funlen // A lot of startup & shutdown ceremony.
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
-
-	var mbConsumer messagebroker.Client
+	mbConsumers := make([]messagebroker.Client, 0, 1+1+1+1+1)
 	prc := &processor{repository: &repository{
 		cfg: &cfg,
 		db: storage.MustConnect(context.Background(), func() { //nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-			if mbConsumer != nil {
-				log.Error(errors.Wrap(mbConsumer.Close(), "failed to close mbConsumer due to db premature cancellation"))
+			consumerStops := make([]func() error, 0, len(mbConsumers))
+			for _, mbConsumer := range mbConsumers {
+				consumerStops = append(consumerStops, mbConsumer.Close)
 			}
+			log.Error(errors.Wrap(executeConcurrently(consumerStops...), "failed to close mbConsumers due to db premature cancellation"))
 			cancel()
 		}, getDDL(&cfg), applicationYamlKey),
 		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
 	//nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-	mbConsumer = messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
-		&usersTableSource{processor: prc},
-		&globalTableSource{processor: prc},
-		&miningSessionsTableSource{processor: prc},
-		&addBalanceCommandsSource{processor: prc},
-		&viewedNewsSource{processor: prc},
-		&deviceMetadataTableSource{processor: prc},
-		&balanceRecalculationTriggerStreamSource{processor: prc},
-		&miningRatesRecalculationTriggerStreamSource{processor: prc},
-		&blockchainBalanceSynchronizationTriggerStreamSource{processor: prc},
-		&extraBonusProcessingTriggerStreamSource{processor: prc},
+	mbConsumers = append(mbConsumers,
+		messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
+			&usersTableSource{processor: prc},
+			&globalTableSource{processor: prc},
+			&miningSessionsTableSource{processor: prc},
+			&addBalanceCommandsSource{processor: prc},
+			&viewedNewsSource{processor: prc},
+			&deviceMetadataTableSource{processor: prc},
+		),
+		messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey+"1",
+			&balanceRecalculationTriggerStreamSource{processor: prc},
+		),
+		messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey+"2",
+			&miningRatesRecalculationTriggerStreamSource{processor: prc},
+		),
+		messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey+"3",
+			&blockchainBalanceSynchronizationTriggerStreamSource{processor: prc},
+		),
+		messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey+"4",
+			&extraBonusProcessingTriggerStreamSource{processor: prc},
+		),
 	)
-	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
+	prc.shutdown = closeAll(mbConsumers, prc.mb, prc.db)
 
 	prc.initializeExtraBonusWorkers()
 	prc.mustNotifyCurrentAdoption(ctx)
@@ -100,9 +111,13 @@ func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
+func closeAll(mbConsumers []messagebroker.Client, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
 	return func() error {
-		err1 := errors.Wrap(mbConsumer.Close(), "closing message broker consumer connection failed")
+		consumerStops := make([]func() error, 0, len(mbConsumers))
+		for _, mbConsumer := range mbConsumers {
+			consumerStops = append(consumerStops, mbConsumer.Close)
+		}
+		err1 := errors.Wrap(executeConcurrently(consumerStops...), "closing message broker consumers connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
 		err3 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
 		errs := make([]error, 0, 1+1+1+len(otherClosers))
@@ -177,6 +192,29 @@ func (r *repository) workerIndex(ctx context.Context) (workerIndex uint64) {
 	userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64) //nolint:errcheck // Not needed.
 
 	return userHashCode % r.cfg.WorkerCount
+}
+
+func executeConcurrently(fs ...func() error) error {
+	if len(fs) == 0 {
+		return nil
+	}
+	wg := new(sync.WaitGroup)
+	wg.Add(len(fs))
+	errChan := make(chan error, len(fs))
+	for i := range fs {
+		go func(ix int) {
+			defer wg.Done()
+			errChan <- errors.Wrapf(fs[ix](), "failed to run func with index [%v]", ix)
+		}(i)
+	}
+	wg.Wait()
+	close(errChan)
+	errs := make([]error, 0, len(fs))
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	return errors.Wrap(multierror.Append(nil, errs...).ErrorOrNil(), "at least one execution failed")
 }
 
 func sendMessagesConcurrently[M any](ctx context.Context, sendMessage func(context.Context, M) error, messages []M) error {

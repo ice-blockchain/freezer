@@ -114,14 +114,6 @@ tokenomics: &tokenomics
       - name: add-balance-commands
       - name: viewed-news
       - name: user-device-metadata-table
-      - name: balance-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-      - name: mining-rates-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-      - name: blockchain-balance-synchronization-trigger-stream
-        oneGoroutinePerPartition: true
-      - name: extra-bonus-processing-trigger-stream
-        oneGoroutinePerPartition: true
   wintr/multimedia/picture:
     urlDownload: https://ice-staging.b-cdn.net/profile
   workerCount: 10
@@ -179,6 +171,38 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
+tokenomics1:
+  messageBroker:
+    consumerGroup: freezer-balance-recalculation-trigger-stream
+    urls:
+      - localhost:9092
+    consumingTopics:
+      - name: balance-recalculation-trigger-stream
+        oneGoroutinePerPartition: true
+tokenomics2:
+  messageBroker:
+    consumerGroup: freezer-mining-rates-recalculation-trigger-stream
+    urls:
+      - localhost:9092
+    consumingTopics:
+      - name: mining-rates-recalculation-trigger-stream
+        oneGoroutinePerPartition: true
+tokenomics3:
+  messageBroker:
+    consumerGroup: freezer-blockchain-balance-synchronization-trigger-stream
+    urls:
+      - localhost:9092
+    consumingTopics:
+      - name: blockchain-balance-synchronization-trigger-stream
+        oneGoroutinePerPartition: true
+tokenomics4:
+  messageBroker:
+    consumerGroup: freezer-extra-bonus-processing-trigger-stream
+    urls:
+      - localhost:9092
+    consumingTopics:
+      - name: extra-bonus-processing-trigger-stream
+        oneGoroutinePerPartition: true
 tokenomics_test:
   <<: *tokenomics
   messageBroker:
