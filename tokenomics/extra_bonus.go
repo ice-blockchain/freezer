@@ -29,7 +29,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 	before := time.Now()
 	bonus, err := r.getAvailableExtraBonus(ctx, now, ebs.UserID)
 	if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-		log.Info("[response]getAvailableExtraBonus SQL took: %v", elapsed)
+		log.Info(fmt.Sprintf("[response]getAvailableExtraBonus SQL took: %v", elapsed))
 	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to getAvailableExtraBonus for userID:%v", ebs.UserID)
@@ -49,7 +49,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]ClaimExtraBonus SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]ClaimExtraBonus SQL took: %v", elapsed))
 		}
 	}()
 	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {

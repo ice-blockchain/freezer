@@ -28,7 +28,7 @@ func (r *repository) GetAdoptionSummary(ctx context.Context) (as *AdoptionSummar
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetAdoptionSummary took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetAdoptionSummary took: %v", elapsed))
 		}
 	}()
 	key := r.totalActiveUsersGlobalParentKey(time.Now().Time)
@@ -185,7 +185,7 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFla
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]getNextAdoption SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]getNextAdoption SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {

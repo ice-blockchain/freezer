@@ -38,7 +38,7 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetPreStakingSummary SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetPreStakingSummary SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
@@ -69,7 +69,7 @@ func (r *repository) getAllPreStakingSummaries(ctx context.Context, userID strin
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]getAllPreStakingSummaries SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]getAllPreStakingSummaries SQL took: %v", elapsed))
 		}
 	}()
 	err = errors.Wrapf(r.db.PrepareExecuteTyped(sql, params, &resp), "failed to select all pre-staking summaries for userID:%v", userID)
@@ -107,7 +107,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]StartOrUpdatePreStaking SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]StartOrUpdatePreStaking SQL took: %v", elapsed))
 		}
 	}()
 	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {

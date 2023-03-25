@@ -30,7 +30,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	before := time.Now()
 	old, err := r.getInternalMiningSummary(ctx, userID)
 	if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-		log.Info("[response]getInternalMiningSummary SQL took: %v", elapsed)
+		log.Info(fmt.Sprintf("[response]getInternalMiningSummary SQL took: %v", elapsed))
 	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
@@ -50,7 +50,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]insertNewMiningSession SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]insertNewMiningSession SQL took: %v", elapsed))
 		}
 	}()
 	if err = r.insertNewMiningSession(ctx, userID, old, newMS, shouldRollback); err != nil {

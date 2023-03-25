@@ -62,7 +62,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetBalanceSummary SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetBalanceSummary SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
@@ -148,7 +148,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetBalanceHistory SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetBalanceHistory SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &res); err != nil {
@@ -445,6 +445,12 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 	}
 	sql := fmt.Sprintf(`%v INTO balances_%v (updated_at,user_id,type,type_detail,negative,amount) 
 									     VALUES %v`, insertOrReplace, workerIndex, strings.Join(values, ","))
+	before2 := time.Now()
+	defer func() {
+		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
+			log.Info(fmt.Sprintf("[response]insert:%v replace balances SQL took: %v", insertOrReplace, elapsed))
+		}
+	}()
 	if _, err := storage.CheckSQLDMLResponse(r.db.PrepareExecute(sql, params)); err != nil {
 		return errors.Wrapf(err, "failed at %v to %v balances:%#v", updatedAt, insertOrReplace, balances)
 	}

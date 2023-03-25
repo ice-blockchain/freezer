@@ -253,7 +253,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]stream:miningRates SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]stream:miningRates SQL took: %v", elapsed))
 		}
 	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {

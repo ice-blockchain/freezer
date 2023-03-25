@@ -201,7 +201,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]blockchainSync SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]blockchainSync SQL took: %v", elapsed))
 		}
 	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {

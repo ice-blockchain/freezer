@@ -146,7 +146,7 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]stream:getAvailableExtraBonuses SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]stream:getAvailableExtraBonuses SQL took: %v", elapsed))
 		}
 	}()
 	if err = s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {

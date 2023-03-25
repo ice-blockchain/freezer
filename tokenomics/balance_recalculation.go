@@ -205,7 +205,7 @@ FROM (SELECT COUNT(t1.user_id) AS t1,
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]balanceRecalculation SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]balanceRecalculation SQL took: %v", elapsed))
 		}
 	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {

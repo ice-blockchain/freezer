@@ -70,7 +70,7 @@ WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetRankingSummary SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetRankingSummary SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
@@ -94,7 +94,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		before := time.Now()
 		defer func() {
 			if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-				log.Info("[response]GetTopMiners SQL took: %v", elapsed)
+				log.Info(fmt.Sprintf("[response]GetTopMiners SQL took: %v", elapsed))
 			}
 		}()
 		return r.getTopMiners(ctx, limit, offset)
@@ -102,7 +102,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		before := time.Now()
 		defer func() {
 			if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-				log.Info("[response]GetTopMiners[keyword] SQL took: %v", elapsed)
+				log.Info(fmt.Sprintf("[response]GetTopMiners[keyword] SQL took: %v", elapsed))
 			}
 		}()
 		return r.getTopMinersByKeyword(ctx, keyword, limit, offset)
@@ -355,7 +355,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	before := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]GetMiningSummary SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]GetMiningSummary SQL took: %v", elapsed))
 		}
 	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {

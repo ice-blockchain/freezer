@@ -118,7 +118,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 	before2 := time.Now()
 	defer func() {
 		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info("[response]cleanup_balance_t1_t2 SQL took: %v", elapsed)
+			log.Info(fmt.Sprintf("[response]cleanup_balance_t1_t2 SQL took: %v", elapsed))
 		}
 	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
