@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
