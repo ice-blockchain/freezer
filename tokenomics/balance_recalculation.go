@@ -76,10 +76,6 @@ func (s *balanceRecalculationTriggerStreamSource) Process(ignoredCtx context.Con
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
-	before2 := time.Now()
-	defer func() {
-		log.Info(fmt.Sprintf("[response]balanceRecalculationTriggerStreamSource.Process[%v] took: %v", uint64(msg.Partition), stdlibtime.Since(*before2.Time)))
-	}()
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
@@ -206,12 +202,6 @@ FROM (SELECT COUNT(t1.user_id) AS t1,
 	params["previousDurationTypeDetail"] = fmt.Sprintf("/%v", now.Add(-1*s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())) //nolint:lll // .
 	const estimatedBalancesPerUser = 14
 	resp := make([]*balanceRecalculationRow, 0, balanceRecalculationBatchSize*estimatedBalancesPerUser)
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]balanceRecalculation SQL took: %v", elapsed))
-		}
-	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,params:%#v", workerIndex, params)
 	}

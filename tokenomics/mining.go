@@ -12,7 +12,6 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	"github.com/ice-blockchain/wintr/connectors/storage"
-	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -67,12 +66,6 @@ WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
 	params := make(map[string]any, 1)
 	params["user_id"] = userID
 	resp := make([]*RankingSummary, 0, 1+1)
-	before := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]GetRankingSummary SQL took: %v", elapsed))
-		}
-	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select miner global rank for userID:%v", userID)
 	}
@@ -91,20 +84,8 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	if keyword == "" {
-		before := time.Now()
-		defer func() {
-			if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-				log.Info(fmt.Sprintf("[response]GetTopMiners SQL took: %v", elapsed))
-			}
-		}()
 		return r.getTopMiners(ctx, limit, offset)
 	} else { //nolint:revive // Nope.
-		before := time.Now()
-		defer func() {
-			if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-				log.Info(fmt.Sprintf("[response]GetTopMiners[keyword] SQL took: %v", elapsed))
-			}
-		}()
 		return r.getTopMinersByKeyword(ctx, keyword, limit, offset)
 	}
 }
@@ -352,12 +333,6 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		BonusPercentageRemaining uint64
 		NewsSeen                 uint64
 	}, 0, 1)
-	before := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]GetMiningSummary SQL took: %v", elapsed))
-		}
-	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select for mining summary for userID:%v", userID)
 	}

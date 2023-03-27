@@ -73,10 +73,6 @@ func (s *miningRatesRecalculationTriggerStreamSource) Process(ignoredCtx context
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
-	before2 := time.Now()
-	defer func() {
-		log.Info(fmt.Sprintf("[response]miningRatesRecalculationTriggerStreamSource.Process[%v] took: %v", uint64(msg.Partition), stdlibtime.Since(*before2.Time)))
-	}()
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
@@ -254,12 +250,6 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	params := make(map[string]any, 1)
 	params["now_nanos"] = now
 	res := make([]*latestMiningRateCalculationSQLRow, 0, miningRatesRecalculationBatchSize)
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]stream:miningRates SQL took: %v", elapsed))
-		}
-	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
 	}

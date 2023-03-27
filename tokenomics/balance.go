@@ -59,12 +59,6 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		PreStakingAllocation, PreStakingBonus uint64
 		BalanceWorkerStarted                  bool
 	}, 0, 1+1+1)
-	before := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]GetBalanceSummary SQL took: %v", elapsed))
-		}
-	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrapf(err, "failed to select user's balances for user_id:%v", userID)
 	}
@@ -145,12 +139,6 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 						  AND type = %[2]v
 						  AND type_detail in (%[3]v)`, r.workerIndex(ctx), totalNoPreStakingBonusBalanceType, strings.Join(typeDetails, ","))
 	res := make([]*balance, 0, 2*len(typeDetails)) //nolint:gomnd // Cuz there's a positive and a negative one.
-	before := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]GetBalanceHistory SQL took: %v", elapsed))
-		}
-	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return nil, errors.Wrapf(err, "failed to select balance history for params:%#v", params)
 	}
@@ -442,12 +430,6 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 	}
 	sql := fmt.Sprintf(`%v INTO balances_%v (updated_at,user_id,type,type_detail,negative,amount) 
 									     VALUES %v`, insertOrReplace, workerIndex, strings.Join(values, ","))
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]insert:%v replace balances SQL took: %v", insertOrReplace, elapsed))
-		}
-	}()
 	if _, err := storage.CheckSQLDMLResponse(r.db.Execute(sql)); err != nil {
 		return errors.Wrapf(err, "failed at %v to %v balances:%#v", updatedAt, insertOrReplace, balances)
 	}

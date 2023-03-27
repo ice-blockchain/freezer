@@ -73,10 +73,6 @@ func (s *extraBonusProcessingTriggerStreamSource) Process(ignoredCtx context.Con
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
-	before2 := time.Now()
-	defer func() {
-		log.Info(fmt.Sprintf("[response]extraBonusProcessingTriggerStreamSource.Process[%v] took: %v", uint64(msg.Partition), stdlibtime.Since(*before2.Time)))
-	}()
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
@@ -147,12 +143,6 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 		UserID                                                         string
 		NewsSeen, FlatBonus, BonusPercentageRemaining, ExtraBonusIndex uint64
 	}, 0, extraBonusProcessingBatchSize)
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]stream:getAvailableExtraBonuses SQL took: %v", elapsed))
-		}
-	}()
 	if err = s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return 0, nil, errors.Wrapf(err, "failed to select for availableExtraBonuses for workerIndex:%v", workerIndex)
 	}

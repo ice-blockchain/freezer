@@ -5,8 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	stdlibtime "time"
-
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -16,8 +14,6 @@ import (
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
-	"github.com/ice-blockchain/wintr/log"
-	"github.com/ice-blockchain/wintr/time"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
@@ -115,12 +111,6 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 		T0UserID, TMinus1UserID string
 	}
 	res := make([]*resp, 0, 1)
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]cleanup_balance_t1_t2 SQL took: %v", elapsed))
-		}
-	}()
 	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
 		return errors.Wrapf(err, "failed to get reverse t0 and t-1 balance information for userID:%v", usr.ID)
 	}

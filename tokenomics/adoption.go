@@ -25,12 +25,6 @@ func (r *repository) GetAdoptionSummary(ctx context.Context) (as *AdoptionSummar
 	if as = new(AdoptionSummary); ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
-	before := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]GetAdoptionSummary took: %v", elapsed))
-		}
-	}()
 	key := r.totalActiveUsersGlobalParentKey(time.Now().Time)
 	if as.TotalActiveUsers, err = r.getGlobalUnsignedValue(ctx, key); err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, errors.Wrapf(err, "failed to get totalActiveUsers getGlobalUnsignedValue for key:%v", key)
@@ -182,12 +176,6 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFla
 							  WHERE x.consecutive_durations == :expected_consecutive_durations
 							    AND x.achieved_at IS NULL`, strings.Join(keyParams, ","), currentAdoptionSQL())
 	resp := make([]*Adoption[coin.ICEFlake], 0, 1)
-	before2 := time.Now()
-	defer func() {
-		if elapsed := stdlibtime.Since(*before2.Time); elapsed > 100*stdlibtime.Millisecond {
-			log.Info(fmt.Sprintf("[response]getNextAdoption SQL took: %v", elapsed))
-		}
-	}()
 	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
 		return nil, errors.Wrap(err, "failed to select if the next adoption is achieved")
 	}
