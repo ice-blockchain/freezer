@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex uint64) (err error) {
@@ -32,26 +33,30 @@ func (r *repository) updateWorkerFields(
 	if ctx.Err() != nil || len(userIDs) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	values := make([]string, 0, len(userIDs))
 	fields := make([]string, 0, len(updateKV))
-	params := make(map[string]any, len(userIDs)+len(updateKV))
 	for key, value := range updateKV {
-		if value == nil {
-			fields = append(fields, fmt.Sprintf("%[1]v = null", key))
-		} else {
-			params[key] = value
-			fields = append(fields, fmt.Sprintf("%[1]v = :%[1]v", key))
+		switch typedValue := value.(type) {
+		case *time.Time:
+			fields = append(fields, fmt.Sprintf("%[1]v = %[2]v", key, typedValue.UnixNano()))
+		case string:
+			fields = append(fields, fmt.Sprintf("%[1]v = '%[2]v'", key, typedValue))
+		default:
+			if typedValue == nil {
+				fields = append(fields, fmt.Sprintf("%[1]v = null", key))
+			} else {
+				fields = append(fields, fmt.Sprintf("%[1]v = %[2]v", key, typedValue))
+			}
 		}
 	}
-	for i := range userIDs {
-		params[fmt.Sprintf("user_id%v", i)] = userIDs[i]
-		values = append(values, fmt.Sprintf(":user_id%v", i))
+	values := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		values = append(values, fmt.Sprintf("'%v'", userID))
 	}
 	sql := fmt.Sprintf(`UPDATE %[1]v%[2]v
 					    SET %[3]v
 					    WHERE user_id in (%[4]v)`, table, workerIndex, strings.Join(fields, ","), strings.Join(values, ","))
-	if _, uErr := storage.CheckSQLDMLResponse(r.db.PrepareExecute(sql, params)); uErr != nil {
-		return errors.Wrapf(uErr, "failed to UPDATE %v%v params :%#v, for userIDs:%#v", table, workerIndex, params, userIDs)
+	if _, uErr := storage.CheckSQLDMLResponse(r.db.Execute(sql)); uErr != nil {
+		return errors.Wrapf(uErr, "failed to UPDATE %v%v updateKV :%#v, for userIDs:%#v", table, workerIndex, updateKV, userIDs)
 	}
 
 	return nil

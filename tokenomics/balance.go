@@ -426,18 +426,15 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	const balanceFields = 5
-	params := make(map[string]any, 1+(balanceFields*len(balances)))
-	params["updated_at"] = updatedAt
 	values := make([]string, 0, len(balances))
-	for ix, bal := range balances {
-		params[fmt.Sprintf("user_id_%v", ix)] = bal.UserID
-		params[fmt.Sprintf("type_%v", ix)] = bal.Type
-		params[fmt.Sprintf("type_detail_%v", ix)] = bal.TypeDetail
-		params[fmt.Sprintf("negative_%v", ix)] = bal.Negative
-		params[fmt.Sprintf("amount_%v", ix)] = bal.Amount
-		value := fmt.Sprintf(`(:updated_at,:user_id_%[1]v,:type_%[1]v,:type_detail_%[1]v,:negative_%[1]v,:amount_%[1]v)`, ix)
-		values = append(values, value)
+	for _, bal := range balances {
+		if bal.Amount.IsNil() {
+			bal.Amount = coin.ZeroICEFlakes()
+		}
+		amount, err := bal.Amount.Uint.Marshal()
+		log.Panic(err)
+		values = append(values, fmt.Sprintf(`(%[1]v,'%[2]v',%[3]v,'%[4]v',%[5]v,'%[6]v')`,
+			updatedAt.UnixNano(), bal.UserID, bal.Type, bal.TypeDetail, bal.Negative, string(amount)))
 	}
 	insertOrReplace := "REPLACE"
 	if insert {
@@ -451,7 +448,7 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 			log.Info(fmt.Sprintf("[response]insert:%v replace balances SQL took: %v", insertOrReplace, elapsed))
 		}
 	}()
-	if _, err := storage.CheckSQLDMLResponse(r.db.PrepareExecute(sql, params)); err != nil {
+	if _, err := storage.CheckSQLDMLResponse(r.db.Execute(sql)); err != nil {
 		return errors.Wrapf(err, "failed at %v to %v balances:%#v", updatedAt, insertOrReplace, balances)
 	}
 
@@ -462,19 +459,14 @@ func (r *repository) deleteBalances(ctx context.Context, workerIndex uint64, bal
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	const fields = 4
-	params := make(map[string]any, fields*len(balances))
 	values := make([]string, 0, len(balances))
-	for ix, bal := range balances {
-		params[fmt.Sprintf("user_id_%v", ix)] = bal.UserID
-		params[fmt.Sprintf("type_%v", ix)] = bal.Type
-		params[fmt.Sprintf("type_detail_%v", ix)] = bal.TypeDetail
-		params[fmt.Sprintf("negative_%v", ix)] = bal.Negative
-		values = append(values, fmt.Sprintf(`(user_id = :user_id_%[1]v AND negative = :negative_%[1]v AND type = :type_%[1]v AND type_detail = :type_detail_%[1]v)`, ix)) //nolint:lll // .
+	for _, bal := range balances {
+		values = append(values, fmt.Sprintf(`(user_id = '%[1]v' AND negative = %[2]v AND type = %[3]v AND type_detail = '%[4]v')`,
+			bal.UserID, bal.Negative, bal.Type, bal.TypeDetail))
 	}
 	sql := fmt.Sprintf(`DELETE FROM balances_%v WHERE %v`, workerIndex, strings.Join(values, " OR "))
-	if _, err := storage.CheckSQLDMLResponse(r.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to DELETE from balances for params:%#v", params)
+	if _, err := storage.CheckSQLDMLResponse(r.db.Execute(sql)); err != nil {
+		return errors.Wrapf(err, "failed to DELETE from balances for values:%#v", values)
 	}
 
 	return nil

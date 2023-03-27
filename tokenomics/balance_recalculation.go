@@ -555,20 +555,15 @@ func (s *balanceRecalculationTriggerStreamSource) stopWorkerForUsers(
 	if ctx.Err() != nil || len(lastMiningEndedAtPerUserID) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	params := make(map[string]any, (1+1)*len(lastMiningEndedAtPerUserID))
 	conditions := make([]string, 0, len(lastMiningEndedAtPerUserID))
-	ix := 0
 	for userID, lastMiningEndedAt := range lastMiningEndedAtPerUserID {
-		params[fmt.Sprintf("user_id%v", ix)] = userID
-		params[fmt.Sprintf("last_mining_ended_at%v", ix)] = lastMiningEndedAt
-		conditions = append(conditions, fmt.Sprintf("(user_id = :user_id%[1]v AND last_mining_ended_at = :last_mining_ended_at%[1]v)", ix))
-		ix++
+		conditions = append(conditions, fmt.Sprintf("(user_id = '%[1]v' AND last_mining_ended_at = %[2]v)", userID, lastMiningEndedAt.UnixNano()))
 	}
 	sql := fmt.Sprintf(`UPDATE balance_recalculation_worker_%[1]v
 					    SET enabled = FALSE
 					    WHERE %v`, workerIndex, strings.Join(conditions, " OR "))
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to update balance_recalculation_worker_%v SET enabled = FALSE for params:%#v", workerIndex, params)
+	if _, err := storage.CheckSQLDMLResponse(s.db.Execute(sql)); err != nil {
+		return errors.Wrapf(err, "failed to update balance_recalculation_worker_%v SET enabled = FALSE for conditions:%#v", workerIndex, conditions)
 	}
 
 	return nil

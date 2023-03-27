@@ -173,7 +173,7 @@ tokenomics: &tokenomics
       - 20
 tokenomics1:
   messageBroker:
-    consumerGroup: freezer-balance-recalculation-trigger-stream
+    consumerGroup: freezer-refrigerant-balance-recalculation-trigger-stream
     urls:
       - localhost:9092
     consumingTopics:
@@ -181,7 +181,7 @@ tokenomics1:
         oneGoroutinePerPartition: true
 tokenomics2:
   messageBroker:
-    consumerGroup: freezer-mining-rates-recalculation-trigger-stream
+    consumerGroup: freezer-refrigerant-mining-rates-recalculation-trigger-stream
     urls:
       - localhost:9092
     consumingTopics:
@@ -189,7 +189,7 @@ tokenomics2:
         oneGoroutinePerPartition: true
 tokenomics3:
   messageBroker:
-    consumerGroup: freezer-blockchain-balance-synchronization-trigger-stream
+    consumerGroup: freezer-refrigerant-blockchain-balance-synchronization-trigger-stream
     urls:
       - localhost:9092
     consumingTopics:
@@ -197,7 +197,7 @@ tokenomics3:
         oneGoroutinePerPartition: true
 tokenomics4:
   messageBroker:
-    consumerGroup: freezer-extra-bonus-processing-trigger-stream
+    consumerGroup: freezer-refrigerant-extra-bonus-processing-trigger-stream
     urls:
       - localhost:9092
     consumingTopics:

@@ -229,10 +229,8 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 		PreStakingICEFlake string
 	}
 	values := make([]string, 0, len(bs))
-	const balanceFields = 6
-	params := make(map[string]any, len(bs)*balanceFields)
 	blockchainMessages := make([]*blockchainMessage, 0, len(bs))
-	for ix, bal := range bs {
+	for _, bal := range bs {
 		if bal.Standard.IsNil() {
 			bal.Standard = coin.ZeroICEFlakes()
 		}
@@ -240,13 +238,10 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 			bal.PreStaking = coin.ZeroICEFlakes()
 		}
 		total := coin.New(bal.Standard.Add(bal.PreStaking))
-		params[fmt.Sprintf("amount%v", ix)] = total.Amount
-		params[fmt.Sprintf("amount_w0%v", ix)] = total.AmountWord0
-		params[fmt.Sprintf("amount_w1%v", ix)] = total.AmountWord1
-		params[fmt.Sprintf("amount_w2%v", ix)] = total.AmountWord2
-		params[fmt.Sprintf("amount_w3%v", ix)] = total.AmountWord3
-		params[fmt.Sprintf("user_id%v", ix)] = bal.UserID
-		values = append(values, fmt.Sprintf("(:amount%[1]v,:amount_w0%[1]v,:amount_w1%[1]v,:amount_w2%[1]v,:amount_w3%[1]v,:user_id%[1]v)", ix))
+		totalAmount, err := total.Amount.Uint.Marshal()
+		log.Panic(err)
+		values = append(values, fmt.Sprintf("('%[1]v',%[2]v,%[3]v,%[4]v,%[5]v,'%[6]v')",
+			string(totalAmount), total.AmountWord0, total.AmountWord1, total.AmountWord2, total.AmountWord3, bal.UserID))
 		if bal.miningBlockchainAccountAddress != "" {
 			blockchainMessages = append(blockchainMessages, &blockchainMessage{
 				AccountAddress:     bal.miningBlockchainAccountAddress,
@@ -256,8 +251,8 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 		}
 	}
 	sql := fmt.Sprintf(`REPLACE INTO balances (amount,amount_w0,amount_w1,amount_w2,amount_w3,user_id) VALUES %v`, strings.Join(values, ","))
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to replace into balances, params:%#v", params)
+	if _, err := storage.CheckSQLDMLResponse(s.db.Execute(sql)); err != nil {
+		return errors.Wrapf(err, "failed to replace into balances, values:%#v", values)
 	}
 	if len(blockchainMessages) != 0 { //nolint:revive,staticcheck // .
 		//nolint:godox // .
