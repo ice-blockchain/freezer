@@ -12,7 +12,7 @@ require (
 	github.com/ice-blockchain/wintr v1.101.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.2
-	github.com/swaggo/swag v1.8.11
+	github.com/swaggo/swag v1.8.12
 	github.com/testcontainers/testcontainers-go v0.19.0
 )
 
@@ -106,7 +106,7 @@ require (
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
-	github.com/swaggo/gin-swagger v1.5.3 // indirect
+	github.com/swaggo/gin-swagger v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/twmb/franz-go v1.13.1 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.8.0 // indirect

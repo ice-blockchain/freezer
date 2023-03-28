@@ -11,7 +11,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -42,47 +41,38 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	return errors.Wrapf(err, "permanently failed to initializeBalanceRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
 }
 
-func (p *processor) startBalanceRecalculationTriggerSeedingStream(ctx context.Context) {
-	nilBodyForEachWorker := make([]any, p.cfg.WorkerCount) //nolint:makezero // Intended.
+func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
+	log.Info("balanceRecalculationTriggerStreamSource started")
+	defer func() {
+		log.Info("balanceRecalculationTriggerStreamSource stopped")
+	}()
+	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	for i := 0; i < int(s.cfg.WorkerCount); i++ {
+		workerIndexes[i] = uint64(i)
+	}
 	ticker := stdlibtime.NewTicker(balanceCalculationProcessingSeedingStreamEmitFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Error(errors.Wrap(sendMessagesConcurrently[any](ctx, p.sendBalanceRecalculationTriggerMessage, nilBodyForEachWorker),
-				"failed to sendMessagesConcurrently[sendBalanceRecalculationTriggerMessage]"))
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
+			log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (p *processor) sendBalanceRecalculationTriggerMessage(ctx context.Context, _ any) error {
-	msg := &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
-		Key:     uuid.NewString(),
-		Topic:   p.cfg.MessageBroker.Topics[9].Name,
-		Value:   nil,
-	}
-	responder := make(chan error, 1)
-	defer close(responder)
-	p.mb.SendMessage(ctx, msg, responder)
-
-	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
-}
-
-func (s *balanceRecalculationTriggerStreamSource) Process(ignoredCtx context.Context, msg *messagebroker.Message) (err error) {
+func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
-	var (
-		now         = time.Now()
-		workerIndex = uint64(msg.Partition)
-	)
+	var now = time.Now()
 	batch, err := s.getLatestBalancesNewBatch(ctx, now, workerIndex) //nolint:contextcheck // Intended.
 	if err != nil || len(batch) == 0 {
 		return errors.Wrapf(err, "failed to getLatestBalancesNewBatch for workerIndex:%v,time:%v", workerIndex, now)
@@ -216,8 +206,8 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
 	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs := s.recalculateBalances(now, batch)
-	if err := sendMessagesConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
-		return errors.Wrapf(err, "failed to sendMessagesConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
+	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
+		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
 	if err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...); err != nil {
 		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)

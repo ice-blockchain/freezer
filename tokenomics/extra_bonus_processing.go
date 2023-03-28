@@ -9,7 +9,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -40,48 +39,43 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 	return errors.Wrapf(err, "permanently failed to initializeExtraBonusProcessingWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
 }
 
-func (p *processor) startExtraBonusProcessingTriggerSeedingStream(ctx context.Context) {
-	nilBodyForEachWorker := make([]any, p.cfg.WorkerCount) //nolint:makezero // Intended.
+func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
+	log.Info("extraBonusProcessingTriggerStreamSource started")
+	defer func() {
+		log.Info("extraBonusProcessingTriggerStreamSource stopped")
+	}()
+	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	for i := 0; i < int(s.cfg.WorkerCount); i++ {
+		workerIndexes[i] = uint64(i)
+	}
 	ticker := stdlibtime.NewTicker(extraBonusProcessingSeedingStreamEmitFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Error(errors.Wrap(sendMessagesConcurrently[any](ctx, p.sendExtraBonusProcessingTriggerMessage, nilBodyForEachWorker),
-				"failed to sendMessagesConcurrently[sendExtraBonusProcessingTriggerMessage]"))
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
+			log.Info(fmt.Sprintf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (p *processor) sendExtraBonusProcessingTriggerMessage(ctx context.Context, _ any) error {
-	msg := &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
-		Key:     uuid.NewString(),
-		Topic:   p.cfg.MessageBroker.Topics[12].Name,
-	}
-	responder := make(chan error, 1)
-	defer close(responder)
-	p.mb.SendMessage(ctx, msg, responder)
-
-	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
-}
-
-func (s *extraBonusProcessingTriggerStreamSource) Process(ignoredCtx context.Context, msg *messagebroker.Message) (err error) {
+func (s *extraBonusProcessingTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
-	extraBonusIndex, availableExtraBonuses, err := s.getAvailableExtraBonuses(ctx, uint64(msg.Partition)) //nolint:contextcheck // Not needed here.
+	extraBonusIndex, availableExtraBonuses, err := s.getAvailableExtraBonuses(ctx, workerIndex) //nolint:contextcheck // Not needed here.
 	if err != nil {
-		return errors.Wrapf(err, "failed to getAvailableExtraBonuses for workerIndex:%v", uint64(msg.Partition))
+		return errors.Wrapf(err, "failed to getAvailableExtraBonuses for workerIndex:%v", workerIndex)
 	}
-	if err = sendMessagesConcurrently(ctx, s.sendAvailableDailyBonusMessage, availableExtraBonuses); err != nil { //nolint:contextcheck // Not needed here.
-		return errors.Wrapf(err, "failed to sendMessagesConcurrently[sendAvailableDailyBonusMessage] for availableExtraBonuses:%#v", availableExtraBonuses)
+	if err = executeBatchConcurrently(ctx, s.sendAvailableDailyBonusMessage, availableExtraBonuses); err != nil { //nolint:contextcheck // Not needed here.
+		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendAvailableDailyBonusMessage] for availableExtraBonuses:%#v", availableExtraBonuses)
 	}
 	const table = "extra_bonus_processing_worker_"
 	params := make(map[string]any, 1)
@@ -91,8 +85,8 @@ func (s *extraBonusProcessingTriggerStreamSource) Process(ignoredCtx context.Con
 		userIDs = append(userIDs, bonus.UserID)
 	}
 
-	return errors.Wrapf(s.updateWorkerFields(ctx, uint64(msg.Partition), table, params, userIDs...), //nolint:contextcheck // Not needed here.
-		"failed to updateWorkerTimeField for workerIndex:%v,table:%q,params:%#v,userIDs:%#v", uint64(msg.Partition), table, params, userIDs)
+	return errors.Wrapf(s.updateWorkerFields(ctx, workerIndex, table, params, userIDs...), //nolint:contextcheck // Not needed here.
+		"failed to updateWorkerTimeField for workerIndex:%v,table:%q,params:%#v,userIDs:%#v", workerIndex, table, params, userIDs)
 }
 
 //nolint:funlen,lll // .

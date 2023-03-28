@@ -9,7 +9,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -40,36 +39,31 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 	return errors.Wrapf(err, "permanently failed to initializeMiningRatesRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
 }
 
-func (p *processor) startMiningRatesRecalculationTriggerSeedingStream(ctx context.Context) {
-	nilBodyForEachWorker := make([]any, p.cfg.WorkerCount) //nolint:makezero // Intended.
+func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
+	log.Info("miningRatesRecalculationTriggerStreamSource started")
+	defer func() {
+		log.Info("miningRatesRecalculationTriggerStreamSource stopped")
+	}()
+	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	for i := 0; i < int(s.cfg.WorkerCount); i++ {
+		workerIndexes[i] = uint64(i)
+	}
 	ticker := stdlibtime.NewTicker(refreshMiningRatesProcessingSeedingStreamEmitFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Error(errors.Wrap(sendMessagesConcurrently[any](ctx, p.sendMiningRatesRecalculationTriggerMessage, nilBodyForEachWorker),
-				"failed to sendMessagesConcurrently[sendMiningRatesRecalculationTriggerMessage]"))
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[miningRatesRecalculationTriggerStreamSource.process]")) //nolint:lll // .
+			log.Info(fmt.Sprintf("miningRatesRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (p *processor) sendMiningRatesRecalculationTriggerMessage(ctx context.Context, _ any) error {
-	msg := &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
-		Key:     uuid.NewString(),
-		Topic:   p.cfg.MessageBroker.Topics[10].Name,
-	}
-	responder := make(chan error, 1)
-	defer close(responder)
-	p.mb.SendMessage(ctx, msg, responder)
-
-	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
-}
-
-func (s *miningRatesRecalculationTriggerStreamSource) Process(ignoredCtx context.Context, msg *messagebroker.Message) (err error) {
+func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
@@ -77,16 +71,16 @@ func (s *miningRatesRecalculationTriggerStreamSource) Process(ignoredCtx context
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	now := time.Now()
-	rows, err := s.getLatestMiningRates(ctx, uint64(msg.Partition), now) //nolint:contextcheck // We use context with longer deadline.
+	rows, err := s.getLatestMiningRates(ctx, workerIndex, now) //nolint:contextcheck // We use context with longer deadline.
 	if err != nil || len(rows) == 0 {
-		return errors.Wrapf(err, "failed to getLatestMiningRates for workerIndex:%v", msg.Partition)
+		return errors.Wrapf(err, "failed to getLatestMiningRates for workerIndex:%v", workerIndex)
 	}
-	if err = sendMessagesConcurrently(ctx, s.sendMiningRatesMessage, rows); err != nil { //nolint:contextcheck // We use context with longer deadline.
+	if err = executeBatchConcurrently(ctx, s.sendMiningRatesMessage, rows); err != nil { //nolint:contextcheck // We use context with longer deadline.
 		return errors.Wrapf(err, "failed to sendMiningRatesMessages for:%#v", rows)
 	}
 
-	return errors.Wrapf(s.updateLastIterationFinishedAt(ctx, uint64(msg.Partition), rows, now), //nolint:contextcheck // We use context with longer deadline.
-		"failed to updateLastIterationFinishedAt for workerIndex:%v,rows:%#v", msg.Partition, rows)
+	return errors.Wrapf(s.updateLastIterationFinishedAt(ctx, workerIndex, rows, now), //nolint:contextcheck // We use context with longer deadline.
+		"failed to updateLastIterationFinishedAt for workerIndex:%v,rows:%#v", workerIndex, rows)
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) getLatestMiningRates( //nolint:funlen,gocognit // .

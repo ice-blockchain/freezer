@@ -160,7 +160,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 		})
 	}
 
-	return errors.Wrapf(sendMessagesConcurrently(ctx, s.sendAddBalanceCommandMessage, cmds), "failed to sendAddBalanceCommandMessages for %#v", cmds)
+	return errors.Wrapf(executeBatchConcurrently(ctx, s.sendAddBalanceCommandMessage, cmds), "failed to sendAddBalanceCommandMessages for %#v", cmds)
 }
 
 func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) (err error) {

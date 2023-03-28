@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"io"
+	"sync"
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
@@ -208,10 +209,10 @@ const (
 	balanceRecalculationBatchSize                              = 100
 	extraBonusProcessingBatchSize                              = 500
 	maxICEBlockchainConcurrentOperations                       = 100000
-	balanceCalculationProcessingSeedingStreamEmitFrequency     = 300 * stdlibtime.Second
-	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 300 * stdlibtime.Second
-	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 300 * stdlibtime.Second
-	extraBonusProcessingSeedingStreamEmitFrequency             = 300 * stdlibtime.Second
+	balanceCalculationProcessingSeedingStreamEmitFrequency     = 1 * stdlibtime.Nanosecond
+	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 1 * stdlibtime.Nanosecond
+	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 1 * stdlibtime.Nanosecond
+	extraBonusProcessingSeedingStreamEmitFrequency             = 1 * stdlibtime.Nanosecond
 	requestDeadline                                            = 25 * stdlibtime.Second
 )
 
@@ -355,6 +356,8 @@ type (
 
 	processor struct {
 		*repository
+		streamsDoneWg *sync.WaitGroup
+		cancelStreams context.CancelFunc
 	}
 
 	config struct {

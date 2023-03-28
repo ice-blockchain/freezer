@@ -10,7 +10,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -42,55 +41,50 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 	return errors.Wrapf(err, "permanently failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
 }
 
-func (p *processor) startBlockchainBalanceSynchronizationTriggerSeedingStream(ctx context.Context) {
-	nilBodyForEachWorker := make([]any, p.cfg.WorkerCount) //nolint:makezero // Intended.
+func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.Context) {
+	log.Info("blockchainBalanceSynchronizationTriggerStreamSource started")
+	defer func() {
+		log.Info("blockchainBalanceSynchronizationTriggerStreamSource stopped")
+	}()
+	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	for i := 0; i < int(s.cfg.WorkerCount); i++ {
+		workerIndexes[i] = uint64(i)
+	}
 	ticker := stdlibtime.NewTicker(blockchainBalanceSynchronizationSeedingStreamEmitFrequency)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Error(errors.Wrap(sendMessagesConcurrently[any](ctx, p.sendBlockchainBalanceSynchronizationTriggerMessage, nilBodyForEachWorker),
-				"failed to sendMessagesConcurrently[sendBlockchainBalanceSynchronizationTriggerMessage]"))
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[blockchainBalanceSynchronizationTriggerStreamSource.process]")) //nolint:lll // .
+			log.Info(fmt.Sprintf("blockchainBalanceSynchronizationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (p *processor) sendBlockchainBalanceSynchronizationTriggerMessage(ctx context.Context, _ any) error {
-	msg := &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
-		Key:     uuid.NewString(),
-		Topic:   p.cfg.MessageBroker.Topics[11].Name,
-	}
-	responder := make(chan error, 1)
-	defer close(responder)
-	p.mb.SendMessage(ctx, msg, responder)
-
-	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
-}
-
-func (s *blockchainBalanceSynchronizationTriggerStreamSource) Process(ignoredCtx context.Context, msg *messagebroker.Message) (err error) {
+func (s *blockchainBalanceSynchronizationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
-	rows, err := s.getLatestBalances(ctx, uint64(msg.Partition)) //nolint:contextcheck // We use context with longer deadline.
+	rows, err := s.getLatestBalances(ctx, workerIndex) //nolint:contextcheck // We use context with longer deadline.
 	if err != nil || len(rows) == 0 {
-		return errors.Wrapf(err, "failed to getLatestBalances for workerIndex:%v", msg.Partition)
+		return errors.Wrapf(err, "failed to getLatestBalances for workerIndex:%v", workerIndex)
 	}
 	if err = s.updateBalances(ctx, rows); err != nil { //nolint:contextcheck // Intended.
 		return errors.Wrapf(err, "failed to updateBalances:%#v", rows)
 	}
-	if err = sendMessagesConcurrently(ctx, s.sendBalancesMessage, rows); err != nil { //nolint:contextcheck // We use context with longer deadline.
+	if err = executeBatchConcurrently(ctx, s.sendBalancesMessage, rows); err != nil { //nolint:contextcheck // We use context with longer deadline.
 		return errors.Wrapf(err, "failed to sendBalancesMessages for:%#v", rows)
 	}
 
-	return errors.Wrapf(s.updateLastIterationFinishedAt(ctx, uint64(msg.Partition), rows), //nolint:contextcheck // We use context with longer deadline.
-		"failed to updateLastIterationFinishedAt for workerIndex:%v,rows:%#v", msg.Partition, rows)
+	return errors.Wrapf(s.updateLastIterationFinishedAt(ctx, workerIndex, rows), //nolint:contextcheck // We use context with longer deadline.
+		"failed to updateLastIterationFinishedAt for workerIndex:%v,rows:%#v", workerIndex, rows)
 }
 
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) getLatestBalances( //nolint:funlen // .

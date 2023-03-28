@@ -94,10 +94,10 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`SELECT b.amount 													  AS amount,
-							   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE u.user_id END)  AS user_id,
-							   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE u.username END) AS username,
-							   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE %[2]v END) 	  AS profile_picture_url
+	sql := fmt.Sprintf(`SELECT b.amount,
+							   u.user_id,
+							   u.username,
+							   %[2]v AS profile_picture_url
 						FROM users u
 							JOIN balances b
 								ON u.user_id = b.user_id
@@ -107,7 +107,8 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 								( u.first_name IS NOT NULL AND u.first_name != '' AND LOWER(u.first_name) LIKE :keyword ESCAPE '\' )
 								OR
 								( u.last_name IS NOT NULL AND u.last_name != '' AND LOWER(u.last_name) LIKE :keyword ESCAPE '\' )
-							  )  
+							  )
+							  AND u.hide_ranking = FALSE
 						ORDER BY b.amount_w3 DESC,
 								 b.amount_w2 DESC,
 								 b.amount_w1 DESC,
@@ -126,13 +127,14 @@ func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`SELECT b.amount 														  AS amount,
-								   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE u.user_id END)  AS user_id,
-								   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE u.username END) AS username,
-								   (CASE WHEN u.hide_ranking == TRUE THEN '' ELSE %[2]v END) 	  AS profile_picture_url
+	sql := fmt.Sprintf(`SELECT b.amount,
+							   u.user_id,
+							   u.username,
+							   %[2]v AS profile_picture_url
 							FROM balances b
 								JOIN users u
 								    ON u.user_id = b.user_id
+									AND u.hide_ranking = FALSE
 							ORDER BY b.amount_w3 DESC,
 									 b.amount_w2 DESC,
 									 b.amount_w1 DESC,
