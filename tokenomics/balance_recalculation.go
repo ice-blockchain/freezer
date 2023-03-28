@@ -50,18 +50,11 @@ func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
 		workerIndexes[i] = uint64(i)
 	}
-	ticker := stdlibtime.NewTicker(balanceCalculationProcessingSeedingStreamEmitFrequency)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			before := time.Now()
-			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
-			log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
-		case <-ctx.Done():
-			return
-		}
+	for ctx.Err() == nil {
+		stdlibtime.Sleep(balanceCalculationProcessingSeedingStreamEmitFrequency)
+		before := time.Now()
+		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
+		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 
