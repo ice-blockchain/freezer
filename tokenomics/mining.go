@@ -19,6 +19,9 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
+	if true {
+		return &RankingSummary{}, nil
+	}
 	sql := fmt.Sprintf(`
 SELECT count(others.user_id) + 1 AS global_rank
 FROM (SELECT x.amount_w0,
@@ -82,6 +85,9 @@ WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
 func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
+	}
+	if true {
+		return make([]*Miner, 0), nil
 	}
 	if keyword == "" {
 		return r.getTopMiners(ctx, limit, offset)
