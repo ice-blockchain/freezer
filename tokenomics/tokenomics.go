@@ -286,7 +286,7 @@ func executeBatchConcurrently[ARG any](ctx context.Context, process func(context
 
 func (c *config) globalAggregationIntervalChildDateFormat() string {
 	const hoursInADay = 24
-	switch c.GlobalAggregationInterval.Child { //nolint:exhaustive // We don't care about the others.
+	switch c.GlobalAggregationInterval.Child {
 	case stdlibtime.Minute:
 		return minuteFormat
 	case stdlibtime.Hour:
@@ -302,7 +302,7 @@ func (c *config) globalAggregationIntervalChildDateFormat() string {
 
 func (c *config) globalAggregationIntervalParentDateFormat() string {
 	const hoursInADay = 24
-	switch c.GlobalAggregationInterval.Parent { //nolint:exhaustive // We don't care about the others.
+	switch c.GlobalAggregationInterval.Parent {
 	case stdlibtime.Minute:
 		return minuteFormat
 	case stdlibtime.Hour:
@@ -318,7 +318,7 @@ func (c *config) globalAggregationIntervalParentDateFormat() string {
 
 func (c *config) lastXMiningSessionsCollectingIntervalDateFormat() string {
 	const hoursInADay = 24
-	switch c.RollbackNegativeMining.LastXMiningSessionsCollectingInterval { //nolint:exhaustive // We don't care about the others.
+	switch c.RollbackNegativeMining.LastXMiningSessionsCollectingInterval {
 	case stdlibtime.Minute:
 		return minuteFormat
 	case stdlibtime.Hour:
