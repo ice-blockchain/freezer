@@ -66,7 +66,9 @@ func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Con
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	var now = time.Now()
+	before := time.Now()
 	batch, err := s.getLatestBalancesNewBatch(ctx, now, workerIndex) //nolint:contextcheck // Intended.
+	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.getLatestBalancesNewBatch[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
 	if err != nil || len(batch) == 0 {
 		return errors.Wrapf(err, "failed to getLatestBalancesNewBatch for workerIndex:%v,time:%v", workerIndex, now)
 	}
@@ -202,16 +204,32 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
-	if err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...); err != nil {
+	before := time.Now()
+	err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...)
+	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.insertOrReplaceBalances[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if err != nil {
 		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)
 	}
-	if err := s.deleteBalances(ctx, workerIndex, balancesForDelete...); err != nil {
+	before = time.Now()
+	err = s.deleteBalances(ctx, workerIndex, balancesForDelete...)
+	if len(balancesForDelete) > 0 {
+		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.deleteBalances[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	}
+	if err != nil {
 		return errors.Wrapf(err, "failed to deleteBalances: %#v", balancesForDelete)
 	}
-	if err := s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs); err != nil {
+	before = time.Now()
+	err = s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs)
+	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.updateLastIterationFinishedAt[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if err != nil {
 		return errors.Wrapf(err, "failed to updateLastIterationFinishedAt, workerIndex:%v,userIDs:%#v", workerIndex, userIDs)
 	}
-	if err := s.stopWorkerForUsers(ctx, workerIndex, processingStoppedForUserIDs); err != nil {
+	before = time.Now()
+	err = s.stopWorkerForUsers(ctx, workerIndex, processingStoppedForUserIDs)
+	if len(processingStoppedForUserIDs) > 0 {
+		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.stopWorkerForUsers[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	}
+	if err != nil {
 		return errors.Wrapf(err, "failed to stopWorkerForUsers, workerIndex:%v,userIDs:%#v", workerIndex, processingStoppedForUserIDs)
 	}
 
