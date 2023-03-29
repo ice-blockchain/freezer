@@ -41,9 +41,7 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 
 func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("miningRatesRecalculationTriggerStreamSource started")
-	defer func() {
-		log.Info("miningRatesRecalculationTriggerStreamSource stopped")
-	}()
+	defer log.Info("miningRatesRecalculationTriggerStreamSource stopped")
 	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
 		workerIndexes[i] = uint64(i)
@@ -144,51 +142,28 @@ SELECT u.last_mining_ended_at,
 	   degradation_btotalt0t1t2.amount AS degradation_btotalt0t1t2_amount,
 	   u.user_id,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
-	   x.t1,
-	   x.t2,
+	   ar_worker.t1,
+	   ar_worker.t2,
 	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus, 
 	   x.pre_staking_allocation,
 	   st_b.bonus
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
-	   		 x.t1,
-	         x.t2,
 			 x.user_id
-	  FROM (SELECT COUNT(t1.user_id) AS t1,
-			       x.t2 AS t2,
-			       x.user_id
-		    FROM (  SELECT COUNT(t2.user_id) AS t2,
-					       x.user_id
-					FROM ( SELECT user_id
-						   FROM mining_rates_recalculation_worker_%[2]v
-						   ORDER BY last_iteration_finished_at
-						   LIMIT %[1]v ) x
-					   LEFT JOIN users t1_mining_not_required
-							  ON t1_mining_not_required.referred_by = x.user_id
-							 AND t1_mining_not_required.user_id != x.user_id
-					   LEFT JOIN users t2
-							  ON t2.referred_by = t1_mining_not_required.user_id
-							 AND t2.user_id != t1_mining_not_required.user_id
-							 AND t2.user_id != x.user_id
-							 AND t2.last_mining_ended_at IS NOT NULL
-							 AND t2.last_mining_ended_at  > :now_nanos
-					GROUP BY x.user_id 
-				   ) x
-						LEFT JOIN users t1
-							   ON t1.referred_by = x.user_id
-							  AND t1.user_id != x.user_id
-							  AND t1.last_mining_ended_at IS NOT NULL
-							  AND t1.last_mining_ended_at  > :now_nanos 
-			GROUP BY x.user_id 
-		   ) x
+	  FROM ( SELECT user_id
+		     FROM mining_rates_recalculation_worker_%[2]v
+		     ORDER BY last_iteration_finished_at
+		     LIMIT %[1]v ) x
 			 LEFT JOIN pre_stakings_%[2]v st
 					ON st.user_id = x.user_id
 	  GROUP BY x.user_id
 	 ) x
 	    JOIN users u
 		  ON u.user_id = x.user_id
-		JOIN extra_bonus_processing_worker_%[2]v eb_worker
+   LEFT JOIN extra_bonus_processing_worker_%[2]v eb_worker
 		  ON eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals_%[2]v ar_worker
+		  ON ar_worker.user_id = x.user_id
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years
    LEFT JOIN balances_%[2]v aggressive_degradation_btotal

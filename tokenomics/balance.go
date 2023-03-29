@@ -420,7 +420,7 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 			bal.Amount = coin.ZeroICEFlakes()
 		}
 		amount, err := bal.Amount.Uint.Marshal()
-		log.Panic(err)
+		log.Panic(err) //nolint:revive // Intended.
 		values = append(values, fmt.Sprintf(`(%[1]v,'%[2]v',%[3]v,'%[4]v',%[5]v,'%[6]v')`,
 			updatedAt.UnixNano(), bal.UserID, bal.Type, bal.TypeDetail, bal.Negative, string(amount)))
 	}

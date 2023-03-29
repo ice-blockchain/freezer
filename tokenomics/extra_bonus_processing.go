@@ -41,9 +41,7 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 
 func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
 	log.Info("extraBonusProcessingTriggerStreamSource started")
-	defer func() {
-		log.Info("extraBonusProcessingTriggerStreamSource stopped")
-	}()
+	defer log.Info("extraBonusProcessingTriggerStreamSource stopped")
 	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
 		workerIndexes[i] = uint64(i)

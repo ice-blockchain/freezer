@@ -43,9 +43,7 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("blockchainBalanceSynchronizationTriggerStreamSource started")
-	defer func() {
-		log.Info("blockchainBalanceSynchronizationTriggerStreamSource stopped")
-	}()
+	defer log.Info("blockchainBalanceSynchronizationTriggerStreamSource stopped")
 	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
 		workerIndexes[i] = uint64(i)
@@ -216,7 +214,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 		}
 		total := coin.New(bal.Standard.Add(bal.PreStaking))
 		totalAmount, err := total.Amount.Uint.Marshal()
-		log.Panic(err)
+		log.Panic(err) //nolint:revive // Intended.
 		values = append(values, fmt.Sprintf("('%[1]v',%[2]v,%[3]v,%[4]v,%[5]v,'%[6]v')",
 			string(totalAmount), total.AmountWord0, total.AmountWord1, total.AmountWord2, total.AmountWord3, bal.UserID))
 		if bal.miningBlockchainAccountAddress != "" {

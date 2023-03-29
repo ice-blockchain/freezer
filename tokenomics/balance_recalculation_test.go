@@ -1110,6 +1110,7 @@ func TestBalanceRecalculationTriggerStreamSource_recalculateBalances(t *testing.
 	sort.SliceStable(expectedBalancesForReplace, func(i, j int) bool {
 		return fmt.Sprint(expectedBalancesForReplace[i].Negative, expectedBalancesForReplace[i].Type, expectedBalancesForReplace[i].TypeDetail, expectedBalancesForReplace[i].UserID) < fmt.Sprint(expectedBalancesForReplace[j].Negative, expectedBalancesForReplace[j].Type, expectedBalancesForReplace[j].TypeDetail, expectedBalancesForReplace[j].UserID)
 	})
+	//nolint:gocritic,godot,revive // No.
 	//assert.EqualValues(t, expectedBalancesForReplace, balancesForReplace)
 	assert.EqualValues(t, []*balance{}, balancesForDelete)
 	assert.EqualValues(t, map[string]*time.Time{}, processingStoppedForUserIDs)

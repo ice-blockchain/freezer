@@ -234,6 +234,7 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 	if ms.LastFreeMiningSessionAwardedAt != nil {
 		lastFreeMiningSessionAwardedAtVal = fmt.Sprint(ms.LastFreeMiningSessionAwardedAt.UnixNano())
 	}
+	//nolint:dupword // Nope.
 	script := fmt.Sprintf(`resp, err = box.execute([[START TRANSACTION;]]) 
 if err ~= nil then
 	return err
@@ -268,7 +269,8 @@ if err ~= nil then
 	return err
 end
 if resp.row_count ~= 1 then
-	resp, err = box.execute([[ INSERT INTO balance_recalculation_worker_%[9]v(user_id,enabled,last_mining_started_at,last_mining_ended_at) VALUES ('%[6]v',TRUE,%[2]v,%[3]v);]])
+	resp, err = box.execute([[ INSERT INTO balance_recalculation_worker_%[9]v(user_id,enabled,last_mining_started_at,last_mining_ended_at) 
+																	   VALUES('%[6]v',TRUE,%[2]v,%[3]v);]])
 	if err ~= nil then
 		box.execute([[ROLLBACK;]]) 
 		return "race condition 2"
@@ -403,13 +405,15 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	params := make(map[string]any, 1)
 	params["user_id"] = *ms.UserID
 	rows := make([]*struct {
-		_msgpack                    struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
+		_msgpack                    struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
 		T0UserID, TMinus1UserID     string
 		T0HashCode, TMinus1HashCode uint64
 	}, 0, 1)
+	//nolint:revive // Nope.
 	if err := s.db.PrepareExecuteTyped(sql, params, &rows); err != nil || len(rows) == 0 || (rows[0].T0UserID == "" && rows[0].TMinus1UserID == "") {
 		return errors.Wrapf(err, "failed to select for t0/t-1 information for userID:%v", *ms.UserID)
 	}
+	//nolint:dupword // Nope.
 	script := fmt.Sprintf(`resp, err = box.execute([[START TRANSACTION;]]) 
 if err ~= nil then
 	return err
@@ -477,7 +481,7 @@ type (
 	}
 )
 
-//nolint:funlen // .
+//nolint:funlen,gocognit,revive // .
 func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Context, usersThatStoppedMining ...*userThatStoppedMining) error {
 	if ctx.Err() != nil || len(usersThatStoppedMining) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -493,7 +497,7 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 			tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount] = make([]string, 0, len(usersThatStoppedMining))
 		}
 		t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount] = append(t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount], usr.T0UserID)
-		tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount] = append(tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount], usr.TMinus1UserID)
+		tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount] = append(tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount], usr.TMinus1UserID) //nolint:lll // .
 		processedMiningSessionValues = append(processedMiningSessionValues, fmt.Sprintf(`(%v,true,'%v')`, r.sessionNumber(usr.LastMiningEndedAt), usr.UserID))
 	}
 	t0Values := make([]string, 0, len(t0UserIDsPerWorkerIndex))

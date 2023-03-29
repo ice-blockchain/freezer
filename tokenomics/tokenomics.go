@@ -94,7 +94,7 @@ func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer messagebroker.Client, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
+func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
@@ -256,29 +256,6 @@ func (r *repository) workerIndex(ctx context.Context) (workerIndex uint64) {
 	userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64) //nolint:errcheck // Not needed.
 
 	return userHashCode % r.cfg.WorkerCount
-}
-
-func executeConcurrently(fs ...func() error) error {
-	if len(fs) == 0 {
-		return nil
-	}
-	wg := new(sync.WaitGroup)
-	wg.Add(len(fs))
-	errChan := make(chan error, len(fs))
-	for i := range fs {
-		go func(ix int) {
-			defer wg.Done()
-			errChan <- errors.Wrapf(fs[ix](), "failed to run func with index [%v]", ix)
-		}(i)
-	}
-	wg.Wait()
-	close(errChan)
-	errs := make([]error, 0, len(fs))
-	for err := range errChan {
-		errs = append(errs, err)
-	}
-
-	return errors.Wrap(multierror.Append(nil, errs...).ErrorOrNil(), "at least one execution failed")
 }
 
 func executeBatchConcurrently[ARG any](ctx context.Context, process func(context.Context, ARG) error, args []ARG) error {

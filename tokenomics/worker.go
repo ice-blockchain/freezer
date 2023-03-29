@@ -27,7 +27,7 @@ func (r *repository) initializeWorker(ctx context.Context, table, userID string,
 	return errors.Wrapf(err, "failed to %v, for userID:%v", sql, userID)
 }
 
-func (r *repository) updateWorkerFields(
+func (r *repository) updateWorkerFields( //nolint:funlen // .
 	ctx context.Context, workerIndex uint64, table string, updateKV map[string]any, userIDs ...string,
 ) (err error) {
 	if ctx.Err() != nil || len(userIDs) == 0 {

@@ -43,9 +43,7 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 
 func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("balanceRecalculationTriggerStreamSource started")
-	defer func() {
-		log.Info("balanceRecalculationTriggerStreamSource stopped")
-	}()
+	defer log.Info("balanceRecalculationTriggerStreamSource stopped")
 	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
 		workerIndexes[i] = uint64(i)
@@ -65,7 +63,7 @@ func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Con
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
-	var now = time.Now()
+	now := time.Now()
 	before := time.Now()
 	batch, err := s.getLatestBalancesNewBatch(ctx, now, workerIndex) //nolint:contextcheck // Intended.
 	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.getLatestBalancesNewBatch[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
@@ -130,44 +128,23 @@ SELECT b.*,
 		   				THEN 1
 		    ELSE 0 
 	   END) AS t0,
-	   x.t1,
-	   x.t2,
+	   ar_worker.t1,
+	   ar_worker.t2,
 	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
 	   t0.hash_code AS t0_hash_code,	
 	   tminus1.hash_code AS tminus1_hash_code
-FROM (SELECT COUNT(t1.user_id) AS t1,
-			 x.t2 AS t2,
-			 x.user_id
-	  FROM (SELECT COUNT(t2.user_id) AS t2,
-				   x.user_id
-			FROM ( SELECT user_id
-				   FROM balance_recalculation_worker_%[2]v
-				   WHERE enabled = TRUE
-				   ORDER BY last_iteration_finished_at
-				   LIMIT %[1]v ) x
-			   LEFT JOIN users t1_mining_not_required
-				   	  ON t1_mining_not_required.referred_by = x.user_id
-				  	 AND t1_mining_not_required.user_id != x.user_id
-			   LEFT JOIN users t2
-				   	  ON t2.referred_by = t1_mining_not_required.user_id
-				  	 AND t2.user_id != t1_mining_not_required.user_id
-				  	 AND t2.user_id != x.user_id
-				  	 AND t2.last_mining_ended_at IS NOT NULL
-				  	 AND t2.last_mining_ended_at  > :now_nanos
-			GROUP BY x.user_id 
-		   ) x
-		 LEFT JOIN users t1
-		     	ON t1.referred_by = x.user_id
-		       AND t1.user_id != x.user_id
-		       AND t1.last_mining_ended_at IS NOT NULL
-		       AND t1.last_mining_ended_at  > :now_nanos
-	  GROUP BY x.user_id
-	 ) x
+FROM ( SELECT user_id
+	   FROM balance_recalculation_worker_%[2]v
+	   WHERE enabled = TRUE
+	   ORDER BY last_iteration_finished_at
+	   LIMIT %[1]v ) x
 		JOIN (%[3]v) current_adoption
 	    JOIN users u
 		  ON u.user_id = x.user_id
    LEFT JOIN extra_bonus_processing_worker_%[2]v eb_worker
 		  ON eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals_%[2]v ar_worker
+		  ON ar_worker.user_id = x.user_id
    LEFT	JOIN users t0
 	  	  ON t0.user_id = u.referred_by
          AND t0.user_id != x.user_id
@@ -225,7 +202,7 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	return nil
 }
 
-//nolint:funlen,gocognit,gocritic,gocyclo,revive,cyclop // .
+//nolint:funlen,gocognit,gocritic,gocyclo,revive,cyclop,maintidx // .
 func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 	now *time.Time, rows []*balanceRecalculationRow,
 ) (balancesForReplace, balancesForDelete []*balance, processingStoppedForUserIDs map[string]*time.Time, dayOffStartedEvents []*FreeMiningSessionStarted, userIDs []string, usersThatStoppedMining []*userThatStoppedMining) { //nolint:lll // .

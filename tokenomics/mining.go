@@ -178,46 +178,21 @@ SELECT u.last_natural_mining_started_at,
 	   degradation_btotalt0t1t2.amount AS degradation_btotalt0t1t2_amount,
 	   u.user_id,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
-	   x.t1,
-	   x.t2,
+	   ar_worker.t1,
+	   ar_worker.t2,
 	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS current_extra_bonus,
 	   x.pre_staking_allocation,
 	   st_b.bonus,
 	   eb.bonus AS flat_extra_bonus,
-	   (CASE WHEN ((:now_nanos - IFNULL(eb_worker.extra_bonus_started_at, 0) > :claim_window) AND ebw.extra_bonus_index IS NOT NULL)
+	   (CASE WHEN (eb_worker.user_id IS NOT NULL AND (:now_nanos - IFNULL(eb_worker.extra_bonus_started_at, 0) > :claim_window) AND ebw.extra_bonus_index IS NOT NULL)
 			 	THEN (100 - (25 *  ((CASE WHEN (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count)) < :first_delayed_claim_penalty_window THEN 0 ELSE (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count)) END)/:delayed_claim_penalty_window)))
 	   		 ELSE 0
 	    END) AS available_flat_extra_bonus_percentage_remaining,
 	   eb_worker.news_seen
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
-			 x.t1,
-			 x.t2,
 			 x.user_id
-			 FROM (SELECT COUNT(t1.user_id) AS t1,
-			 			  x.t2 AS t2,
-			 			  x.user_id
-				   FROM (SELECT COUNT(t2.user_id) AS t2,
-							   x.user_id
-						 FROM ( SELECT CAST(:user_id AS STRING) AS user_id ) x
-						   LEFT JOIN users t1_mining_not_required
-								  ON t1_mining_not_required.referred_by = x.user_id
-								 AND t1_mining_not_required.user_id != x.user_id
-						   LEFT JOIN users t2
-								  ON t2.referred_by = t1_mining_not_required.user_id
-								 AND t2.user_id != t1_mining_not_required.user_id
-								 AND t2.user_id != x.user_id
-								 AND t2.last_mining_ended_at IS NOT NULL
-								 AND t2.last_mining_ended_at  > :now_nanos
-						GROUP BY x.user_id 
-					    ) x
-					 LEFT JOIN users t1
-							ON t1.referred_by = x.user_id
-						   AND t1.user_id != x.user_id
-						   AND t1.last_mining_ended_at IS NOT NULL
-						   AND t1.last_mining_ended_at  > :now_nanos
-				   GROUP BY x.user_id 
-			      ) x
+			 FROM ( SELECT CAST(:user_id AS STRING) AS user_id ) x
 				 LEFT JOIN pre_stakings_%[1]v st
 						ON st.user_id = x.user_id
 			 GROUP BY x.user_id 
@@ -227,8 +202,10 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		  ON u.user_id = x.user_id
    		JOIN extra_bonus_start_date sd 
 		  ON sd.key = 0
-   		JOIN extra_bonus_processing_worker_%[1]v eb_worker
+   LEFT	JOIN extra_bonus_processing_worker_%[1]v eb_worker
 		  ON eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals_%[1]v ar_worker
+		  ON ar_worker.user_id = x.user_id
    LEFT JOIN extra_bonuses eb 
           ON eb.ix = (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - sd.value) / :duration
 		 AND :now_nanos + (eb_worker.utc_offset * :utc_offset_duration) > sd.value
