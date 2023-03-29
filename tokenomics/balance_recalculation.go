@@ -164,7 +164,7 @@ FROM (SELECT COUNT(t1.user_id) AS t1,
 		JOIN (%[3]v) current_adoption
 	    JOIN users u
 		  ON u.user_id = x.user_id
-		JOIN extra_bonus_processing_worker_%[2]v eb_worker
+   LEFT JOIN extra_bonus_processing_worker_%[2]v eb_worker
 		  ON eb_worker.user_id = x.user_id
    LEFT	JOIN users t0
 	  	  ON t0.user_id = u.referred_by
@@ -204,32 +204,16 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
-	before := time.Now()
-	err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...)
-	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.insertOrReplaceBalances[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
-	if err != nil {
+	if err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...); err != nil {
 		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)
 	}
-	before = time.Now()
-	err = s.deleteBalances(ctx, workerIndex, balancesForDelete...)
-	if len(balancesForDelete) > 0 {
-		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.deleteBalances[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
-	}
-	if err != nil {
+	if err := s.deleteBalances(ctx, workerIndex, balancesForDelete...); err != nil {
 		return errors.Wrapf(err, "failed to deleteBalances: %#v", balancesForDelete)
 	}
-	before = time.Now()
-	err = s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs)
-	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.updateLastIterationFinishedAt[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
-	if err != nil {
+	if err := s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs); err != nil {
 		return errors.Wrapf(err, "failed to updateLastIterationFinishedAt, workerIndex:%v,userIDs:%#v", workerIndex, userIDs)
 	}
-	before = time.Now()
-	err = s.stopWorkerForUsers(ctx, workerIndex, processingStoppedForUserIDs)
-	if len(processingStoppedForUserIDs) > 0 {
-		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.updateBalances.stopWorkerForUsers[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
-	}
-	if err != nil {
+	if err := s.stopWorkerForUsers(ctx, workerIndex, processingStoppedForUserIDs); err != nil {
 		return errors.Wrapf(err, "failed to stopWorkerForUsers, workerIndex:%v,userIDs:%#v", workerIndex, processingStoppedForUserIDs)
 	}
 

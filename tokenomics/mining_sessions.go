@@ -268,9 +268,15 @@ if err ~= nil then
 	return err
 end
 if resp.row_count ~= 1 then
-	box.execute([[ROLLBACK;]]) 
-	return "missing balance_recalculation_worker entry"
-end 
+	resp, err = box.execute([[ INSERT INTO balance_recalculation_worker_%[9]v(user_id,enabled,last_mining_started_at,last_mining_ended_at) VALUES ('%[6]v',TRUE,%[2]v,%[3]v);]])
+	if err ~= nil then
+		box.execute([[ROLLBACK;]]) 
+		return "race condition 2"
+	end
+end
+box.execute([[ INSERT INTO blockchain_balance_synchronization_worker_%[9]v(user_id) VALUES ('%[6]v');]])
+box.execute([[ INSERT INTO extra_bonus_processing_worker_%[9]v(user_id) VALUES ('%[6]v');]])
+box.execute([[ INSERT INTO mining_rates_recalculation_worker_%[9]v(user_id) VALUES ('%[6]v');]])
 resp,err = box.execute([[COMMIT;]]) 
 if err ~= nil then
 	box.execute([[ROLLBACK;]])
