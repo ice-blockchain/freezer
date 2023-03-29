@@ -86,9 +86,9 @@ type (
 		LastMiningEndedAt, T0LastMiningEndedAt, TMinus1LastMiningEndedAt,
 		PreviousMiningEndedAt, T0PreviousMiningEndedAt, TMinus1PreviousMiningEndedAt,
 		RollbackUsedAt, T0RollbackUsedAt, TMinus1RollbackUsedAt *time.Time
-		BaseMiningRate                   *coin.ICEFlake
-		UUserID, T0UserID, TMinus1UserID string
-		T0, T1, T2, ExtraBonus           uint64
+		BaseMiningRate                                      *coin.ICEFlake
+		UUserID, T0UserID, TMinus1UserID                    string
+		T0, T1, T2, ExtraBonus, T0HashCode, TMinus1HashCode uint64
 	}
 	B                       = balance
 	balanceRecalculationRow struct {
@@ -132,7 +132,9 @@ SELECT b.*,
 	   END) AS t0,
 	   x.t1,
 	   x.t2,
-	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus
+	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
+	   t0.hash_code AS t0_hash_code,	
+	   tminus1.hash_code AS tminus1_hash_code
 FROM (SELECT COUNT(t1.user_id) AS t1,
 			 x.t2 AS t2,
 			 x.user_id
@@ -200,7 +202,10 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs := s.recalculateBalances(now, batch)
+	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, usersThatStoppedMining := s.recalculateBalances(now, batch) //nolint:lll // .
+	if err := s.decrementActiveReferralCountForT0AndTMinus1(ctx, usersThatStoppedMining...); err != nil {
+		return errors.Wrapf(err, "failed to decrementActiveReferralCountForT0AndTMinus1 for:%#v", usersThatStoppedMining)
+	}
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
@@ -223,12 +228,13 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 //nolint:funlen,gocognit,gocritic,gocyclo,revive,cyclop // .
 func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 	now *time.Time, rows []*balanceRecalculationRow,
-) (balancesForReplace, balancesForDelete []*balance, processingStoppedForUserIDs map[string]*time.Time, dayOffStartedEvents []*FreeMiningSessionStarted, userIDs []string) { //nolint:lll // .
+) (balancesForReplace, balancesForDelete []*balance, processingStoppedForUserIDs map[string]*time.Time, dayOffStartedEvents []*FreeMiningSessionStarted, userIDs []string, usersThatStoppedMining []*userThatStoppedMining) { //nolint:lll // .
 	balancesForReplace = make([]*balance, 0, len(rows))
 	balancesForDelete = make([]*balance, 0, 0) //nolint:gosimple // Nope.
 	processingStoppedForUserIDs = make(map[string]*time.Time)
 	dayOffStartedEvents = make([]*FreeMiningSessionStarted, 0, 0) //nolint:gosimple // Nope.
 	userIDs = make([]string, 0, len(rows))
+	usersThatStoppedMining = make([]*userThatStoppedMining, 0, len(rows))
 	var (
 		thisDurationTypeDetail                = fmt.Sprintf("/%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat()))
 		untilThisDurationTypeDetail           = fmt.Sprintf("@%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat()))
@@ -375,9 +381,19 @@ func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 		if shouldStop {
 			processingStoppedForUserIDs[userID] = details.LastMiningEndedAt
 		}
+		if details.LastMiningEndedAt.Before(*now.Time) && previousElapsedDuration > 0 {
+			usersThatStoppedMining = append(usersThatStoppedMining, &userThatStoppedMining{
+				LastMiningEndedAt: details.LastMiningEndedAt,
+				UserID:            userID,
+				T0UserID:          details.T0UserID,
+				TMinus1UserID:     details.TMinus1UserID,
+				T0HashCode:        details.T0HashCode,
+				TMinus1HashCode:   details.TMinus1HashCode,
+			})
+		}
 	}
 
-	return balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs
+	return balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, usersThatStoppedMining
 }
 
 func (s *balanceRecalculationTriggerStreamSource) calculateElapsedDurations(

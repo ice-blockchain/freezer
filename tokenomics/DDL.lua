@@ -107,6 +107,14 @@ box.execute([[CREATE TABLE IF NOT EXISTS processed_seen_news (
                                                 )
                                                  WITH ENGINE = 'memtx';]])
 --************************************************************************************************************************************
+-- processed_mining_sessions
+box.execute([[CREATE TABLE IF NOT EXISTS processed_mining_sessions (
+                     user_id         STRING NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                     session_number  UNSIGNED NOT NULL,
+                     negative        BOOLEAN NOT NULL DEFAULT FALSE,
+                     PRIMARY KEY(session_number, negative, user_id)
+                     ) WITH ENGINE = 'memtx';]])
+--************************************************************************************************************************************
 -- mining_sessions_dlq
 for worker_index=0,%[2]v do
         box.execute([[CREATE TABLE IF NOT EXISTS mining_sessions_dlq_]] .. worker_index .. [[ (
@@ -204,6 +212,17 @@ for worker_index=0,%[2]v do
                            type        UNSIGNED NOT NULL,
                            negative    BOOLEAN NOT NULL DEFAULT FALSE,
                            PRIMARY KEY (user_id, negative, type, type_detail)
+                        )
+                         WITH ENGINE = 'memtx';]])
+end
+--************************************************************************************************************************************
+-- active_referrals
+for worker_index=0,%[2]v do
+        box.execute([[CREATE TABLE IF NOT EXISTS active_referrals_]] .. worker_index .. [[
+                        (
+                           user_id STRING NOT NULL PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+                           t1      UNSIGNED NOT NULL DEFAULT 0,
+                           t2      UNSIGNED NOT NULL DEFAULT 0
                         )
                          WITH ENGINE = 'memtx';]])
 end

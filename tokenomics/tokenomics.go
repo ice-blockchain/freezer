@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	stdlibtime "time"
@@ -67,6 +68,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	prc.initializeExtraBonusWorkers()
 	prc.mustNotifyCurrentAdoption(ctx)
 	go prc.startStreams(ctx)
+	go prc.startCleaners(ctx)
 
 	return prc
 }
@@ -161,6 +163,37 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	}()
 	p.streamsDoneWg.Wait()
 	log.Info("streams stopped")
+}
+
+func (p *processor) startCleaners(ctx context.Context) {
+	ticker := stdlibtime.NewTicker(stdlibtime.Duration(10+rand.Intn(30)) * stdlibtime.Second) //nolint:gosec,gomnd // Not an  issue.
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			const deadline = 30 * stdlibtime.Second
+			reqCtx, cancel := context.WithTimeout(ctx, deadline)
+			log.Error(errors.Wrap(p.deleteOldProcessedMiningSessions(reqCtx), "failed to deleteOldProcessedMiningSessions"))
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return errors.Wrap(ctx.Err(), "unexpected deadline")
+	}
+	sql := `DELETE FROM processed_mining_sessions WHERE session_number < :session_number`
+	params := make(map[string]any, 1)
+	params["session_number"] = p.sessionNumber(time.New(time.Now().Add(-24 * stdlibtime.Hour)))
+	if _, err := storage.CheckSQLDMLResponse(p.db.PrepareExecute(sql, params)); err != nil {
+		return errors.Wrap(err, "failed to delete old data from processed_mining_sessions")
+	}
+
+	return nil
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
