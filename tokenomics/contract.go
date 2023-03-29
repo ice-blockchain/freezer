@@ -205,10 +205,10 @@ const (
 	percentage100                                              = uint64(100)
 	registrationICEFlakeBonusAmount                            = 10 * uint64(coin.Denomination)
 	lastAdoptionMilestone                                      = 6
-	miningRatesRecalculationBatchSize                          = 1
-	balanceRecalculationBatchSize                              = 1
-	extraBonusProcessingBatchSize                              = 1
-	maxICEBlockchainConcurrentOperations                       = 1000
+	miningRatesRecalculationBatchSize                          = 10
+	balanceRecalculationBatchSize                              = 10
+	extraBonusProcessingBatchSize                              = 100
+	maxICEBlockchainConcurrentOperations                       = 10000
 	balanceCalculationProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
 	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
 	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 0 * stdlibtime.Second
