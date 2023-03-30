@@ -298,7 +298,7 @@ return ''`,
 	if err := r.db.EvalTyped(script, []any{}, &resp); err != nil {
 		return errors.Wrapf(err, "failed to eval script to insert mining session for %#v", ms)
 	} else if errMessage := resp[0]; errMessage != "" {
-		if strings.Contains(errMessage, `race condition`) {
+		if strings.Contains(errMessage, `race condition`) || strings.Contains(errMessage, "Transaction has been aborted by conflict") {
 			return ErrRaceCondition
 		}
 

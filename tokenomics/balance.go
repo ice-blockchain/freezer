@@ -499,9 +499,13 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	if err = storage.CheckNoSQLDMLErr(s.db.InsertTyped("PROCESSED_ADD_BALANCE_COMMANDS", tuple, &[]*processedAddBalanceCommand{})); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMAND:%#v)", tuple)
 	}
-	workerIndex, err := s.getWorkerIndex(ctx, val.UserID)
-	if err != nil {
+	var workerIndex uint64
+	if err = retry(ctx, func() error {
+		workerIndex, err = s.getWorkerIndex(ctx, val.UserID)
+
 		return errors.Wrapf(err, "failed to getWorkerIndex for userID:%v", val.UserID)
+	}); err != nil {
+		return errors.Wrapf(err, "permanently failed to getWorkerIndex for userID:%v", val.UserID)
 	}
 	err = errors.Wrapf(retry(ctx, func() error {
 		if err = s.insertOrReplaceBalances(ctx, workerIndex, true, time.New(message.Timestamp), bal); err != nil {

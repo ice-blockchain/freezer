@@ -199,19 +199,22 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	if err != nil {
 		return errors.Wrapf(err, "invalid timezone:%#v", &dm)
 	}
-	workerIndex, err := s.getWorkerIndex(ctx, dm.UserID)
-	if err != nil {
+	var workerIndex uint64
+	if err = retry(ctx, func() error {
+		workerIndex, err = s.getWorkerIndex(ctx, dm.UserID)
+
 		return errors.Wrapf(err, "failed to getWorkerIndex for userID:%v", dm.UserID)
+	}); err != nil {
+		return errors.Wrapf(err, "permanently failed to getWorkerIndex for userID:%v", dm.UserID)
 	}
 	space := fmt.Sprintf("EXTRA_BONUS_PROCESSING_WORKER_%v", workerIndex)
 	tuple := &extraBonusProcessingWorker{UserID: dm.UserID, UTCOffset: int64(duration / stdlibtime.Minute)}
 	ops := append(make([]tarantool.Op, 0, 1), tarantool.Op{Op: "=", Field: 3, Arg: tuple.UTCOffset}) //nolint:gomnd // `utc_offset` column index.
 
-	return errors.Wrapf(storage.CheckNoSQLDMLErr(s.db.UpsertTyped(space, tuple, ops, &[]*extraBonusProcessingWorker{})),
-		"failed to update users' timezone for %#v", &dm)
+	return errors.Wrapf(storage.CheckNoSQLDMLErr(s.db.UpsertTyped(space, tuple, ops, &[]*extraBonusProcessingWorker{})), "failed to update users' timezone for %#v", &dm) //nolint:lll // .
 }
 
-func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:funlen // .
+func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Message) (err error) { //nolint:funlen // .
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
@@ -219,18 +222,22 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 		return nil
 	}
 	var vn viewedNews
-	if err := json.UnmarshalContext(ctx, msg.Value, &vn); err != nil {
+	if err = json.UnmarshalContext(ctx, msg.Value, &vn); err != nil {
 		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), &vn)
 	}
 	if vn.UserID == "" {
 		return nil
 	}
-	if err := storage.CheckNoSQLDMLErr(s.db.InsertTyped("PROCESSED_SEEN_NEWS", &vn, &[]*viewedNews{})); err != nil {
+	if err = storage.CheckNoSQLDMLErr(s.db.InsertTyped("PROCESSED_SEEN_NEWS", &vn, &[]*viewedNews{})); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_SEEN_NEWS:%#v)", &vn)
 	}
-	workerIndex, err := s.getWorkerIndex(ctx, vn.UserID)
-	if err != nil {
+	var workerIndex uint64
+	if err = retry(ctx, func() error {
+		workerIndex, err = s.getWorkerIndex(ctx, vn.UserID)
+
 		return errors.Wrapf(err, "failed to getWorkerIndex for userID:%v", vn.UserID)
+	}); err != nil {
+		return errors.Wrapf(err, "permanently failed to getWorkerIndex for userID:%v", vn.UserID)
 	}
 	space := fmt.Sprintf("EXTRA_BONUS_PROCESSING_WORKER_%v", workerIndex)
 	tuple := &extraBonusProcessingWorker{UserID: vn.UserID, NewsSeen: 1}
