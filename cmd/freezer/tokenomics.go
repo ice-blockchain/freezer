@@ -27,22 +27,22 @@ func (s *service) setupTokenomicsRoutes(router *server.Router) {
 
 // GetMiningSummary godoc
 //
-//	@Schemes
-//	@Description	Returns the mining related information.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Success		200				{object}	tokenomics.MiningSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		404				{object}	server.ErrorResponse	"if not found"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/mining-summary [GET].
+// @Schemes
+// @Description	Returns the mining related information.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Success		200				{object}	tokenomics.MiningSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		404				{object}	server.ErrorResponse	"if not found"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/mining-summary [GET].
 func (s *service) GetMiningSummary( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetMiningSummaryArg, tokenomics.MiningSummary],
@@ -62,22 +62,22 @@ func (s *service) GetMiningSummary( //nolint:gocritic // False negative.
 
 // GetPreStakingSummary godoc
 //
-//	@Schemes
-//	@Description	Returns the pre-staking related information.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Success		200				{object}	tokenomics.PreStakingSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		404				{object}	server.ErrorResponse	"if not found"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/pre-staking-summary [GET].
+// @Schemes
+// @Description	Returns the pre-staking related information.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Success		200				{object}	tokenomics.PreStakingSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		404				{object}	server.ErrorResponse	"if not found"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/pre-staking-summary [GET].
 func (s *service) GetPreStakingSummary( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetPreStakingSummaryArg, tokenomics.PreStakingSummary],
@@ -97,21 +97,21 @@ func (s *service) GetPreStakingSummary( //nolint:gocritic // False negative.
 
 // GetBalanceSummary godoc
 //
-//	@Schemes
-//	@Description	Returns the balance related information.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Success		200				{object}	tokenomics.BalanceSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/balance-summary [GET].
+// @Schemes
+// @Description	Returns the balance related information.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Success		200				{object}	tokenomics.BalanceSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/balance-summary [GET].
 func (s *service) GetBalanceSummary( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetBalanceSummaryArg, tokenomics.BalanceSummary],
@@ -128,28 +128,28 @@ func (s *service) GetBalanceSummary( //nolint:gocritic // False negative.
 
 // GetBalanceHistory godoc
 //
-//	@Schemes
-//	@Description	Returns the balance history for the provided params.
-//	@Description	If `startDate` is after `endDate`, we go backwards in time: I.E. today, yesterday, etc.
-//	@Description	If `startDate` is before `endDate`, we go forwards in time: I.E. today, tomorrow, etc.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Param			startDate		query		string	false	"The start date in RFC3339 or ISO8601 formats. Default is `now` in UTC."
-//	@Param			endDate			query		string	false	"The start date in RFC3339 or ISO8601 formats. Default is `end of day, relative to startDate`."
-//	@Param			tz				query		string	false	"The user's timezone. I.E. `+03:00`, `-1:30`. Default is UTC."
-//	@Param			limit			query		uint64	false	"max number of elements to return. Default is `24`."
-//	@Param			offset			query		uint64	false	"number of elements to skip before starting to fetch data"
-//	@Success		200				{array}		tokenomics.BalanceHistoryEntry
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/balance-history [GET].
+// @Schemes
+// @Description	Returns the balance history for the provided params.
+// @Description	If `startDate` is after `endDate`, we go backwards in time: I.E: today, yesterday, etc.
+// @Description	If `startDate` is before `endDate`, we go forwards in time: I.E: today, tomorrow, etc.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Param			startDate		query		string	false	"The start date in RFC3339 or ISO8601 formats. Default is `now` in UTC."
+// @Param			endDate			query		string	false	"The start date in RFC3339 or ISO8601 formats. Default is `end of day, relative to startDate`."
+// @Param			tz				query		string	false	"The user's timezone. I.E. `+03:00`, `-1:30`. Default is UTC."
+// @Param			limit			query		uint64	false	"max number of elements to return. Default is `24`."
+// @Param			offset			query		uint64	false	"number of elements to skip before starting to fetch data"
+// @Success		200				{array}		tokenomics.BalanceHistoryEntry
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/balance-history [GET].
 func (s *service) GetBalanceHistory( //nolint:gocritic,funlen // False negative.
 	ctx context.Context,
 	req *server.Request[GetBalanceHistoryArg, []*tokenomics.BalanceHistoryEntry],
@@ -191,22 +191,22 @@ func (s *service) GetBalanceHistory( //nolint:gocritic,funlen // False negative.
 
 // GetRankingSummary godoc
 //
-//	@Schemes
-//	@Description	Returns the ranking related information.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Success		200				{object}	tokenomics.RankingSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if hidden by the user"
-//	@Failure		404				{object}	server.ErrorResponse	"if not found"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/ranking-summary [GET].
+// @Schemes
+// @Description	Returns the ranking related information.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Success		200				{object}	tokenomics.RankingSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if hidden by the user"
+// @Failure		404				{object}	server.ErrorResponse	"if not found"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/ranking-summary [GET].
 func (s *service) GetRankingSummary( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetRankingSummaryArg, tokenomics.RankingSummary],

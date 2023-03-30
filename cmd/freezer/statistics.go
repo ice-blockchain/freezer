@@ -20,22 +20,22 @@ func (s *service) setupStatisticsRoutes(router *server.Router) {
 
 // GetTopMiners godoc
 //
-//	@Schemes
-//	@Description	Returns the paginated leaderboard with top miners.
-//	@Tags			Statistics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			keyword			query		string	false	"a keyword to look for in the user's username or firstname/lastname"
-//	@Param			limit			query		uint64	false	"max number of elements to return. Default is `10`."
-//	@Param			offset			query		uint64	false	"number of elements to skip before starting to fetch data"
-//	@Success		200				{array}		tokenomics.Miner
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics-statistics/top-miners [GET].
+// @Schemes
+// @Description	Returns the paginated leaderboard with top miners.
+// @Tags			Statistics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			keyword			query		string	false	"a keyword to look for in the user's username or firstname/lastname"
+// @Param			limit			query		uint64	false	"max number of elements to return. Default is `10`."
+// @Param			offset			query		uint64	false	"number of elements to skip before starting to fetch data"
+// @Success		200				{array}		tokenomics.Miner
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics-statistics/top-miners [GET].
 func (s *service) GetTopMiners( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetTopMinersArg, []*tokenomics.Miner],
@@ -57,18 +57,18 @@ func (s *service) GetTopMiners( //nolint:gocritic // False negative.
 
 // GetAdoption godoc
 //
-//	@Schemes
-//	@Description	Returns the current adoption information.
-//	@Tags			Statistics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Success		200				{object}	tokenomics.AdoptionSummary
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics-statistics/adoption [GET].
+// @Schemes
+// @Description	Returns the current adoption information.
+// @Tags			Statistics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Success		200				{object}	tokenomics.AdoptionSummary
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics-statistics/adoption [GET].
 func (s *service) GetAdoption( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[GetAdoptionArg, tokenomics.AdoptionSummary],

@@ -22,24 +22,24 @@ func (s *service) setupTokenomicsRoutes(router *server.Router) {
 
 // StartNewMiningSession godoc
 //
-//	@Schemes
-//	@Description	Starts a new mining session for the user, if not already in progress with another one.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string								true	"ID of the user"
-//	@Param			request			body		StartNewMiningSessionRequestBody	true	"Request params"
-//	@Success		201				{object}	tokenomics.MiningSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		404				{object}	server.ErrorResponse	"if user not found"
-//	@Failure		409				{object}	server.ErrorResponse	"if mining is in progress or if a decision about negative mining progress is required"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/mining-sessions [POST].
+// @Schemes
+// @Description	Starts a new mining session for the user, if not already in progress with another one.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string								true	"ID of the user"
+// @Param			request			body		StartNewMiningSessionRequestBody	true	"Request params"
+// @Success		201				{object}	tokenomics.MiningSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		404				{object}	server.ErrorResponse	"if user not found"
+// @Failure		409				{object}	server.ErrorResponse	"if mining is in progress or if a decision about negative mining progress is required"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/mining-sessions [POST].
 func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[StartNewMiningSessionRequestBody, tokenomics.MiningSummary],
@@ -70,23 +70,23 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 
 // ClaimExtraBonus godoc
 //
-//	@Schemes
-//	@Description	Claims an extra bonus for the user.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string	true	"ID of the user"
-//	@Success		201				{object}	tokenomics.ExtraBonusSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		404				{object}	server.ErrorResponse	"if user not found or no extra bonus available"
-//	@Failure		409				{object}	server.ErrorResponse	"if already claimed"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/extra-bonus-claims [POST].
+// @Schemes
+// @Description	Claims an extra bonus for the user.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string	true	"ID of the user"
+// @Success		201				{object}	tokenomics.ExtraBonusSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		404				{object}	server.ErrorResponse	"if user not found or no extra bonus available"
+// @Failure		409				{object}	server.ErrorResponse	"if already claimed"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/extra-bonus-claims [POST].
 func (s *service) ClaimExtraBonus( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[ClaimExtraBonusRequestBody, tokenomics.ExtraBonusSummary],
@@ -109,23 +109,23 @@ func (s *service) ClaimExtraBonus( //nolint:gocritic // False negative.
 
 // StartOrUpdatePreStaking godoc
 //
-//	@Schemes
-//	@Description	Starts or updates pre-staking for the user.
-//	@Tags			Tokenomics
-//	@Accept			json
-//	@Produce		json
-//	@Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			userId			path		string								true	"ID of the user"
-//	@Param			request			body		StartOrUpdatePreStakingRequestBody	true	"Request params"
-//	@Success		200				{object}	tokenomics.PreStakingSummary
-//	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
-//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
-//	@Failure		404				{object}	server.ErrorResponse	"user not found"
-//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500				{object}	server.ErrorResponse
-//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
-//	@Router			/tokenomics/{userId}/pre-staking [PUT].
+// @Schemes
+// @Description	Starts or updates pre-staking for the user.
+// @Tags			Tokenomics
+// @Accept			json
+// @Produce		json
+// @Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
+// @Param			userId			path		string								true	"ID of the user"
+// @Param			request			body		StartOrUpdatePreStakingRequestBody	true	"Request params"
+// @Success		200				{object}	tokenomics.PreStakingSummary
+// @Failure		400				{object}	server.ErrorResponse	"if validations fail"
+// @Failure		401				{object}	server.ErrorResponse	"if not authorized"
+// @Failure		403				{object}	server.ErrorResponse	"if not allowed"
+// @Failure		404				{object}	server.ErrorResponse	"user not found"
+// @Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+// @Failure		500				{object}	server.ErrorResponse
+// @Failure		504				{object}	server.ErrorResponse	"if request times out"
+// @Router			/tokenomics/{userId}/pre-staking [PUT].
 func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[StartOrUpdatePreStakingRequestBody, tokenomics.PreStakingSummary],
