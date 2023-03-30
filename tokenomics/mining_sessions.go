@@ -508,7 +508,7 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 		}
 		t0Values = append(t0Values, fmt.Sprintf(`
 resp, err = box.execute([[ UPDATE active_referrals_%[1]v 
-						   SET t1 = t1 - 1
+						   SET t1 = GREATEST(t1 - 1, 0)
 						   WHERE user_id in (%[2]v);]]) 
 if err ~= nil then
 	box.execute([[ROLLBACK;]]) 
@@ -521,7 +521,7 @@ end`, t0WorkerIndex, strings.Join(t0UserIDs, ",")))
 		}
 		tMinus1Values = append(tMinus1Values, fmt.Sprintf(`
 resp, err = box.execute([[ UPDATE active_referrals_%[1]v 
-						   SET t2 = t2 - 1
+						   SET t2 = GREATEST(t2 - 1, 0)
 						   WHERE user_id in (%[2]v);]]) 
 if err ~= nil then
 	box.execute([[ROLLBACK;]]) 
