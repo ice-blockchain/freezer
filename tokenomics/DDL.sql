@@ -140,7 +140,7 @@ create table if not exists processed_mining_sessions
 ----
 --************************************************************************************************************************************
 -- functions
-CREATE OR REPLACE FUNCTION createHashWorkerPartition(tableName text, count smallint)
+CREATE OR REPLACE FUNCTION createListWorkerPartition(tableName text, count smallint)
   RETURNS VOID AS
 $$
 BEGIN
@@ -183,10 +183,11 @@ create table if not exists mining_sessions_dlq
     user_id         text not null references users(user_id) on delete cascade,
     message         text not null,
     hash_code       bigint not null,
-    primary key(hash_code, id)
-) partition by hash (hash_code);
+    worker_index    smallint not null check (worker_index >= 0),
+    primary key(worker_index, id)
+) partition by list (worker_index);
 ----
-select createHashWorkerPartition('mining_sessions_dlq'::text,%[2]v::smallint);
+select createListWorkerPartition('mining_sessions_dlq'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- extra_bonuses_worker
@@ -209,12 +210,13 @@ create table if not exists pre_stakings
     years        smallint not null references pre_staking_bonuses(years),
     allocation   smallint not null check (allocation > 0 AND allocation <= 100),
     hash_code    bigint not null,
-    primary key (hash_code, user_id, years, allocation)
-) partition by hash (hash_code);
+    worker_index smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id, years, allocation)
+) partition by list (worker_index);
 ----
-create index if not exists pre_stakings_years_idx ON pre_stakings(hash_code,years);
+create index if not exists pre_stakings_years_idx ON pre_stakings(worker_index,years);
 ----
-select createHashWorkerPartition('pre_stakings'::text,%[2]v::smallint);
+select createListWorkerPartition('pre_stakings'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- balance_recalculation_workers
@@ -226,12 +228,13 @@ create table if not exists balance_recalculation_worker
     enabled                    boolean not null default false,
     user_id                    text not null references users(user_id) on delete cascade,
     hash_code                  bigint not null,
-    primary key (hash_code, user_id)
-) partition by hash (hash_code);
+    worker_index               smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id)
+) partition by list (worker_index);
 ----
-create index if not exists balance_recalculation_worker_iterator_ix ON balance_recalculation_worker(hash_code,enabled,last_iteration_finished_at);
+create index if not exists balance_recalculation_worker_iterator_ix ON balance_recalculation_worker(worker_index,enabled,last_iteration_finished_at);
 ----
-select createHashWorkerPartition('balance_recalculation_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('balance_recalculation_worker'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- mining_rates_recalculation_workers
@@ -240,12 +243,13 @@ create table if not exists mining_rates_recalculation_worker
     last_iteration_finished_at timestamp,
     user_id                    text not null references users(user_id) on delete cascade,
     hash_code                  bigint not null,
-    primary key (hash_code, user_id)
-) partition by hash (hash_code);
+    worker_index               smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id)
+) partition by list (worker_index);
 ----
-create index if not exists mining_rates_recalculation_worker_last_iteration_finished_at_ix ON mining_rates_recalculation_worker(hash_code,last_iteration_finished_at);
+create index if not exists mining_rates_recalculation_worker_last_iteration_finished_at_ix ON mining_rates_recalculation_worker(worker_index,last_iteration_finished_at);
 ----
-select createHashWorkerPartition('mining_rates_recalculation_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('mining_rates_recalculation_worker'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- blockchain_balance_synchronization_workers
@@ -255,12 +259,13 @@ create table if not exists blockchain_balance_synchronization_worker
     mining_blockchain_account_address text,
     user_id                           text not null references users(user_id) on delete cascade,
     hash_code                         bigint not null,
-    primary key (hash_code, user_id)
-) partition by hash (hash_code);
+    worker_index                      smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id)
+) partition by list (worker_index);
 ----
-create index if not exists blockchain_balance_synchronization_worker_last_iteration_finished_at_ix ON blockchain_balance_synchronization_worker(hash_code,last_iteration_finished_at);
+create index if not exists blockchain_balance_synchronization_worker_last_iteration_finished_at_ix ON blockchain_balance_synchronization_worker(worker_index,last_iteration_finished_at);
 ----
-select createHashWorkerPartition('blockchain_balance_synchronization_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('blockchain_balance_synchronization_worker'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- extra_bonus_processing_workers
@@ -274,38 +279,41 @@ create table if not exists extra_bonus_processing_worker
     extra_bonus                     smallint not null default 0 check (extra_bonus >= 0),
     last_extra_bonus_index_notified smallint references extra_bonuses(ix) on delete set null,
     hash_code                       bigint not null,
-    primary key (hash_code, user_id)
-) partition by hash (hash_code);
+    worker_index                    smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id)
+) partition by list (worker_index);
 ----
-create index if not exists extra_bonus_processing_worker_iterator_ix ON extra_bonus_processing_worker(hash_code,last_extra_bonus_index_notified);
+create index if not exists extra_bonus_processing_worker_iterator_ix ON extra_bonus_processing_worker(worker_index,last_extra_bonus_index_notified);
 ----
-select createHashWorkerPartition('extra_bonus_processing_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('extra_bonus_processing_worker'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- balances_worker
 create table if not exists balances_worker
 (
-    updated_at  timestamp not null,
-    amount      text not null default '0',
-    user_id     text not null references users(user_id) on delete cascade,
-    type_detail text not null default '',
-    type        smallint not null check (type >= 0),
-    negative    boolean not null default false,
-    hash_code   bigint not null,
-    primary key (hash_code, user_id, negative, type, type_detail)
-) partition by hash (hash_code);
+    updated_at    timestamp not null,
+    amount        text not null default '0',
+    user_id       text not null references users(user_id) on delete cascade,
+    type_detail   text not null default '',
+    type          smallint not null check (type >= 0),
+    negative      boolean not null default false,
+    hash_code     bigint not null,
+    worker_index  smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id, negative, type, type_detail)
+) partition by list (worker_index);
 ----
-select createHashWorkerPartition('balances_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('balances_worker'::text,%[2]v::smallint);
 ----
 --************************************************************************************************************************************
 -- active_referrals
 create table if not exists active_referrals
 (
-    user_id    text not null references users(user_id) on delete cascade,
-    t1         integer not null default 0 check (t1 >= 0),
-    t2         integer not null default 0 check (t2 >= 0),
-    hash_code  bigint not null,
-    primary key (hash_code, user_id)
-) partition by hash (hash_code);
+    user_id      text not null references users(user_id) on delete cascade,
+    t1           integer not null default 0 check (t1 >= 0),
+    t2           integer not null default 0 check (t2 >= 0),
+    hash_code    bigint not null,
+    worker_index smallint not null check (worker_index >= 0),
+    primary key (worker_index, user_id)
+) partition by list (worker_index);
 ----
-select createHashWorkerPartition('active_referrals'::text,%[2]v::smallint);
+select createListWorkerPartition('active_referrals'::text,%[2]v::smallint);

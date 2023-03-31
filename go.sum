@@ -262,8 +262,8 @@ github.com/ice-blockchain/eskimo v1.106.0 h1:w17Ro42U5SAjUk796anQD/TTK8OhstJ9TMi
 github.com/ice-blockchain/eskimo v1.106.0/go.mod h1:umEdb6A6BT32B7mxHjePtOAUaMdK3BYazfMRrrftUgY=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb h1:8TnFP3mc7O+tc44kv2e0/TpZKnEVUaKH+UstwfBwRkk=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb/go.mod h1:ZsQU7i3mxhgBBu43Oev7WPFbIjP4TniN/b1UPNGbrq8=
-github.com/ice-blockchain/wintr v1.104.0 h1:pj8hNBerNcxTkyHs+Ws42/gOOf5ru3/b4X2I4M88IdU=
-github.com/ice-blockchain/wintr v1.104.0/go.mod h1:4C/Nk0UG4wJWahj02RGjBkrDOaZ++BCV7pODKkDPN3U=
+github.com/ice-blockchain/wintr v1.105.0 h1:6LPGtHL5/JCp2f2IR40WPelLdSmpL3FVhO0Jsejpavo=
+github.com/ice-blockchain/wintr v1.105.0/go.mod h1:vpRXW0GxtN8lkJqFCm61qNYs7ujd15AFFz1JrQwJQ8U=
 github.com/imdario/mergo v0.3.15 h1:M8XP7IuFNsqUx6VPK2P9OSmsYsI/YFaGil0uD21V3dM=
 github.com/imdario/mergo v0.3.15/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/imroc/req/v3 v3.33.2 h1:mqphLIo++p+IPYdjgP/Wd5rqXUjKvuEIst2U+EsLIwQ=
@@ -764,8 +764,8 @@ google.golang.org/genproto v0.0.0-20201210142538-e3217bee35cc/go.mod h1:FWY/as6D
 google.golang.org/genproto v0.0.0-20201214200347-8c77b98c765d/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20210108203827-ffc7fda8c3d7/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20210226172003-ab064af71705/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
-google.golang.org/genproto v0.0.0-20230330200707-38013875ee22 h1:n3ThVoQnHbCbnkhZZ1fx3+3fBAisViSwrpbtLV7vydY=
-google.golang.org/genproto v0.0.0-20230330200707-38013875ee22/go.mod h1:UUQDJDOlWu4KYeJZffbWgBkS1YFobzKbLVfK69pe0Ak=
+google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633 h1:0BOZf6qNozI3pkN3fJLwNubheHJYHhMh91GRFOWWK08=
+google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633/go.mod h1:UUQDJDOlWu4KYeJZffbWgBkS1YFobzKbLVfK69pe0Ak=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.20.1/go.mod h1:10oTOabMzJvdu6/UiuZezV6QK5dSlG84ov/aaiqXj38=
 google.golang.org/grpc v1.21.1/go.mod h1:oYelfM1adQP15Ek0mdvEgi9Df8B9CZIaU1084ijfRaM=

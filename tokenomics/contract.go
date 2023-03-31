@@ -273,13 +273,14 @@ type (
 		Verified                       bool       `json:"verified,omitempty" example:"false"`
 	}
 	balance struct {
-		_msgpack   struct{}       `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		UpdatedAt  *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		Amount     *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`
-		UserID     string         `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		TypeDetail string         `json:"typeDetail,omitempty" example:"/2022-01-03"`
-		Type       balanceType    `json:"type,omitempty" example:"1"`
-		Negative   bool           `json:"negative,omitempty" example:"false"`
+		UpdatedAt   *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
+		Amount      *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`
+		UserID      string         `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		TypeDetail  string         `json:"typeDetail,omitempty" example:"/2022-01-03"`
+		Type        balanceType    `json:"type,omitempty" example:"1"`
+		Negative    bool           `json:"negative,omitempty" example:"false"`
+		HashCode    int64          `json:"hashCode,omitempty" example:"11"`
+		WorkerIndex int16          `json:"workerIndex,omitempty" example:"11"`
 	}
 	miningSummary struct {
 		LastNaturalMiningStartedAt                    *time.Time     `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`

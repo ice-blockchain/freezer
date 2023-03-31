@@ -140,7 +140,8 @@ func currentAdoptionSQL() string {
 				   MAX(milestone) AS milestone,
 				   total_active_users
 		    FROM adoption
-		    WHERE achieved_at IS NOT NULL`
+		    WHERE achieved_at IS NOT NULL
+		    GROUP BY achieved_at, base_mining_rate, total_active_users`
 }
 
 func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFlake], error) { //nolint:funlen // Alot of SQL & mappings.

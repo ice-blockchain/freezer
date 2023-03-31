@@ -17,6 +17,7 @@ import (
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -79,7 +80,6 @@ func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Con
 
 type (
 	BalanceRecalculationDetails struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		LastNaturalMiningStartedAt, LastMiningStartedAt, T0LastMiningStartedAt, TMinus1LastMiningStartedAt,
 		LastMiningEndedAt, T0LastMiningEndedAt, TMinus1LastMiningEndedAt,
 		PreviousMiningEndedAt, T0PreviousMiningEndedAt, TMinus1PreviousMiningEndedAt,
@@ -90,7 +90,6 @@ type (
 	}
 	B                       = balance
 	balanceRecalculationRow struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		*B
 		*BalanceRecalculationDetails
 	}
@@ -107,67 +106,74 @@ SELECT b.*,
 	   u.last_natural_mining_started_at,
 	   u.last_mining_started_at,
 	   t0.last_mining_started_at AS t0_last_mining_started_at,
-	   tminus1.last_mining_started_at AS tminus1_last_mining_started_at,
+	   tminus1.last_mining_started_at AS t_minus1_last_mining_started_at,
 	   u.last_mining_ended_at,
 	   t0.last_mining_ended_at AS t0_last_mining_ended_at,
-	   tminus1.last_mining_ended_at AS tminus1_last_mining_ended_at,
+	   tminus1.last_mining_ended_at AS t_minus1_last_mining_ended_at,
 	   u.previous_mining_ended_at,
 	   t0.previous_mining_ended_at AS t0_previous_mining_ended_at,
-	   tminus1.previous_mining_ended_at AS tminus1_previous_mining_ended_at,
+	   tminus1.previous_mining_ended_at AS t_minus1_previous_mining_ended_at,
 	   u.rollback_used_at,
 	   t0.rollback_used_at AS t0_rollback_used_at,
-	   tminus1.rollback_used_at AS tminus1_rollback_used_at,
+	   tminus1.rollback_used_at AS t_minus1_rollback_used_at,
 	   current_adoption.base_mining_rate,
-	   u.user_id AS uuser_id,
-	   t0.user_id AS t0_user_id,
-	   tminus1.user_id AS tminus1_user_id,
+	   u.user_id AS u_user_id,
+	   coalesce(t0.user_id,'') AS t0_user_id,
+	   coalesce(tminus1.user_id,'') AS t_minus1_user_id,
 	   (CASE 
 	   		WHEN 1 = 1
 	   			 AND t0.last_mining_ended_at IS NOT NULL 
-	   			 AND t0.last_mining_ended_at  > :now_nanos 
+	   			 AND t0.last_mining_ended_at  > $1 
 		   				THEN 1
 		    ELSE 0 
 	   END) AS t0,
-	   ar_worker.t1,
-	   ar_worker.t2,
-	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
-	   t0.hash_code AS t0_hash_code,	
-	   tminus1.hash_code AS tminus1_hash_code
+	   coalesce(ar_worker.t1,0) AS t1,
+	   coalesce(ar_worker.t2,0) AS t2,
+	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at, '1999-01-08 04:05:06') > $1 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
+	   coalesce(t0.hash_code,0) AS t0_hash_code,	
+	   coalesce(tminus1.hash_code,0) AS t_minus1_hash_code
 FROM ( SELECT user_id
-	   FROM balance_recalculation_worker_%[2]v
-	   WHERE enabled = TRUE
+	   FROM balance_recalculation_worker
+	   WHERE worker_index = $3 AND enabled = TRUE
 	   ORDER BY last_iteration_finished_at
-	   LIMIT %[1]v ) x
-		JOIN (%[3]v) current_adoption
+	   LIMIT $2 ) x
+		JOIN (%[1]v) current_adoption 
+		  ON 1=1
 	    JOIN users u
 		  ON u.user_id = x.user_id
-   LEFT JOIN extra_bonus_processing_worker_%[2]v eb_worker
-		  ON eb_worker.user_id = x.user_id
-   LEFT JOIN active_referrals_%[2]v ar_worker
-		  ON ar_worker.user_id = x.user_id
+   LEFT JOIN extra_bonus_processing_worker eb_worker
+		  ON eb_worker.worker_index = $3
+		 AND eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals ar_worker
+		  ON ar_worker.worker_index = $3
+		 AND ar_worker.user_id = x.user_id
    LEFT	JOIN users t0
 	  	  ON t0.user_id = u.referred_by
          AND t0.user_id != x.user_id
    LEFT JOIN users tminus1
 	  	  ON tminus1.user_id = t0.referred_by
          AND tminus1.user_id != x.user_id
-   LEFT JOIN balances_%[2]v b
-	      ON b.user_id = u.user_id
-	     AND POSITION('@',b.type_detail) == 0
+   LEFT JOIN balances_worker b
+		  ON b.worker_index = $3
+		 AND b.user_id = u.user_id
+	     AND POSITION('@' IN b.type_detail) = 0
 	     AND (CASE 
-	     		WHEN POSITION('/',b.type_detail) == 1 AND POSITION('&',b.type_detail) == 0
-	              THEN b.type_detail == :thisDurationTypeDetail OR b.type_detail == :previousDurationTypeDetail OR b.type_detail == :nextDurationTypeDetail
-             	ELSE 1 == 1
-              END)`, balanceRecalculationBatchSize, workerIndex, currentAdoptionSQL())
-	params := make(map[string]any, 1+1+1+1)
-	params["now_nanos"] = now
-	params["nextDurationTypeDetail"] = fmt.Sprintf("/%v", now.Add(s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())) //nolint:lll // .
-	params["thisDurationTypeDetail"] = fmt.Sprintf("/%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat()))
-	params["previousDurationTypeDetail"] = fmt.Sprintf("/%v", now.Add(-1*s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())) //nolint:lll // .
-	const estimatedBalancesPerUser = 14
-	resp := make([]*balanceRecalculationRow, 0, balanceRecalculationBatchSize*estimatedBalancesPerUser)
-	if err := s.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
-		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,params:%#v", workerIndex, params)
+	     		WHEN POSITION('/' IN b.type_detail) = 1 AND POSITION('&' IN b.type_detail) = 0
+	              THEN b.type_detail = ANY($4)
+             	ELSE 1 = 1
+              END)`, currentAdoptionSQL())
+	args := append(make([]any, 0, 4), //nolint:gomnd // There are 4 elements.
+		*now.Time,
+		balanceRecalculationBatchSize,
+		workerIndex,
+		[]string{
+			fmt.Sprintf("/%v", now.Add(-1*s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())),
+			fmt.Sprintf("/%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat())),
+			fmt.Sprintf("/%v", now.Add(s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())),
+		})
+	resp, err := storagev2.Select[balanceRecalculationRow](ctx, s.dbV2, sql, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,now:%#v", workerIndex, now)
 	}
 
 	return resp, nil
