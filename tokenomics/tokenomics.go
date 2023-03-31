@@ -30,7 +30,7 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
-	db := storage.MustConnect(ctx, cancel, getDDL(ddl, &cfg), applicationYamlKey)
+	db := storage.MustConnect(ctx, cancel, getDDL(ddl, &cfg, true), applicationYamlKey)
 	dbV2 := storagev2.MustConnect(ctx, "", applicationYamlKey)
 
 	return &repository{
@@ -55,8 +55,8 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 				log.Error(errors.Wrap(mbConsumer.Close(), "failed to close mbConsumer due to db premature cancellation"))
 			}
 			cancel()
-		}, getDDL(ddl, &cfg), applicationYamlKey),
-		dbV2:          storagev2.MustConnect(ctx, getDDL(ddlV2, &cfg), applicationYamlKey),
+		}, getDDL(ddl, &cfg, true), applicationYamlKey),
+		dbV2:          storagev2.MustConnect(ctx, getDDL(ddlV2, &cfg, false), applicationYamlKey),
 		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
@@ -79,16 +79,21 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	return prc
 }
 
-func getDDL(ddl string, cfg *config) string {
+func getDDL(ddl string, cfg *config, v1 bool) string { //nolint:revive // We need it cuz of different types.
 	extraBonusesValues := make([]string, 0, len(cfg.ExtraBonuses.FlatValues))
 	for ix, value := range cfg.ExtraBonuses.FlatValues {
 		extraBonusesValues = append(extraBonusesValues, fmt.Sprintf("(%v,%v)", ix, value))
 	}
 	now := time.Now()
-	adoptionStart := now.Add(-24 * stdlibtime.Hour).UnixNano()
+	adoptionStart := now.Add(-24 * stdlibtime.Hour)
 	dailyBonusStart := now.Add(-1 * users.NanosSinceMidnight(now)).UnixNano()
 	args := make([]any, 0, len(cfg.AdoptionMilestoneSwitch.ActiveUserMilestones)+1+1+1+1)
-	args = append(args, adoptionStart, cfg.WorkerCount-1, strings.Join(extraBonusesValues, ","), dailyBonusStart)
+	if v1 {
+		args = append(args, adoptionStart.UnixNano())
+	} else {
+		args = append(args, adoptionStart.UTC().Format("2006-01-02 15:04:05"))
+	}
+	args = append(args, cfg.WorkerCount-1, strings.Join(extraBonusesValues, ","), dailyBonusStart)
 	for ix := range cfg.AdoptionMilestoneSwitch.ActiveUserMilestones {
 		args = append(args, cfg.AdoptionMilestoneSwitch.ActiveUserMilestones[ix])
 	}

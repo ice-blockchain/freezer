@@ -29,9 +29,9 @@ cmd/freezer-refrigerant:
 tokenomics: &tokenomics
   wintr/connectors/storage/v2:
     runDDL: true
-    primaryURL: postgresql://bogus-user:bogus-pass@bogus-host:bogus-port/bogus-database?sslmode=require
+    primaryURL: postgresql://root:pass@localhost:5432/ice
     replicaURLs:
-      - postgresql://bogus-user:bogus-pass@bogus-host:bogus-port/bogus-database?sslmode=require
+      - postgresql://root:pass@localhost:5432/ice
   db: &tokenomicsDatabase
     urls:
       - localhost:3401

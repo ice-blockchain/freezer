@@ -23,13 +23,13 @@ create table if not exists extra_bonuses
     bonus smallint not null default 0 check (bonus >= 0)
 );
 ----
-insert into extra_bonuses (ix, bonus) 
+insert into extra_bonuses (ix, bonus)
                     values %[3]v
 on conflict(ix) do nothing;
 ----
 --************************************************************************************************************************************
 -- global
-create table if not exists global 
+create table if not exists global
 (
     key   text not null primary key,
     value bigint not null
@@ -37,7 +37,7 @@ create table if not exists global
 ----
 --************************************************************************************************************************************
 -- extra_bonus_start_date
-create table if not exists extra_bonus_start_date 
+create table if not exists extra_bonus_start_date
 (
     key smallint not null primary key check (key >= 0),
     value bigint not null check (value > 0)
@@ -49,7 +49,7 @@ on conflict(key) do nothing;
 ----
 --************************************************************************************************************************************
 -- adoption
-create table if not exists adoption 
+create table if not exists adoption
 (
     achieved_at             timestamp,
     base_mining_rate        text not null default '0',
@@ -58,7 +58,7 @@ create table if not exists adoption
 );
 ----
 insert into adoption (milestone, total_active_users, base_mining_rate, achieved_at)
-              values (1,         0,                  '16000000000',          %[1]v),
+              values (1,         0,                  '16000000000',          '%[1]v'),
                      (2,         %[5]v,              '8000000000',            null),
                      (3,         %[6]v,              '4000000000',            null),
                      (4,         %[7]v,              '2000000000',            null),
@@ -68,7 +68,7 @@ on conflict(milestone) do nothing;
 ----
 --************************************************************************************************************************************
 -- users
-create table if not exists users 
+create table if not exists users
 (
     created_at                                              timestamp not null,
     updated_at                                              timestamp not null,
@@ -98,7 +98,7 @@ create index if not exists top_miners_lookup_idx ON users (username,first_name,l
 ----
 --************************************************************************************************************************************
 -- balances
-create table if not exists balances 
+create table if not exists balances
 (
     amount     text not null default '0',
     amount_w0  bigint not null default 0,
@@ -112,7 +112,7 @@ create index if not exists balances_amount_words_ix ON balances (amount_w3, amou
 ----
 --************************************************************************************************************************************
 -- processed_add_balance_commands
-create table if not exists processed_add_balance_commands 
+create table if not exists processed_add_balance_commands
 (
     user_id text not null references users(user_id) on delete cascade,
     key     text not null,
@@ -121,7 +121,7 @@ create table if not exists processed_add_balance_commands
 ----
 --************************************************************************************************************************************
 -- processed_seen_news
-create table if not exists processed_seen_news 
+create table if not exists processed_seen_news
 (
     user_id text not null references users(user_id) on delete cascade,
     news_id text not null,
@@ -130,7 +130,7 @@ create table if not exists processed_seen_news
 ----
 --************************************************************************************************************************************
 -- processed_mining_sessions
-create table if not exists processed_mining_sessions 
+create table if not exists processed_mining_sessions
 (
     user_id         text not null references users(user_id) on delete cascade,
     session_number  integer not null check (session_number >= 0),
@@ -147,7 +147,7 @@ BEGIN
     FOR worker_index IN 0 .. count-1 BY 1
     LOOP
         EXECUTE format(
-            'CREATE TABLE IF NOT EXISTS %s_%s PARTITION OF %s FOR VALUES WITH (MODULUS %s,REMAINDER %s);',
+            'CREATE TABLE IF NOT EXISTS %%s_%%s PARTITION OF %%s FOR VALUES WITH (MODULUS %%s,REMAINDER %%s);',
            tableName,
            worker_index,
            tableName,
@@ -165,7 +165,7 @@ BEGIN
     FOR worker_index IN 0 .. count-1 BY 1
     LOOP
         EXECUTE format(
-            'CREATE TABLE IF NOT EXISTS %s_%s PARTITION OF %s FOR VALUES IN (%s);',
+            'CREATE TABLE IF NOT EXISTS %%s_%%s PARTITION OF %%s FOR VALUES IN (%%s);',
            tableName,
            worker_index,
            tableName,
@@ -193,7 +193,7 @@ select createHashWorkerPartition('mining_sessions_dlq'::text,%[2]v::smallint);
 create table if not exists extra_bonuses_worker
 (
     extra_bonus_index smallint not null references extra_bonuses(ix) on delete cascade,
-    offset            smallint not null default 0 check (offset >= 0),
+    offset_value      smallint not null default 0 check (offset_value >= 0),
     worker_index      smallint not null check (worker_index >= 0),
     primary key(worker_index, extra_bonus_index)
 ) partition by list (worker_index);
