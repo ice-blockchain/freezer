@@ -20,6 +20,7 @@ import (
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
@@ -29,12 +30,16 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
-	db := storage.MustConnect(ctx, cancel, getDDL(&cfg), applicationYamlKey)
+	db := storage.MustConnect(ctx, cancel, getDDL(ddl, &cfg), applicationYamlKey)
+	dbV2 := storagev2.MustConnect(ctx, "", applicationYamlKey)
 
 	return &repository{
-		cfg:           &cfg,
-		shutdown:      db.Close,
+		cfg: &cfg,
+		shutdown: func() error {
+			return multierror.Append(db.Close(), dbV2.Close())
+		},
 		db:            db,
+		dbV2:          dbV2,
 		pictureClient: picture.New(applicationYamlKey),
 	}
 }
@@ -50,7 +55,8 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 				log.Error(errors.Wrap(mbConsumer.Close(), "failed to close mbConsumer due to db premature cancellation"))
 			}
 			cancel()
-		}, getDDL(&cfg), applicationYamlKey),
+		}, getDDL(ddl, &cfg), applicationYamlKey),
+		dbV2:          storagev2.MustConnect(ctx, getDDL(ddlV2, &cfg), applicationYamlKey),
 		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
@@ -63,7 +69,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 		&viewedNewsSource{processor: prc},
 		&deviceMetadataTableSource{processor: prc},
 	)
-	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
+	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db, prc.dbV2)
 
 	prc.initializeExtraBonusWorkers()
 	prc.mustNotifyCurrentAdoption(ctx)
@@ -73,7 +79,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	return prc
 }
 
-func getDDL(cfg *config) string {
+func getDDL(ddl string, cfg *config) string {
 	extraBonusesValues := make([]string, 0, len(cfg.ExtraBonuses.FlatValues))
 	for ix, value := range cfg.ExtraBonuses.FlatValues {
 		extraBonusesValues = append(extraBonusesValues, fmt.Sprintf("(%v,%v)", ix, value))
@@ -94,13 +100,14 @@ func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
+func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, dbV2 *storagev2.DB, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
-		err3 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
-		errs := make([]error, 0, 1+1+1+len(otherClosers))
-		errs = append(errs, err1, err2, err3)
+		err3 := errors.Wrap(dbV2.Close(), "closing dbV2 connection failed")
+		err4 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
+		errs := make([]error, 0, 1+1+1+1+len(otherClosers))
+		errs = append(errs, err1, err2, err3, err4)
 		for _, closeOther := range otherClosers {
 			if err := closeOther(); err != nil {
 				errs = append(errs, err)
