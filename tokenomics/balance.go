@@ -146,7 +146,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 		return make([]*BalanceHistoryEntry, 0, 0), nil //nolint:gosimple // Nope.
 	}
 
-	adoptions, gErr := getAllAdoptions[coin.ICEFlake](ctx, r.db)
+	adoptions, gErr := getAllAdoptions[coin.ICEFlake](ctx, r.dbV2)
 	if gErr != nil {
 		return nil, errors.Wrap(gErr, "failed to getAllAdoptions")
 	}
