@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -13,7 +14,7 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex uint64) (err error) {
+func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex int16) (err error) {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
@@ -28,7 +29,7 @@ func (r *repository) initializeWorker(ctx context.Context, table, userID string,
 }
 
 func (r *repository) updateWorkerFields( //nolint:funlen // .
-	ctx context.Context, workerIndex uint64, table string, updateKV map[string]any, userIDs ...string,
+	ctx context.Context, workerIndex int16, table string, updateKV map[string]any, userIDs ...string,
 ) (err error) {
 	if ctx.Err() != nil || len(userIDs) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
@@ -62,24 +63,15 @@ func (r *repository) updateWorkerFields( //nolint:funlen // .
 	return nil
 }
 
-func (r *repository) getWorkerIndex(ctx context.Context, userID string) (uint64, error) {
-	if ctx.Err() != nil {
-		return 0, errors.Wrap(ctx.Err(), "context failed")
+func (r *repository) getWorker(ctx context.Context, userID string) (workerIndex int16, hashCode int64, err error) {
+	sql := `SELECT hash_code 
+			FROM users 
+			where user_id = $1`
+	resp, err := storagev2.Get[struct{ HashCode int64 }](ctx, r.dbV2, sql, userID)
+	if err != nil {
+		return 0, 0, errors.Wrapf(err, "failed to get worker for userID:%v", userID)
 	}
-	sql := `SELECT hash_code % :workers FROM users where user_id = :user_id`
-	params := make(map[string]any, 1+1)
-	params["workers"] = r.cfg.WorkerCount
-	params["user_id"] = userID
-	resp := make([]*struct {
-		_msgpack    struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
-		WorkerIndex uint64
-	}, 0, 1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
-		return 0, errors.Wrapf(err, "failed to get worker index for userID:%v", userID)
-	}
-	if len(resp) == 0 {
-		return 0, ErrNotFound
-	}
+	workerIndex = int16(resp.HashCode % int64(r.cfg.WorkerCount))
 
-	return resp[0].WorkerIndex, nil
+	return workerIndex, resp.HashCode, nil
 }

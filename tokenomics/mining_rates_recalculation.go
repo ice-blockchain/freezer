@@ -23,7 +23,7 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := usr.HashCode % r.cfg.WorkerCount
+	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
 		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker_", usr.ID, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
@@ -42,9 +42,9 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("miningRatesRecalculationTriggerStreamSource started")
 	defer log.Info("miningRatesRecalculationTriggerStreamSource stopped")
-	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = uint64(i)
+		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
 		stdlibtime.Sleep(refreshMiningRatesProcessingSeedingStreamEmitFrequency)
@@ -54,7 +54,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context)
 	}
 }
 
-func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
+func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex int16) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
@@ -75,7 +75,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) getLatestMiningRates( //nolint:funlen,gocognit // .
-	ctx context.Context, workerIndex uint64, now *time.Time,
+	ctx context.Context, workerIndex int16, now *time.Time,
 ) ([]*MiningRates[coin.ICEFlake], error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -128,7 +128,7 @@ type (
 )
 
 func (s *miningRatesRecalculationTriggerStreamSource) getUserMiningRateCalculationParametersNewBatch( //nolint:funlen,gocritic// .
-	ctx context.Context, workerIndex uint64, now *time.Time,
+	ctx context.Context, workerIndex int16, now *time.Time,
 ) ([]*latestMiningRateCalculationSQLRow, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -273,7 +273,7 @@ func (r *repository) calculateICEFlakeMiningRates(
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) updateLastIterationFinishedAt(
-	ctx context.Context, workerIndex uint64, rows []*MiningRates[coin.ICEFlake], now *time.Time,
+	ctx context.Context, workerIndex int16, rows []*MiningRates[coin.ICEFlake], now *time.Time,
 ) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")

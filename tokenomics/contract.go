@@ -15,7 +15,6 @@ import (
 	"github.com/ice-blockchain/go-tarantool-client"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
 	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
@@ -34,9 +33,9 @@ const (
 )
 
 var (
-	ErrNotFound                                        = storage.ErrNotFound
-	ErrRelationNotFound                                = storage.ErrRelationNotFound
-	ErrDuplicate                                       = storage.ErrDuplicate
+	ErrNotFound                                        = storagev2.ErrNotFound
+	ErrRelationNotFound                                = storagev2.ErrRelationNotFound
+	ErrDuplicate                                       = storagev2.ErrDuplicate
 	ErrNegativeMiningProgressDecisionRequired          = errors.New("you have negative mining progress, please decide what to do with it")
 	ErrRaceCondition                                   = errors.New("race condition")
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
@@ -409,6 +408,6 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
-		WorkerCount uint64 `yaml:"workerCount"`
+		WorkerCount int16 `yaml:"workerCount"`
 	}
 )

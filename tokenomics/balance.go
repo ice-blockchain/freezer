@@ -409,7 +409,7 @@ func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate *coin.ICEFlake)
 }
 
 func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL params and error handling. Control coupling is ok here.
-	ctx context.Context, workerIndex uint64, insert bool, updatedAt *time.Time, balances ...*balance,
+	ctx context.Context, workerIndex int16, insert bool, updatedAt *time.Time, balances ...*balance,
 ) error {
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -437,7 +437,7 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 	return nil
 }
 
-func (r *repository) deleteBalances(ctx context.Context, workerIndex uint64, balances ...*balance) error {
+func (r *repository) deleteBalances(ctx context.Context, workerIndex int16, balances ...*balance) error {
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
@@ -499,14 +499,18 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	if err = storage.CheckNoSQLDMLErr(s.db.InsertTyped("PROCESSED_ADD_BALANCE_COMMANDS", tuple, &[]*processedAddBalanceCommand{})); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMAND:%#v)", tuple)
 	}
-	var workerIndex uint64
+	var (
+		workerIndex int16
+		hashCode    int64
+	)
 	if err = retry(ctx, func() error {
-		workerIndex, err = s.getWorkerIndex(ctx, val.UserID)
+		workerIndex, hashCode, err = s.getWorker(ctx, val.UserID)
 
-		return errors.Wrapf(err, "failed to getWorkerIndex for userID:%v", val.UserID)
+		return errors.Wrapf(err, "failed to getWorker for userID:%v", val.UserID)
 	}); err != nil {
-		return errors.Wrapf(err, "permanently failed to getWorkerIndex for userID:%v", val.UserID)
+		return errors.Wrapf(err, "permanently failed to getWorker for userID:%v", val.UserID)
 	}
+	bal.HashCode, bal.WorkerIndex = hashCode, workerIndex
 	err = errors.Wrapf(retry(ctx, func() error {
 		if err = s.insertOrReplaceBalances(ctx, workerIndex, true, time.New(message.Timestamp), bal); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {

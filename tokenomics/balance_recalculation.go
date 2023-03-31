@@ -26,7 +26,7 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := usr.HashCode % r.cfg.WorkerCount
+	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
 		if err := r.initializeWorker(ctx, "balance_recalculation_worker_", usr.ID, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
@@ -45,9 +45,9 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("balanceRecalculationTriggerStreamSource started")
 	defer log.Info("balanceRecalculationTriggerStreamSource stopped")
-	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = uint64(i)
+		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
 		stdlibtime.Sleep(balanceCalculationProcessingSeedingStreamEmitFrequency)
@@ -57,7 +57,7 @@ func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 	}
 }
 
-func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
+func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex int16) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
@@ -96,7 +96,7 @@ type (
 )
 
 func (s *balanceRecalculationTriggerStreamSource) getLatestBalancesNewBatch( //nolint:funlen // Big SQL.
-	ctx context.Context, now *time.Time, workerIndex uint64,
+	ctx context.Context, now *time.Time, workerIndex int16,
 ) ([]*balanceRecalculationRow, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
@@ -180,7 +180,7 @@ FROM ( SELECT user_id
 }
 
 func (s *balanceRecalculationTriggerStreamSource) updateBalances(
-	ctx context.Context, now *time.Time, workerIndex uint64, batch []*balanceRecalculationRow,
+	ctx context.Context, now *time.Time, workerIndex int16, batch []*balanceRecalculationRow,
 ) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "context failed")
@@ -510,7 +510,7 @@ func (s *balanceRecalculationTriggerStreamSource) processLastXPositiveMiningSess
 }
 
 func (s *balanceRecalculationTriggerStreamSource) updateLastIterationFinishedAt(
-	ctx context.Context, workerIndex uint64, userIDs []string,
+	ctx context.Context, workerIndex int16, userIDs []string,
 ) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -524,19 +524,25 @@ func (s *balanceRecalculationTriggerStreamSource) updateLastIterationFinishedAt(
 }
 
 func (s *balanceRecalculationTriggerStreamSource) stopWorkerForUsers(
-	ctx context.Context, workerIndex uint64, lastMiningEndedAtPerUserID map[string]*time.Time,
+	ctx context.Context, workerIndex int16, lastMiningEndedAtPerUserID map[string]*time.Time,
 ) error {
 	if ctx.Err() != nil || len(lastMiningEndedAtPerUserID) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
+	ix := 1
+	args := make([]any, 0, 1+len(lastMiningEndedAtPerUserID)*2)
+	args = append(args, workerIndex)
 	conditions := make([]string, 0, len(lastMiningEndedAtPerUserID))
 	for userID, lastMiningEndedAt := range lastMiningEndedAtPerUserID {
-		conditions = append(conditions, fmt.Sprintf("(user_id = '%[1]v' AND last_mining_ended_at = %[2]v)", userID, lastMiningEndedAt.UnixNano()))
+		args = append(args, userID, *lastMiningEndedAt.Time)
+		conditions = append(conditions, fmt.Sprintf("(user_id = $%[1]v AND last_mining_ended_at = $%[2]v)", ix+1, ix+2))
+		ix += 2
 	}
-	sql := fmt.Sprintf(`UPDATE balance_recalculation_worker_%[1]v
+	sql := fmt.Sprintf(`UPDATE balance_recalculation_worker
 					    SET enabled = FALSE
-					    WHERE %v`, workerIndex, strings.Join(conditions, " OR "))
-	if _, err := storage.CheckSQLDMLResponse(s.db.Execute(sql)); err != nil {
+					    WHERE worker_index = $1 AND (%v)`, strings.Join(conditions, " OR "))
+
+	if _, err := storagev2.Exec(ctx, s.dbV2, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed to update balance_recalculation_worker_%v SET enabled = FALSE for conditions:%#v", workerIndex, conditions)
 	}
 
