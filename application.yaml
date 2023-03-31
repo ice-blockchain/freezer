@@ -79,22 +79,6 @@ tokenomics: &tokenomics
         partitions: 10
         replicationFactor: 1
         retention: 10s
-      - name: balance-recalculation-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: mining-rates-recalculation-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: blockchain-balance-synchronization-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: extra-bonus-processing-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
       ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
       - name: users-table
         partitions: 10
