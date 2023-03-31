@@ -27,6 +27,11 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 tokenomics: &tokenomics
+  wintr/connectors/storage/v2:
+    runDDL: true
+    primaryURL: postgresql://bogus-user:bogus-pass@bogus-host:bogus-port/bogus-database?sslmode=require
+    replicaURLs:
+      - postgresql://bogus-user:bogus-pass@bogus-host:bogus-port/bogus-database?sslmode=require
   db: &tokenomicsDatabase
     urls:
       - localhost:3401
@@ -171,38 +176,6 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
-tokenomics1:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-balance-recalculation-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: balance-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics2:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-mining-rates-recalculation-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: mining-rates-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics3:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-blockchain-balance-synchronization-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: blockchain-balance-synchronization-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics4:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-extra-bonus-processing-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: extra-bonus-processing-trigger-stream
-        oneGoroutinePerPartition: true
 tokenomics_test:
   <<: *tokenomics
   messageBroker:
