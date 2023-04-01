@@ -88,40 +88,45 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 						FROM users u 
 							LEFT JOIN pre_stakings st
 								   ON st.user_id = u.user_id
+						    	   AND st.worker_index = $1
 							LEFT JOIN pre_staking_bonuses st_b
 								   ON st.years = st_b.years
 							LEFT JOIN balances_worker negative_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_balance.user_id = u.user_id
+								  AND negative_balance.worker_index = $1
 								  AND negative_balance.negative = TRUE
 								  AND negative_balance.type = %[1]v
 								  AND negative_balance.type_detail = ''
 							LEFT JOIN balances_worker negative_t0_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t0_balance.user_id = u.user_id
+								  AND negative_t0_balance.worker_index = $1
 								  AND negative_t0_balance.negative = TRUE
 								  AND negative_t0_balance.type = %[1]v
 								  AND negative_t0_balance.type_detail = '%[2]v_' || u.referred_by
 							LEFT JOIN balances_worker negative_t1_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t1_balance.user_id = u.user_id
+								  AND negative_t1_balance.worker_index = $1
 								  AND negative_t1_balance.negative = TRUE
 								  AND negative_t1_balance.type = %[1]v
 								  AND negative_t1_balance.type_detail = '%[3]v'
 							LEFT JOIN balances_worker negative_t2_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t2_balance.user_id = u.user_id
+								  AND negative_t2_balance.worker_index = $1
 								  AND negative_t2_balance.negative = TRUE
 								  AND negative_t2_balance.type = %[1]v
 								  AND negative_t2_balance.type_detail = '%[4]v'
-						WHERE u.user_id = $1
+						WHERE u.user_id = $2
 						GROUP BY u.user_id`, totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
-	resp, err := storage.Select[miningSummary](ctx, r.dbV2, sql, userID)
+	resp, err := storage.Get[miningSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get the current mining summary for userID:%v", userID)
 	}
 
-	return resp[0], nil
+	return resp, nil
 }
 
 func (r *repository) validateRollbackNegativeMiningProgress(
@@ -404,8 +409,8 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		T0HashCode, TMinus1HashCode int64
 	}
 	//nolint:revive // Nope.
-	rows, err := storage.Select[referrals](ctx, s.dbV2, sql, *ms.UserID)
-	if err != nil || len(rows) == 0 || (rows[0].T0UserID == "" && rows[0].TMinus1UserID == "") {
+	t0tMinus1, err := storage.Get[referrals](ctx, s.dbV2, sql, *ms.UserID)
+	if err != nil || (t0tMinus1.T0UserID == "" && t0tMinus1.TMinus1UserID == "") {
 		return errors.Wrapf(err, "failed to select for t0/t-1 information for userID:%v", *ms.UserID)
 	}
 
@@ -420,34 +425,34 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		if rowsAffected, err := conn.Exec(ctx, `UPDATE active_referrals 
 			   SET t1 = t1 + 1 
 			   WHERE user_id = $1 and worker_index = $2;`,
-			rows[0].T0UserID,
-			rows[0].T0HashCode%int64(s.cfg.WorkerCount),
+			t0tMinus1.T0UserID,
+			t0tMinus1.T0HashCode%int64(s.cfg.WorkerCount),
 		); err != nil {
-			return errors.Wrapf(err, "failed to update active_referrals for userId:%v", rows[0].T0UserID)
-		} else if rowsAffected.RowsAffected() != 1 && rows[0].T0UserID != "" {
+			return errors.Wrapf(err, "failed to update active_referrals for userId:%v", t0tMinus1.T0UserID)
+		} else if rowsAffected.RowsAffected() != 1 && t0tMinus1.T0UserID != "" {
 			if _, err := conn.Exec(ctx,
 				`INSERT INTO active_referrals(t1, user_id, hash_code, worker_index) VALUES (1, $1, $2, $3);`,
-				rows[0].T0UserID, rows[0].T0HashCode, rows[0].T0HashCode%int64(s.cfg.WorkerCount),
+				t0tMinus1.T0UserID, t0tMinus1.T0HashCode, t0tMinus1.T0HashCode%int64(s.cfg.WorkerCount),
 			); err != nil {
-				return errors.Wrapf(err, "failed to insert active_referrals for userId:%v", rows[0].T0UserID)
+				return errors.Wrapf(err, "failed to insert active_referrals for userId:%v", t0tMinus1.T0UserID)
 			}
 		}
 		if rowsAffected, err := conn.Exec(ctx, `UPDATE active_referrals 
 			   SET t2 = t2 + 1
 			   WHERE user_id = $1 AND worker_index = $2;`,
-			rows[0].TMinus1UserID,
-			rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount),
+			t0tMinus1.TMinus1UserID,
+			t0tMinus1.TMinus1HashCode%int64(s.cfg.WorkerCount),
 		); err != nil {
 			return errors.Wrapf(err, "failed to update active_referrals_%v for userId:%v",
-				rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount), rows[0].TMinus1UserID)
-		} else if rowsAffected.RowsAffected() != 1 && rows[0].TMinus1UserID != "" {
+				t0tMinus1.TMinus1HashCode%int64(s.cfg.WorkerCount), t0tMinus1.TMinus1UserID)
+		} else if rowsAffected.RowsAffected() != 1 && t0tMinus1.TMinus1UserID != "" {
 			if _, err := conn.Exec(ctx,
 				`INSERT INTO active_referrals(t1, user_id, hash_code, worker_index) VALUES (1, $1, $2, $3);`,
-				rows[0].TMinus1UserID,
-				rows[0].TMinus1HashCode,
-				rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount),
+				t0tMinus1.TMinus1UserID,
+				t0tMinus1.TMinus1HashCode,
+				t0tMinus1.TMinus1HashCode%int64(s.cfg.WorkerCount),
 			); err != nil {
-				return errors.Wrapf(err, "failed to insert active_referrals for userId:%v", rows[0].TMinus1UserID)
+				return errors.Wrapf(err, "failed to insert active_referrals for userId:%v", t0tMinus1.TMinus1UserID)
 			}
 		}
 
@@ -486,24 +491,24 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 	}
 	t0Values := make([]string, 0, len(t0UserIDsPerWorkerIndex))
 	tMinus1Values := make([]string, 0, len(tMinus1UserIDsPerWorkerIndex))
-	for _, t0UserIDs := range t0UserIDsPerWorkerIndex {
+	for workerIndex, t0UserIDs := range t0UserIDsPerWorkerIndex {
 		for i := range t0UserIDs {
-			t0UserIDs[i] = fmt.Sprintf(`'%v'`, t0UserIDs[i])
+			t0UserIDs[i] = fmt.Sprintf(`('%v', %v)`, t0UserIDs[i], workerIndex)
 		}
 		t0Values = append(t0Values, fmt.Sprintf(`
 			UPDATE active_referrals
 			SET t1 = GREATEST(t1 - 1, 0)
-			WHERE user_id in (%[1]v);
+			WHERE (user_id, worker_index) in (%[1]v);
 		`, strings.Join(t0UserIDs, ",")))
 	}
-	for _, tMinus1UserIDs := range tMinus1UserIDsPerWorkerIndex {
+	for workerIndex, tMinus1UserIDs := range tMinus1UserIDsPerWorkerIndex {
 		for i := range tMinus1UserIDs {
-			tMinus1UserIDs[i] = fmt.Sprintf(`'%v'`, tMinus1UserIDs[i])
+			tMinus1UserIDs[i] = fmt.Sprintf(`('%v', %v)`, tMinus1UserIDs[i], workerIndex)
 		}
 		tMinus1Values = append(tMinus1Values, fmt.Sprintf(`
 		   UPDATE active_referrals
 		   SET t2 = GREATEST(t2 - 1, 0)
-		   WHERE user_id in (%[1]v); 
+		   WHERE (user_id, worker_index) in (%[1]v); 
 		`, strings.Join(tMinus1UserIDs, ",")))
 	}
 
