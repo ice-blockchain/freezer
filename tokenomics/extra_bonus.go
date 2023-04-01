@@ -162,13 +162,13 @@ func (r *repository) initializeExtraBonusWorkers() {
 func (r *repository) mustPopulateExtraBonusWorker(workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
 	ix := 0
 	values := make([]string, 0, r.cfg.WorkerCount)
-	args := append(make([]any, 2*r.cfg.WorkerCount+1), workerIndex)
+	args := append(make([]any, 0), workerIndex)
 	for extraBonusIndex, offset := range extraBonusesWorkerValues {
 		values = append(values, fmt.Sprintf("($1,$%v,$%v)", ix+2, ix+3))
 		args = append(args, extraBonusIndex, offset)
 		ix += 2
 	}
-	sql := fmt.Sprintf(`INSERT INTO extra_bonuses_worker (worker_index,extra_bonus_index,offset) 
+	sql := fmt.Sprintf(`INSERT INTO extra_bonuses_worker (worker_index,extra_bonus_index,offset_value) 
 													     VALUES %[1]v
 							   ON CONFLICT DO NOTHING`, strings.Join(values, ","))
 	_, err := storagev2.Exec(context.Background(), r.dbV2, sql, args...)

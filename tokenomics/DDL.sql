@@ -144,7 +144,7 @@ CREATE OR REPLACE FUNCTION createListWorkerPartition(tableName text, count small
   RETURNS VOID AS
 $$
 BEGIN
-    FOR worker_index IN 0 .. count-1 BY 1
+    FOR worker_index IN 0 .. count BY 1
     LOOP
         EXECUTE format(
             'CREATE TABLE IF NOT EXISTS %%s_%%s PARTITION OF %%s FOR VALUES WITH (MODULUS %%s,REMAINDER %%s);',
@@ -162,7 +162,7 @@ CREATE OR REPLACE FUNCTION createListWorkerPartition(tableName text, count small
   RETURNS VOID AS
 $$
 BEGIN
-    FOR worker_index IN 0 .. count-1 BY 1
+    FOR worker_index IN 0 .. count BY 1
     LOOP
         EXECUTE format(
             'CREATE TABLE IF NOT EXISTS %%s_%%s PARTITION OF %%s FOR VALUES IN (%%s);',

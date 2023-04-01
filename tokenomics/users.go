@@ -99,7 +99,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 							  AND negative_tminus1_balance.type = %[2]v
 							  AND negative_tminus1_balance.type_detail =  '%[4]v_' || tminus1.user_id
 					    WHERE u.user_id = :user_id`,
-		usr.HashCode%s.cfg.WorkerCount,
+		usr.HashCode%uint64(s.cfg.WorkerCount),
 		totalNoPreStakingBonusBalanceType,
 		reverseT0BalanceTypeDetail,
 		reverseTMinus1BalanceTypeDetail)
