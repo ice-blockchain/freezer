@@ -198,8 +198,13 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey                                         = "tokenomics"
-	dayFormat, hourFormat, minuteFormat                        = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
+	applicationYamlKey                  = "tokenomics"
+	dayFormat, hourFormat, minuteFormat = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
+
+	pgTimeFormat = "2006-01-02 15:04:05.000000"
+
+	pgMicrosecordsPrecision = 1e6
+
 	totalActiveUsersGlobalKey                                  = "TOTAL_ACTIVE_USERS"
 	requestingUserIDCtxValueKey                                = "requestingUserIDCtxValueKey"
 	userHashCodeCtxValueKey                                    = "userHashCodeCtxValueKey"

@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"github.com/ice-blockchain/wintr/time"
 	"strings"
 	stdlibtime "time"
 
@@ -15,8 +16,8 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storage "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/terror"
-	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of handling.
@@ -31,6 +32,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
 	}
 	now := time.Now()
+	nowValue := *(*now).Time
 	if old.LastMiningEndedAt != nil &&
 		old.LastNaturalMiningStartedAt != nil &&
 		old.LastMiningEndedAt.After(*now.Time) &&
@@ -49,7 +51,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err = retry(ctx, func() error {
 		summary, gErr := r.GetMiningSummary(ctx, userID)
 		if gErr == nil {
-			if summary.MiningSession == nil || summary.MiningSession.StartedAt == nil || !summary.MiningSession.StartedAt.Equal(*now.Time) {
+			if summary.MiningSession == nil || summary.MiningSession.StartedAt == nil || !(summary.MiningSession.StartedAt.UnixMicro() == nowValue.UnixMicro()) {
 				gErr = ErrNotFound
 			} else {
 				*ms = *summary
@@ -75,53 +77,48 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 							   u.previous_mining_started_at,
 							   u.previous_mining_ended_at,
 							   u.last_free_mining_session_awarded_at,
-							   negative_balance.amount,
-							   negative_t0_balance.amount,
-							   negative_t1_balance.amount,
-							   negative_t2_balance.amount,
+							   COALESCE(MAX(negative_balance.amount),'0') as negative_total_no_pre_staking_bonus_balance_amount,
+							   COALESCE(MAX(negative_t0_balance.amount),'0') as negative_total_t0_no_pre_staking_bonus_balance_amount,
+							   COALESCE(MAX(negative_t1_balance.amount),'0') as negative_total_t1_no_pre_staking_bonus_balance_amount,
+							   COALESCE(MAX(negative_t2_balance.amount),'0') negative_total_t2_no_pre_staking_bonus_balance_amount,
 							   0 AS mining_streak,
-							   MAX(st.years) AS years,
-							   MAX(st.allocation) AS allocation,
-							   st_b.bonus
+							   COALESCE(MAX(st.years),'0') AS pre_staking_years,
+							   COALESCE(MAX(st.allocation),'0') AS pre_staking_allocation,
+							   COALESCE(MAX(st_b.bonus),'0') as pre_staking_bonus
 						FROM users u 
 							LEFT JOIN pre_stakings_%[1]v st
 								   ON st.user_id = u.user_id
 							LEFT JOIN pre_staking_bonuses st_b
 								   ON st.years = st_b.years
-							LEFT JOIN balances_%[1]v negative_balance
+							LEFT JOIN balances_worker_%[1]v negative_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_balance.user_id = u.user_id
 								  AND negative_balance.negative = TRUE
 								  AND negative_balance.type = %[2]v
 								  AND negative_balance.type_detail = ''
-							LEFT JOIN balances_%[1]v negative_t0_balance
+							LEFT JOIN balances_worker_%[1]v negative_t0_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t0_balance.user_id = u.user_id
 								  AND negative_t0_balance.negative = TRUE
 								  AND negative_t0_balance.type = %[2]v
 								  AND negative_t0_balance.type_detail = '%[3]v_' || u.referred_by
-							LEFT JOIN balances_%[1]v negative_t1_balance
+							LEFT JOIN balances_worker_%[1]v negative_t1_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t1_balance.user_id = u.user_id
 								  AND negative_t1_balance.negative = TRUE
 								  AND negative_t1_balance.type = %[2]v
 								  AND negative_t1_balance.type_detail = '%[4]v'
-							LEFT JOIN balances_%[1]v negative_t2_balance
+							LEFT JOIN balances_worker_%[1]v negative_t2_balance
 								   ON u.rollback_used_at IS NULL
 								  AND negative_t2_balance.user_id = u.user_id
 								  AND negative_t2_balance.negative = TRUE
 								  AND negative_t2_balance.type = %[2]v
 								  AND negative_t2_balance.type_detail = '%[5]v'
-						WHERE u.user_id = :user_id
+						WHERE u.user_id = $1
 						GROUP BY u.user_id`, r.workerIndex(ctx), totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	resp := make([]*miningSummary, 0, 1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+	resp, err := storage.Select[miningSummary](ctx, r.dbV2, sql, userID)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get the current mining summary for userID:%v", userID)
-	}
-	if len(resp) == 0 {
-		return nil, ErrRelationNotFound
 	}
 
 	return resp[0], nil
@@ -222,90 +219,90 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 	}
 	var rollbackUsedAt, rollbackUsedAtCondition string
 	if rollbackNegativeMiningSession != nil && *rollbackNegativeMiningSession {
-		rollbackUsedAt = fmt.Sprintf("rollback_used_at = %v,", ms.LastNaturalMiningStartedAt.UnixNano())
+		rollbackUsedAt = fmt.Sprintf("rollback_used_at = '%v',", ms.LastNaturalMiningStartedAt.Format(pgTimeFormat))
 		rollbackUsedAtCondition = "AND rollback_used_at IS NULL"
 	}
-	const null = "null"
-	previousMiningEndedAtVal := null
+	var previousMiningEndedAtVal *stdlibtime.Time
 	if old.LastMiningEndedAt != nil {
-		previousMiningEndedAtVal = fmt.Sprint(old.LastMiningEndedAt.UnixNano())
+		previousMiningEndedAtVal = old.LastMiningEndedAt.Time
 	}
-	lastFreeMiningSessionAwardedAtVal := null
+	var lastFreeMiningSessionAwardedAtVal *stdlibtime.Time
 	if ms.LastFreeMiningSessionAwardedAt != nil {
-		lastFreeMiningSessionAwardedAtVal = fmt.Sprint(ms.LastFreeMiningSessionAwardedAt.UnixNano())
+		lastFreeMiningSessionAwardedAtVal = ms.LastFreeMiningSessionAwardedAt.Time
 	}
-	//nolint:dupword // Nope.
-	script := fmt.Sprintf(`resp, err = box.execute([[START TRANSACTION;]]) 
-if err ~= nil then
-	return err
-end 
-resp, err = box.execute([[ UPDATE users
-						   SET updated_at = %[1]v,
-							   last_natural_mining_started_at = %[1]v,
-							   last_mining_started_at = %[2]v,
-							   last_mining_ended_at = %[3]v,
-							   previous_mining_started_at = (CASE WHEN last_mining_started_at = %[2]v THEN previous_mining_started_at ELSE last_mining_started_at END),
-							   previous_mining_ended_at = (CASE WHEN last_mining_started_at = %[2]v THEN previous_mining_ended_at ELSE last_mining_ended_at END),
- 							   %[4]v							   
-							   last_free_mining_session_awarded_at = %[5]v
-						   WHERE user_id = '%[6]v'
-						     AND IFNULL(last_mining_ended_at,0) = IFNULL(%[7]v,0)
-							 %[8]v;]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end 
-if resp.row_count ~= 1 then
-	box.execute([[ROLLBACK;]]) 
-	return "race condition"
-end 
-resp, err = box.execute([[ UPDATE balance_recalculation_worker_%[9]v 
-						   SET enabled = TRUE,
-							   last_mining_started_at = %[2]v,
-							   last_mining_ended_at = %[3]v
-						   WHERE user_id = '%[6]v';]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end
-if resp.row_count ~= 1 then
-	resp, err = box.execute([[ INSERT INTO balance_recalculation_worker_%[9]v(user_id,enabled,last_mining_started_at,last_mining_ended_at) 
-																	   VALUES('%[6]v',TRUE,%[2]v,%[3]v);]])
-	if err ~= nil then
-		box.execute([[ROLLBACK;]]) 
-		return "race condition 2"
-	end
-end
-box.execute([[ INSERT INTO blockchain_balance_synchronization_worker_%[9]v(user_id) VALUES ('%[6]v');]])
-box.execute([[ INSERT INTO extra_bonus_processing_worker_%[9]v(user_id) VALUES ('%[6]v');]])
-box.execute([[ INSERT INTO mining_rates_recalculation_worker_%[9]v(user_id) VALUES ('%[6]v');]])
-resp,err = box.execute([[COMMIT;]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]])
-	return err
-end 
-return ''`,
-		ms.LastNaturalMiningStartedAt.UnixNano(),
-		ms.LastMiningStartedAt.UnixNano(),
-		ms.LastMiningEndedAt.UnixNano(),
-		rollbackUsedAt,
-		lastFreeMiningSessionAwardedAtVal,
-		userID,
-		previousMiningEndedAtVal,
-		rollbackUsedAtCondition,
-		r.workerIndex(ctx))
-	resp := make([]string, 0, 1)
-	if err := r.db.EvalTyped(script, []any{}, &resp); err != nil {
-		return errors.Wrapf(err, "failed to eval script to insert mining session for %#v", ms)
-	} else if errMessage := resp[0]; errMessage != "" {
-		if strings.Contains(errMessage, `race condition`) || strings.Contains(errMessage, "Transaction has been aborted by conflict") {
+
+	return storage.DoInTransaction(ctx, r.dbV2, func(conn storage.QueryExecer) error {
+		userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64)
+		sql := fmt.Sprintf(`UPDATE users
+							   SET updated_at = $1,
+								   last_natural_mining_started_at = $1,
+								   last_mining_started_at = $2,
+								   last_mining_ended_at = $3,
+								   previous_mining_started_at = (CASE WHEN last_mining_started_at = $2 THEN previous_mining_started_at ELSE last_mining_started_at END),
+								   previous_mining_ended_at = (CASE WHEN last_mining_started_at = $2 THEN previous_mining_ended_at ELSE last_mining_ended_at END),
+								   %[1]v							   
+								   last_free_mining_session_awarded_at = $4
+							   WHERE user_id = $5
+								 AND COALESCE(last_mining_ended_at,'1999-01-08 04:05:06')::timestamp = COALESCE($6,'1999-01-08 04:05:06')::timestamp
+								 %[2]v;`, rollbackUsedAt, rollbackUsedAtCondition)
+		rowsAffected, err := conn.Exec(ctx, sql,
+			ms.LastNaturalMiningStartedAt.Time,
+			ms.LastMiningStartedAt.Time,
+			ms.LastMiningEndedAt.Time,
+			lastFreeMiningSessionAwardedAtVal,
+			userID,
+			previousMiningEndedAtVal.Format(pgTimeFormat))
+		if err != nil {
+			return errors.Wrapf(err, "failed to update users mining time")
+		}
+		if rowsAffected.RowsAffected() != 1 {
 			return ErrRaceCondition
 		}
+		rowsAffected, err = conn.Exec(ctx, fmt.Sprintf(`
+						UPDATE balance_recalculation_worker_%[1]v 
+							   SET enabled = TRUE,
+								   last_mining_started_at = $1,
+								   last_mining_ended_at = $2
+							   WHERE user_id = $3;`, r.workerIndex(ctx)),
+			ms.LastMiningStartedAt.Time,
+			ms.LastMiningEndedAt.Time,
+			userID,
+		)
+		if rowsAffected.RowsAffected() != 1 {
+			if _, err := conn.Exec(ctx, fmt.Sprintf(`
+						INSERT INTO balance_recalculation_worker_%[1]v(user_id,enabled,last_mining_started_at,last_mining_ended_at, hash_code, worker_index) 
+																		   VALUES($3,TRUE,$1,$2, $4, %[1]v);`,
+				r.workerIndex(ctx)),
+				ms.LastMiningStartedAt.Time,
+				ms.LastMiningEndedAt.Time,
+				userID,
+				userHashCode,
+			); err != nil {
+				return ErrRaceCondition
+			}
+		}
+		if _, err := conn.Exec(ctx, fmt.Sprintf(
+			`INSERT INTO blockchain_balance_synchronization_worker_%[1]v(user_id, hash_code, worker_index) VALUES ($1,$2,%[1]v) ON CONFLICT (worker_index, user_id) DO NOTHING;`, r.workerIndex(ctx)),
+			userID, userHashCode,
+		); err != nil {
+			return errors.Wrapf(err, "failed to insert blockchain_balance_synchronization_worker_%v for userId:%v", r.workerIndex(ctx), userID)
+		}
+		if _, err := conn.Exec(ctx, fmt.Sprintf(
+			`INSERT INTO extra_bonus_processing_worker_%[1]v(user_id, hash_code, worker_index) VALUES ($1,$2, %[1]v) ON CONFLICT (worker_index, user_id) DO NOTHING;`,
+			r.workerIndex(ctx)),
+			userID, userHashCode,
+		); err != nil {
+			return errors.Wrapf(err, "failed to insert extra_bonus_processing_worker_%v for userId:%v", r.workerIndex(ctx), userID)
+		}
+		if _, err := conn.Exec(ctx, fmt.Sprintf(
+			`INSERT INTO mining_rates_recalculation_worker_%[1]v(user_id,  hash_code, worker_index) VALUES ($1, $2, %[1]v) ON CONFLICT (worker_index, user_id) DO NOTHING;`, r.workerIndex(ctx)),
+			userID, userHashCode,
+		); err != nil {
+			return errors.Wrapf(err, "failed to insert mining_rates_recalculation_worker_%v for userId:%v", r.workerIndex(ctx), userID)
+		}
 
-		return errors.Errorf("insert mining session script returned unexpected error message:`%v`, for %#v", errMessage, ms)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (r *repository) trySendMiningSessionMessage(ctx context.Context, userID string, newMS *miningSummary) error { //nolint:funlen // .
@@ -334,11 +331,11 @@ func (r *repository) trySendMiningSessionMessage(ctx context.Context, userID str
 			}
 		)
 		dlq := &MiningSessionDLQ{ID: uuid.NewString(), UserID: userID, Message: string(valueBytes)}
-
+		_, insertErr := storage.Exec(ctx, r.dbV2,
+			`INSERT INTO mining_sessions_dlq (id, user_id, message,hash_code) VALUES ($1,$2,$3, $4)`, dlq.ID, dlq.UserID, dlq.Message, 0)
 		return multierror.Append( //nolint:wrapcheck // Not needed.
 			errors.Wrapf(err, "failed to send a new mining session message: %#v", sess),
-			errors.Wrapf(r.db.InsertTyped(fmt.Sprintf("MINING_SESSIONS_DLQ_%v", r.workerIndex(ctx)), dlq, &[]*MiningSessionDLQ{}),
-				"failed to dlqMiningSessionMessage:%#v because sendMiningSessionMessage failed", sess),
+			errors.Wrapf(insertErr, "failed to dlqMiningSessionMessage:%#v because sendMiningSessionMessage failed", sess),
 		).ErrorOrNil()
 	}
 
@@ -401,76 +398,57 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 			  			   ON tMinus1.user_id = t0.referred_by
 						  AND tMinus1.user_id != t0.user_id
 						  AND tMinus1.user_id != u.user_id
-			  WHERE u.user_id = :user_id`
-	params := make(map[string]any, 1)
-	params["user_id"] = *ms.UserID
-	rows := make([]*struct {
-		_msgpack                    struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
+			  WHERE u.user_id = $1;`
+	type referrals struct {
 		T0UserID, TMinus1UserID     string
 		T0HashCode, TMinus1HashCode int64
-	}, 0, 1)
+	}
 	//nolint:revive // Nope.
-	if err := s.db.PrepareExecuteTyped(sql, params, &rows); err != nil || len(rows) == 0 || (rows[0].T0UserID == "" && rows[0].TMinus1UserID == "") {
+	rows, err := storage.Select[referrals](ctx, s.dbV2, sql, *ms.UserID)
+	if err != nil || len(rows) == 0 || (rows[0].T0UserID == "" && rows[0].TMinus1UserID == "") {
 		return errors.Wrapf(err, "failed to select for t0/t-1 information for userID:%v", *ms.UserID)
 	}
-	//nolint:dupword // Nope.
-	script := fmt.Sprintf(`resp, err = box.execute([[START TRANSACTION;]]) 
-if err ~= nil then
-	return err
-end 
-resp, err = box.execute([[ INSERT INTO processed_mining_sessions(session_number, user_id) VALUES (%[1]v, '%[2]v'); ]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end 
-resp, err = box.execute([[ UPDATE active_referrals_%[3]v 
-						   SET t1 = t1 + 1
-						   WHERE user_id = '%[4]v';]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end
-if resp.row_count ~= 1 and '%[4]v' ~= '' then
-	resp, err = box.execute([[ INSERT INTO active_referrals_%[3]v(t1, user_id) VALUES (1, '%[4]v'); ]]) 
-	if err ~= nil then
-		box.execute([[ROLLBACK;]]) 
-		return err
-	end 
-end
-resp, err = box.execute([[ UPDATE active_referrals_%[5]v 
-						   SET t2 = t2 + 1
-						   WHERE user_id = '%[6]v';]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end
-if resp.row_count ~= 1 and '%[6]v' ~= '' then
-	resp, err = box.execute([[ INSERT INTO active_referrals_%[5]v(t2, user_id) VALUES (1, '%[6]v'); ]]) 
-	if err ~= nil then
-		box.execute([[ROLLBACK;]]) 
-		return err
-	end 
-end
-resp, err = box.execute([[COMMIT;]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]])
-	return err
-end 
-return ''`,
-		s.sessionNumber(ms.LastNaturalMiningStartedAt),
-		*ms.UserID,
-		uint64(rows[0].T0HashCode)%uint64(s.cfg.WorkerCount),
-		rows[0].T0UserID,
-		uint64(rows[0].TMinus1HashCode)%uint64(s.cfg.WorkerCount),
-		rows[0].TMinus1UserID)
-	resp := make([]string, 0, 1)
-	if err := s.db.EvalTyped(script, []any{}, &resp); err != nil {
-		return errors.Wrapf(err, "failed to eval script to increment active_referrals for t0&t-1, for %#v", ms)
-	} else if errMessage := resp[0]; errMessage != "" {
-		return errors.Errorf("increment active_referrals for t0&t-1 script returned unexpected error message:`%v`, for %#v", errMessage, ms)
-	}
 
-	return nil
+	return errors.Wrapf(storage.DoInTransaction(ctx, s.dbV2, func(conn storage.QueryExecer) error {
+		if _, err := conn.Exec(ctx, `INSERT INTO processed_mining_sessions(session_number, user_id) VALUES ($1, $2);`,
+			s.sessionNumber(ms.LastNaturalMiningStartedAt),
+			*ms.UserID,
+		); err != nil {
+			return errors.Wrapf(err, "failed to insert processed_mining_sessions for userId:%v, sessionNumber:%v",
+				*ms.UserID, s.sessionNumber(ms.LastNaturalMiningStartedAt))
+		}
+		if rowsAffected, err := conn.Exec(ctx, fmt.Sprintf(`UPDATE active_referrals_%[1]v 
+			   SET t1 = t1 + 1 
+			   WHERE user_id = $1;`,
+			rows[0].T0HashCode%int64(s.cfg.WorkerCount),
+		), rows[0].T0UserID); err != nil {
+			return errors.Wrapf(err, "failed to update active_referrals_%v for userId:%v",
+				rows[0].T0HashCode%int64(s.cfg.WorkerCount), rows[0].T0UserID)
+		} else if rowsAffected.RowsAffected() != 1 && rows[0].T0UserID != "" {
+			if _, err := conn.Exec(ctx,
+				fmt.Sprintf(`INSERT INTO active_referrals_%[3]v(t1, user_id) VALUES (1, $1);`, rows[0].T0HashCode%int64(s.cfg.WorkerCount)), rows[0].T0UserID); err != nil {
+				return errors.Wrapf(err, "failed to insert active_referrals_%v for userId:%v",
+					rows[0].T0HashCode%int64(s.cfg.WorkerCount), rows[0].T0UserID)
+			}
+		}
+		if rowsAffected, err := conn.Exec(ctx, fmt.Sprintf(`UPDATE active_referrals_%[1]v 
+			   SET t2 = t2 + 1
+			   WHERE user_id = $1;`,
+			rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount)),
+			rows[0].TMinus1UserID); err != nil {
+			return errors.Wrapf(err, "failed to update active_referrals_%v for userId:%v",
+				rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount), rows[0].TMinus1UserID)
+		} else if rowsAffected.RowsAffected() != 1 && rows[0].TMinus1UserID != "" {
+			if _, err := conn.Exec(ctx,
+				fmt.Sprintf(`INSERT INTO active_referrals_%[3]v(t1, user_id) VALUES (1, $1);`, rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount)),
+				rows[0].TMinus1UserID,
+			); err != nil {
+				return errors.Wrapf(err, "failed to insert active_referrals_%v for userId:%v",
+					rows[0].TMinus1HashCode%int64(s.cfg.WorkerCount), rows[0].TMinus1UserID)
+			}
+		}
+		return nil
+	}), "failed to execute transaction to increment active_referrals for t0&t-1, for %#v", ms)
 }
 
 type (
@@ -509,58 +487,46 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 			t0UserIDs[i] = fmt.Sprintf(`'%v'`, t0UserIDs[i])
 		}
 		t0Values = append(t0Values, fmt.Sprintf(`
-resp, err = box.execute([[ UPDATE active_referrals_%[1]v 
-						   SET t1 = GREATEST(t1 - 1, 0)
-						   WHERE user_id in (%[2]v);]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end`, t0WorkerIndex, strings.Join(t0UserIDs, ",")))
+			UPDATE active_referrals_%[1]v 
+			SET t1 = GREATEST(t1 - 1, 0)
+			WHERE user_id in (%[2]v);
+		`, t0WorkerIndex, strings.Join(t0UserIDs, ",")))
 	}
 	for tMinus1WorkerIndex, tMinus1UserIDs := range tMinus1UserIDsPerWorkerIndex {
 		for i := range tMinus1UserIDs {
 			tMinus1UserIDs[i] = fmt.Sprintf(`'%v'`, tMinus1UserIDs[i])
 		}
 		tMinus1Values = append(tMinus1Values, fmt.Sprintf(`
-resp, err = box.execute([[ UPDATE active_referrals_%[1]v 
-						   SET t2 = GREATEST(t2 - 1, 0)
-						   WHERE user_id in (%[2]v);]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end`, tMinus1WorkerIndex, strings.Join(tMinus1UserIDs, ",")))
+		   UPDATE active_referrals_%[1]v 
+		   SET t2 = GREATEST(t2 - 1, 0)
+		   WHERE user_id in (%[2]v); 
+		`, tMinus1WorkerIndex, strings.Join(tMinus1UserIDs, ",")))
 	}
-	script := fmt.Sprintf(`resp, err = box.execute([[START TRANSACTION;]]) 
-if err ~= nil then
-	return err
-end 
-resp, err = box.execute([[ INSERT INTO processed_mining_sessions(session_number, negative, user_id) VALUES %[1]v; ]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]]) 
-	return err
-end 
-%[2]v
-%[3]v
-resp, err = box.execute([[COMMIT;]]) 
-if err ~= nil then
-	box.execute([[ROLLBACK;]])
-	return err
-end 
-return ''`,
-		strings.Join(processedMiningSessionValues, ","),
-		strings.Join(t0Values, "\n"),
-		strings.Join(tMinus1Values, "\n"))
-	resp := make([]string, 0, 1)
-	if err := r.db.EvalTyped(script, []any{}, &resp); err != nil {
-		return errors.Wrapf(err, "failed to eval script to decrement active_referrals for t0&t-1, for %#v", usersThatStoppedMining)
-	} else if errMessage := resp[0]; errMessage != "" {
-		if strings.Contains(errMessage, "Duplicate key exists in unique index \"pk_unnamed_PROCESSED_MINING_SESSIONS_1\"") {
+
+	err := storage.DoInTransaction(ctx, r.dbV2, func(conn storage.QueryExecer) error {
+		if _, err := conn.Exec(ctx, fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) VALUES %[1]v;`,
+			strings.Join(processedMiningSessionValues, ",")),
+		); err != nil {
+			return errors.Wrap(err, "failed to insert processed_mining_sessions")
+		}
+		for _, t0Query := range t0Values {
+			if _, err := conn.Exec(ctx, t0Query); err != nil {
+				return errors.Wrapf(err, "failed to update active_referrals: %v", t0Query)
+			}
+		}
+		for _, tMinus1Query := range tMinus1Values {
+			if _, err := conn.Exec(ctx, tMinus1Query); err != nil {
+				return errors.Wrapf(err, "failed to update active_referrals: %v", tMinus1Query)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate key value violates unique constraint \"processed_mining_sessions_pkey\"") {
 			return nil
 		}
-
-		return errors.Errorf("decrement active_referrals for t0&t-1 script returned unexpected error message:`%v`,for %#v", errMessage, usersThatStoppedMining)
+		return errors.Wrapf(err, "failed to eval script to decrement active_referrals for t0&t-1, for %#v", usersThatStoppedMining)
 	}
-
 	return nil
 }
 
