@@ -265,11 +265,7 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 }
 
 func (r *repository) workerIndex(ctx context.Context) (workerIndex int16) {
-	if workerIndex = int16(r.hashCode(ctx) % int64(r.cfg.WorkerCount)); workerIndex < 0 {
-		workerIndex *= -1
-	}
-
-	return workerIndex
+	return int16(uint64(r.hashCode(ctx)) % uint64(r.cfg.WorkerCount))
 }
 
 func (r *repository) hashCode(ctx context.Context) (hashCode int64) {

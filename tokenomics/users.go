@@ -206,7 +206,7 @@ func (s *usersTableSource) insertUser(ctx context.Context, usr *users.User) erro
 					    VALUES($1, $2, $3, $4,  $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 	u := s.user(usr)
 	affectedRows, err := storagev2.Exec(ctx, s.dbV2, sql, u.CreatedAt.Time, u.UpdatedAt.Time, u.UserID, u.ReferredBy, u.Username, u.FirstName, u.LastName,
-		u.ProfilePictureURL, u.MiningBlockchainAccountAddress, u.BlockchainAccountAddress, int64(u.HashCode), u.HideRanking, u.Verified)
+		u.ProfilePictureURL, u.MiningBlockchainAccountAddress, u.BlockchainAccountAddress, u.HashCode, u.HideRanking, u.Verified)
 	if err != nil || affectedRows == 0 {
 		if errors.Is(err, storage.ErrDuplicate) {
 			return s.updateUser(ctx, usr)
@@ -249,7 +249,7 @@ func (s *usersTableSource) user(usr *users.User) *user {
 		ProfilePictureURL:              s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
 		MiningBlockchainAccountAddress: usr.MiningBlockchainAccountAddress,
 		BlockchainAccountAddress:       usr.BlockchainAccountAddress,
-		HashCode:                       usr.HashCode,
+		HashCode:                       int64(usr.HashCode),
 		HideRanking:                    s.hideRanking(usr),
 		Verified:                       verified,
 	}

@@ -249,7 +249,6 @@ type (
 		T0, T1, T2, ExtraBonus, PreStakingAllocation, PreStakingBonus uint64
 	}
 	user struct {
-		_msgpack                       struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		CreatedAt                      *time.Time `json:"createdAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		UpdatedAt                      *time.Time `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		RollbackUsedAt                 *time.Time `json:"rollbackUsedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
@@ -267,7 +266,7 @@ type (
 		ProfilePictureURL              string     `json:"profilePictureUrl,omitempty" example:"https://somecdn.com/p1.jpg"`
 		MiningBlockchainAccountAddress string     `json:"miningBlockchainAccountAddress,omitempty" example:"0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		BlockchainAccountAddress       string     `json:"blockchainAccountAddress,omitempty" example:"0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		HashCode                       uint64     `json:"hashCode,omitempty" example:"1234567890"`
+		HashCode                       int64      `json:"hashCode,omitempty" example:"1234567890"`
 		HideRanking                    bool       `json:"hideRanking,omitempty" example:"false"`
 		Verified                       bool       `json:"verified,omitempty" example:"false"`
 	}

@@ -55,7 +55,7 @@ func (r *repository) getWorker(ctx context.Context, userID string) (workerIndex 
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "failed to get worker for userID:%v", userID)
 	}
-	workerIndex = int16(resp.HashCode % int64(r.cfg.WorkerCount))
+	workerIndex = int16(uint64(resp.HashCode) % uint64(r.cfg.WorkerCount))
 
 	return workerIndex, resp.HashCode, nil
 }

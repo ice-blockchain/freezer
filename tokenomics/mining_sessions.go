@@ -407,7 +407,7 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	rows := make([]*struct {
 		_msgpack                    struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
 		T0UserID, TMinus1UserID     string
-		T0HashCode, TMinus1HashCode uint64
+		T0HashCode, TMinus1HashCode int64
 	}, 0, 1)
 	//nolint:revive // Nope.
 	if err := s.db.PrepareExecuteTyped(sql, params, &rows); err != nil || len(rows) == 0 || (rows[0].T0UserID == "" && rows[0].TMinus1UserID == "") {
@@ -459,9 +459,9 @@ end
 return ''`,
 		s.sessionNumber(ms.LastNaturalMiningStartedAt),
 		*ms.UserID,
-		rows[0].T0HashCode%s.cfg.WorkerCount,
+		uint64(rows[0].T0HashCode)%uint64(s.cfg.WorkerCount),
 		rows[0].T0UserID,
-		rows[0].TMinus1HashCode%s.cfg.WorkerCount,
+		uint64(rows[0].TMinus1HashCode)%uint64(s.cfg.WorkerCount),
 		rows[0].TMinus1UserID)
 	resp := make([]string, 0, 1)
 	if err := s.db.EvalTyped(script, []any{}, &resp); err != nil {
@@ -477,7 +477,7 @@ type (
 	userThatStoppedMining struct {
 		LastMiningEndedAt               *time.Time
 		UserID, T0UserID, TMinus1UserID string
-		T0HashCode, TMinus1HashCode     uint64
+		T0HashCode, TMinus1HashCode     int64
 	}
 )
 
@@ -490,14 +490,16 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 	tMinus1UserIDsPerWorkerIndex := make(map[uint64][]string)
 	processedMiningSessionValues := make([]string, 0, len(usersThatStoppedMining))
 	for _, usr := range usersThatStoppedMining {
-		if _, found := t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount]; !found {
-			t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount] = make([]string, 0, len(usersThatStoppedMining))
+		t0WorkerIndex := uint64(usr.T0HashCode) % uint64(r.cfg.WorkerCount)
+		tMinus1WorkerIndex := uint64(usr.TMinus1HashCode) % uint64(r.cfg.WorkerCount)
+		if _, found := t0UserIDsPerWorkerIndex[t0WorkerIndex]; !found {
+			t0UserIDsPerWorkerIndex[t0WorkerIndex] = make([]string, 0, len(usersThatStoppedMining))
 		}
-		if _, found := tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount]; !found {
-			tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount] = make([]string, 0, len(usersThatStoppedMining))
+		if _, found := tMinus1UserIDsPerWorkerIndex[tMinus1WorkerIndex]; !found {
+			tMinus1UserIDsPerWorkerIndex[tMinus1WorkerIndex] = make([]string, 0, len(usersThatStoppedMining))
 		}
-		t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount] = append(t0UserIDsPerWorkerIndex[usr.T0HashCode%r.cfg.WorkerCount], usr.T0UserID)
-		tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount] = append(tMinus1UserIDsPerWorkerIndex[usr.TMinus1HashCode%r.cfg.WorkerCount], usr.TMinus1UserID) //nolint:lll // .
+		t0UserIDsPerWorkerIndex[t0WorkerIndex] = append(t0UserIDsPerWorkerIndex[t0WorkerIndex], usr.T0UserID)
+		tMinus1UserIDsPerWorkerIndex[tMinus1WorkerIndex] = append(tMinus1UserIDsPerWorkerIndex[tMinus1WorkerIndex], usr.TMinus1UserID)
 		processedMiningSessionValues = append(processedMiningSessionValues, fmt.Sprintf(`(%v,true,'%v')`, r.sessionNumber(usr.LastMiningEndedAt), usr.UserID))
 	}
 	t0Values := make([]string, 0, len(t0UserIDsPerWorkerIndex))

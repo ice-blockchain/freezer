@@ -84,9 +84,10 @@ type (
 		LastMiningEndedAt, T0LastMiningEndedAt, TMinus1LastMiningEndedAt,
 		PreviousMiningEndedAt, T0PreviousMiningEndedAt, TMinus1PreviousMiningEndedAt,
 		RollbackUsedAt, T0RollbackUsedAt, TMinus1RollbackUsedAt *time.Time
-		BaseMiningRate                                      *coin.ICEFlake
-		UUserID, T0UserID, TMinus1UserID                    string
-		T0, T1, T2, ExtraBonus, T0HashCode, TMinus1HashCode uint64
+		BaseMiningRate                   *coin.ICEFlake
+		UUserID, T0UserID, TMinus1UserID string
+		T0, T1, T2, ExtraBonus           uint64
+		T0HashCode, TMinus1HashCode      int64
 	}
 	B                       = balance
 	balanceRecalculationRow struct {
