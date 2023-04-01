@@ -25,7 +25,7 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "extra_bonus_processing_worker_", usr.ID, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "extra_bonus_processing_worker", usr.ID, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
@@ -69,7 +69,7 @@ func (s *extraBonusProcessingTriggerStreamSource) process(ignoredCtx context.Con
 	if err = executeBatchConcurrently(ctx, s.sendAvailableDailyBonusMessage, availableExtraBonuses); err != nil { //nolint:contextcheck // Not needed here.
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendAvailableDailyBonusMessage] for availableExtraBonuses:%#v", availableExtraBonuses)
 	}
-	const table = "extra_bonus_processing_worker_"
+	const table = "extra_bonus_processing_worker"
 	params := make(map[string]any, 1)
 	params["last_extra_bonus_index_notified"] = extraBonusIndex
 	userIDs := make([]string, 0, len(availableExtraBonuses))
@@ -94,7 +94,7 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 				   eb_worker.user_id,
 				   eb_worker.news_seen,
 				   b.bonus AS flat_bonus,
-				   (100 - (25 *  ((CASE WHEN ($3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $7) / $9)) < $11 THEN 0 ELSE ($3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $7) / $9)) END)/$10))) AS bonus_percentage_remaining,
+				   (100 - (25 *  ((CASE WHEN ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $7::bigint) / $9)) < $11::bigint THEN 0 ELSE ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $7::bigint) / $9)) END)/$10::bigint))) AS bonus_percentage_remaining,
 				   b.ix AS extra_bonus_index
 			FROM extra_bonus_processing_worker eb_worker
 				JOIN balance_recalculation_worker bal_worker
@@ -103,14 +103,14 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 				JOIN sd 
 				  ON 1=1
 				JOIN extra_bonuses b 
-				  ON b.ix = ($3 + (eb_worker.utc_offset * $4) - sd.value) / $5
-				 AND $3 + (eb_worker.utc_offset * $4) > sd.value
+				  ON b.ix = ($3::bigint + (eb_worker.utc_offset * $4::bigint) - sd.value) / $5::bigint
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) > sd.value
 				 AND b.bonus > 0
 				JOIN extra_bonuses_worker e
 				  ON e.worker_index = $1
 				 AND e.extra_bonus_index = b.ix
-				 AND $3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $7) / $9) < $8
-				 AND $3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $7) / $9) > 0
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $7::bigint) / $9) < $8::bigint
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $7::bigint) / $9) > 0
 			WHERE eb_worker.worker_index = $1
 			  AND (eb_worker.last_extra_bonus_index_notified IS NULL OR eb_worker.last_extra_bonus_index_notified < b.ix)
 			  AND $12 > coalesce(eb_worker.extra_bonus_started_at, '1999-01-08 04:05:06') 

@@ -265,9 +265,17 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 }
 
 func (r *repository) workerIndex(ctx context.Context) (workerIndex int16) {
+	if workerIndex = int16(r.hashCode(ctx) % int64(r.cfg.WorkerCount)); workerIndex < 0 {
+		workerIndex *= -1
+	}
+
+	return workerIndex
+}
+
+func (r *repository) hashCode(ctx context.Context) (hashCode int64) {
 	userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64) //nolint:errcheck // Not needed.
 
-	return int16(userHashCode % uint64(r.cfg.WorkerCount))
+	return int64(userHashCode)
 }
 
 func executeBatchConcurrently[ARG any](ctx context.Context, process func(context.Context, ARG) error, args []ARG) error {

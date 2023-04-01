@@ -28,7 +28,7 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "balance_recalculation_worker_", usr.ID, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
@@ -515,9 +515,9 @@ func (s *balanceRecalculationTriggerStreamSource) updateLastIterationFinishedAt(
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	const table = "balance_recalculation_worker_"
+	const table = "balance_recalculation_worker"
 	params := make(map[string]any, 1)
-	params["last_iteration_finished_at"] = time.Now()
+	params["last_iteration_finished_at"] = *time.Now().Time
 	err := s.updateWorkerFields(ctx, workerIndex, table, params, userIDs...)
 
 	return errors.Wrapf(err, "failed to updateWorkerFields for workerIndex:%v,table:%q,params:%#v,userIDs:%#v", workerIndex, table, params, userIDs)

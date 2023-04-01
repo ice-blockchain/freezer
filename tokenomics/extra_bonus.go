@@ -63,21 +63,21 @@ func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time,
 				   bal_worker.last_mining_ended_at,
 				   eb_worker.news_seen,
 				   b.bonus AS flat_bonus,
-				   (100 - (25 *  ((CASE WHEN ($3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $8) / $11)) < $9 THEN 0 ELSE ($3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $8) / $11)) END)/$10))) AS bonus_percentage_remaining,
+				   (100 - (25 *  ((CASE WHEN ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11)) < $9::bigint THEN 0 ELSE ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11)) END)/$10::bigint))) AS bonus_percentage_remaining,
 				   $12 < coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06') AS already_claimed
 			FROM extra_bonus_start_date sd
 				JOIN extra_bonus_processing_worker eb_worker
 				  ON eb_worker.worker_index = $1
 				 AND eb_worker.user_id = $2
 				JOIN extra_bonuses b 
-				  ON b.ix = ($3 + (eb_worker.utc_offset * $4) - sd.value) / $5
-				 AND $3 + (eb_worker.utc_offset * $4) > sd.value
+				  ON b.ix = ($3::bigint + (eb_worker.utc_offset * $4::bigint) - sd.value) / $5::bigint
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) > sd.value
 				 AND b.bonus > 0
 				JOIN extra_bonuses_worker e
 				  ON e.worker_index = $1
 				 AND b.ix = e.extra_bonus_index
-				 AND $3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $8) / $11) < $7
-				 AND $3 + (eb_worker.utc_offset * $4) - (sd.value + (e.extra_bonus_index * $5)) - $6 - ((e.offset_value * $8) / $11) > 0
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11) < $7::bigint
+				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11) > 0
 				JOIN balance_recalculation_worker bal_worker
 				  ON bal_worker.worker_index = $1
 				 AND bal_worker.user_id = eb_worker.user_id

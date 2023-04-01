@@ -9,21 +9,16 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex int16) (err error) {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`INSERT INTO %v%v(user_id) VALUES (:user_id)`, table, workerIndex)
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil && errors.Is(err, storage.ErrDuplicate) {
-		return nil
-	}
+	sql := fmt.Sprintf(`INSERT INTO %v(worker_index,user_id) VALUES ($1,$2)
+						ON CONFLICT (worker_index,user_id) 
+								DO NOTHING`, table)
+	_, err = storagev2.Exec(ctx, r.dbV2, sql, workerIndex, userID)
 
 	return errors.Wrapf(err, "failed to %v, for userID:%v", sql, userID)
 }
@@ -34,29 +29,18 @@ func (r *repository) updateWorkerFields( //nolint:funlen // .
 	if ctx.Err() != nil || len(userIDs) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
+	ix := 0
 	fields := make([]string, 0, len(updateKV))
+	args := append(make([]any, 0, 1+1+len(updateKV)), workerIndex, userIDs)
 	for key, value := range updateKV {
-		switch typedValue := value.(type) {
-		case *time.Time:
-			fields = append(fields, fmt.Sprintf("%[1]v = %[2]v", key, typedValue.UnixNano()))
-		case string:
-			fields = append(fields, fmt.Sprintf("%[1]v = '%[2]v'", key, typedValue))
-		default:
-			if typedValue == nil {
-				fields = append(fields, fmt.Sprintf("%[1]v = null", key))
-			} else {
-				fields = append(fields, fmt.Sprintf("%[1]v = %[2]v", key, typedValue))
-			}
-		}
+		fields = append(fields, fmt.Sprintf("%[1]v = $%[2]v", key, ix+1+1+1))
+		args = append(args, value)
+		ix++
 	}
-	values := make([]string, 0, len(userIDs))
-	for _, userID := range userIDs {
-		values = append(values, fmt.Sprintf("'%v'", userID))
-	}
-	sql := fmt.Sprintf(`UPDATE %[1]v%[2]v
-					    SET %[3]v
-					    WHERE user_id in (%[4]v)`, table, workerIndex, strings.Join(fields, ","), strings.Join(values, ","))
-	if _, uErr := storage.CheckSQLDMLResponse(r.db.Execute(sql)); uErr != nil {
+	sql := fmt.Sprintf(`UPDATE %[1]v
+					    SET %[2]v
+					    WHERE worker_index = $1 AND user_id = ANY($2)`, table, strings.Join(fields, ","))
+	if _, uErr := storagev2.Exec(ctx, r.dbV2, sql, args...); uErr != nil {
 		return errors.Wrapf(uErr, "failed to UPDATE %v%v updateKV :%#v, for userIDs:%#v", table, workerIndex, updateKV, userIDs)
 	}
 

@@ -4,26 +4,22 @@ package tokenomics
 
 import (
 	"context"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
 )
 
 func (r *repository) getGlobalUnsignedValue(ctx context.Context, key string) (uint64, error) {
 	if ctx.Err() != nil {
 		return 0, errors.Wrap(ctx.Err(), "context failed")
 	}
-	var val users.GlobalUnsigned
-	if err := r.db.GetTyped("GLOBAL", "pk_unnamed_GLOBAL_1", tarantool.StringKey{S: key}, &val); err != nil {
+	val, err := storagev2.Get[users.GlobalUnsigned](ctx, r.dbV2, `SELECT * FROM global WHERE key = $1`, key)
+	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get global value for key:%v ", key)
-	}
-	if val.Key == "" {
-		return 0, storage.ErrNotFound
 	}
 
 	return val.Value, nil
@@ -43,9 +39,12 @@ func (s *globalTableSource) Process(ctx context.Context, msg *messagebroker.Mess
 	if val.Key == "" {
 		return nil
 	}
-	ops := make([]tarantool.Op, 0, 1)
-	ops = append(ops, tarantool.Op{Op: "=", Field: 1, Arg: val.Value})
+	sql := `INSERT INTO global(key,value) VALUES($1,$2::bigint)
+			ON CONFLICT (key)
+					 DO UPDATE
+						   SET value = EXCLUDED.value
+					 WHERE value != EXCLUDED.value`
+	_, err := storagev2.Exec(ctx, s.dbV2, sql, val.Key, val.Value)
 
-	return errors.Wrapf(s.db.UpsertTyped("GLOBAL", &val, ops, &[]*users.GlobalUnsigned{}),
-		"failed to upsert global unsigned value:%#v", &val)
+	return errors.Wrapf(err, "failed to upsert global unsigned value:%#v", &val)
 }

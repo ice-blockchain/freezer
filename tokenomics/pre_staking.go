@@ -4,61 +4,56 @@ package tokenomics
 
 import (
 	"context"
-	"fmt"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 
 	"github.com/goccy/go-json"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
-	"github.com/ice-blockchain/go-tarantool-client"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error) {
+func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (resp *PreStakingSummary, err error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`SELECT st.created_at,
-							   st.user_id,
-							   MAX(st.years) AS years,
-							   MAX(st.allocation) AS allocation,
-							   st_b.bonus	
-						FROM pre_stakings_%[1]v st
-							LEFT JOIN pre_staking_bonuses st_b
-								   ON st.years = st_b.years
-						WHERE st.user_id = :user_id
-						GROUP BY st.user_id`, r.workerIndex(ctx))
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	resp := make([]*PreStakingSummary, 0, 1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+	sql := `SELECT st.created_at,
+				   st.user_id,
+				   MAX(st.years) AS years,
+				   MAX(st.allocation) AS allocation,
+				   st.hash_code,	
+				   st.worker_index,	
+				   coalesce(st_b.bonus,0) AS bonus
+			FROM pre_stakings st
+				LEFT JOIN pre_staking_bonuses st_b
+					   ON st.worker_index = $1 
+					  AND st.years = st_b.years
+			WHERE st.worker_index = $1 
+			  AND st.user_id = $2
+			GROUP BY st.worker_index,st.user_id,st.hash_code,st.created_at,st_b.bonus`
+	if resp, err = storagev2.Get[PreStakingSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID); err != nil {
 		return nil, errors.Wrapf(err, "failed to select for pre-staking summary for userID:%v", userID)
 	}
-	if len(resp) == 0 {
-		return nil, storage.ErrNotFound
-	}
-	resp[0].UserID = ""
-	resp[0].CreatedAt = nil
 
-	return resp[0], nil
+	return resp, nil
 }
 
 func (r *repository) getAllPreStakingSummaries(ctx context.Context, userID string) (resp []*PreStakingSummary, err error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`SELECT st.*,
-							   st_b.bonus	
-						FROM pre_stakings_%[1]v st
-							JOIN pre_staking_bonuses st_b
-							  ON st.years = st_b.years
-						WHERE st.user_id = :user_id
-						ORDER BY st.created_at`, r.workerIndex(ctx))
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	err = errors.Wrapf(r.db.PrepareExecuteTyped(sql, params, &resp), "failed to select all pre-staking summaries for userID:%v", userID)
+	sql := `SELECT st.*,
+				   st_b.bonus	
+			FROM pre_stakings st
+				JOIN pre_staking_bonuses st_b
+			      ON st.worker_index = $1 
+			     AND st.years = st_b.years
+			WHERE st.worker_index = $1 
+			  AND st.user_id = $2
+			ORDER BY st.created_at`
+	if resp, err = storagev2.Select[PreStakingSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID); err != nil {
+		return nil, errors.Wrapf(err, "failed to select all pre-staking summaries for userID:%v", userID)
+	}
 
 	return
 }
@@ -68,7 +63,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	existing, err := r.GetPreStakingSummary(ctx, st.UserID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return errors.Wrapf(err, "failed to GetPreStakingSummary for userID:%v", st.UserID)
 	}
 	if existing != nil {
@@ -82,40 +77,22 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 			return ErrDecreasingPreStakingAllocationOrYearsNotAllowed
 		}
 	}
-	st.CreatedAt = time.Now()
-	sql := fmt.Sprintf(`INSERT INTO pre_stakings_%[1]v (created_at,user_id,years,allocation) 
-												VALUES (:created_at,:user_id,:years,:allocation)`, r.workerIndex(ctx))
-	params := make(map[string]any, 1+1+1+1)
-	params["created_at"] = st.CreatedAt
-	params["user_id"] = st.UserID
-	params["years"] = st.Years
-	params["allocation"] = st.Allocation
-	if err = storage.CheckSQLDMLErr(r.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to insertNewPreStaking:%#v", st)
-	}
-	var res struct {
-		_msgpack     struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
-		Years, Bonus uint64
-	}
-	if err = r.db.GetTyped("PRE_STAKING_BONUSES", "pk_unnamed_PRE_STAKING_BONUSES_1", tarantool.UintKey{I: uint(st.Years)}, &res); err != nil {
+	res, err := storagev2.Get[struct{ Bonus uint64 }](ctx, r.dbV2, `SELECT bonus FROM pre_staking_bonuses WHERE years = $1`, st.Years)
+	if err != nil {
 		return errors.Wrapf(err, "failed to get pre-staking bonus for years:%v", st.Years)
 	}
-	st.Bonus = res.Bonus
-	ss := &PreStakingSnapshot{PreStakingSummary: st, Before: existing}
-	if err = r.sendPreStakingSnapshotMessage(ctx, ss); err != nil {
-		pkIndex := fmt.Sprintf("pk_unnamed_PRE_STAKINGS_%v_1", r.workerIndex(ctx))
-		key := []any{st.UserID, st.Years, st.Allocation}
+	st.CreatedAt, st.Bonus = time.Now(), res.Bonus
 
-		return multierror.Append( //nolint:wrapcheck // Not needed.
-			errors.Wrapf(err, "failed to send pre-staking snapshot message:%#v", ss),
-			errors.Wrapf(r.db.DeleteTyped(fmt.Sprintf("PRE_STAKINGS_%v", r.workerIndex(ctx)), pkIndex, key, &[]*PreStaking{}),
-				"failed to revertInsertNewPreStaking: %#v", st),
-		).ErrorOrNil()
-	}
-	st.UserID = ""
-	st.CreatedAt = nil
+	return errors.Wrap(storagev2.DoInTransaction(ctx, r.dbV2, func(conn storagev2.QueryExecer) error {
+		sql := `INSERT INTO pre_stakings (created_at, user_id, years, allocation, hash_code , worker_index) 
+							      VALUES ($1        , $2     , $3   , $4        , $5::bigint, $6)`
+		if _, err = storagev2.Exec(ctx, conn, sql, *st.CreatedAt.Time, st.UserID, st.Years, st.Allocation, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
+			return errors.Wrapf(err, "failed to insertNewPreStaking:%#v", st)
+		}
+		ss := &PreStakingSnapshot{PreStakingSummary: st, Before: existing}
 
-	return nil
+		return errors.Wrapf(r.sendPreStakingSnapshotMessage(ctx, ss), "failed to send pre-staking snapshot message:%#v", ss)
+	}), "DoInTransaction failed")
 }
 
 func (r *repository) sendPreStakingSnapshotMessage(ctx context.Context, st *PreStakingSnapshot) error {

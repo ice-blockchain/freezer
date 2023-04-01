@@ -27,7 +27,7 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "blockchain_balance_synchronization_worker_", usr.ID, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "blockchain_balance_synchronization_worker", usr.ID, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
@@ -274,9 +274,9 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateLastIteratio
 	for i := range rows {
 		userIDs = append(userIDs, rows[i].UserID)
 	}
-	const table = "blockchain_balance_synchronization_worker_"
+	const table = "blockchain_balance_synchronization_worker"
 	params := make(map[string]any, 1)
-	params["last_iteration_finished_at"] = time.Now()
+	params["last_iteration_finished_at"] = *time.Now().Time
 	err := s.updateWorkerFields(ctx, workerIndex, table, params, userIDs...)
 
 	return errors.Wrapf(err, "failed to updateWorkerTimeField for workerIndex:%v,table:%q,params:%#v,userIDs:%#v", workerIndex, table, params, userIDs)
@@ -286,7 +286,7 @@ func (r *repository) updateBlockchainBalanceSynchronizationWorkerBlockchainAccou
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	const table = "blockchain_balance_synchronization_worker_"
+	const table = "blockchain_balance_synchronization_worker"
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	params := make(map[string]any, 1)
 	params["mining_blockchain_account_address"] = usr.MiningBlockchainAccountAddress

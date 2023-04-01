@@ -106,11 +106,12 @@ type (
 		Before *PreStakingSummary `json:"before,omitempty"`
 	}
 	PreStaking struct {
-		_msgpack   struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		CreatedAt  *time.Time `json:"createdAt,omitempty" swaggerignore:"true" example:"2022-01-03T16:20:52.156534Z"`
-		UserID     string     `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Years      uint64     `json:"years,omitempty" example:"1"`
-		Allocation uint64     `json:"allocation,omitempty" example:"100"`
+		CreatedAt   *time.Time `json:"createdAt,omitempty" swaggerignore:"true" example:"2022-01-03T16:20:52.156534Z"`
+		UserID      string     `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Years       uint64     `json:"years,omitempty" example:"1"`
+		Allocation  uint64     `json:"allocation,omitempty" example:"100"`
+		HashCode    int64      `json:"-" example:"11"`
+		WorkerIndex int16      `json:"-" example:"11"`
 	}
 	MiningRateBonuses struct {
 		T1         uint64 `json:"t1,omitempty" example:"100"`
@@ -244,7 +245,6 @@ var (
 type (
 	balanceType                           int8
 	userMiningRateRecalculationParameters struct {
-		_msgpack                                                      struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // .
 		UserID                                                        users.UserID
 		T0, T1, T2, ExtraBonus, PreStakingAllocation, PreStakingBonus uint64
 	}
