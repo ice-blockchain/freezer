@@ -12,15 +12,15 @@ import (
 	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
-func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex int16) (err error) {
+func (r *repository) initializeWorker(ctx context.Context, table, userID string, hashCode uint64, workerIndex int16) (err error) {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`INSERT INTO %v(worker_index,user_id) VALUES ($1,$2)
+	sql := fmt.Sprintf(`INSERT INTO %v(worker_index,hash_code,user_id) VALUES ($1,$2,$3)
 						ON CONFLICT (worker_index,user_id) DO NOTHING`, table)
-	_, err = storagev2.Exec(ctx, r.dbV2, sql, workerIndex, userID)
+	_, err = storagev2.Exec(ctx, r.dbV2, sql, workerIndex, int64(hashCode), userID)
 
-	return errors.Wrapf(err, "failed to %v, for userID:%v", sql, userID)
+	return errors.Wrapf(err, "failed to %v, for userID:%v and workerIndex:%v", sql, userID, workerIndex)
 }
 
 func (r *repository) updateWorkerFields(

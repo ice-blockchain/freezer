@@ -28,7 +28,7 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}

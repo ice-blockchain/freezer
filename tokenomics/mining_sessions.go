@@ -15,7 +15,7 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storage "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/terror"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -121,7 +121,7 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 								  AND negative_t2_balance.type_detail = '%[4]v'
 						WHERE u.user_id = $2
 						GROUP BY u.user_id`, totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
-	resp, err := storage.Get[miningSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID)
+	resp, err := storagev2.Get[miningSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get the current mining summary for userID:%v", userID)
 	}
@@ -236,7 +236,7 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 		lastFreeMiningSessionAwardedAtVal = ms.LastFreeMiningSessionAwardedAt.Time
 	}
 
-	return storage.DoInTransaction(ctx, r.dbV2, func(conn storage.QueryExecer) error {
+	return storagev2.DoInTransaction(ctx, r.dbV2, func(conn storagev2.QueryExecer) error {
 		userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64)
 		sql := fmt.Sprintf(`UPDATE users
 							   SET updated_at = $1,
@@ -263,28 +263,33 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 		if rowsAffected.RowsAffected() != 1 {
 			return ErrRaceCondition
 		}
-		rowsAffected, err = conn.Exec(ctx, fmt.Sprintf(`
-						UPDATE balance_recalculation_worker_%[1]v 
-							   SET enabled = TRUE,
-								   last_mining_started_at = $1,
-								   last_mining_ended_at = $2
-							   WHERE user_id = $3;`, r.workerIndex(ctx)),
+		_, err = conn.Exec(ctx, `UPDATE balance_recalculation_worker
+							   		SET enabled = TRUE,
+								   		last_mining_started_at = $1,
+								   		last_mining_ended_at = $2
+							   		WHERE user_id = $3
+							   		AND worker_index = $4;`,
 			ms.LastMiningStartedAt.Time,
 			ms.LastMiningEndedAt.Time,
 			userID,
+			r.workerIndex(ctx),
 		)
-		if rowsAffected.RowsAffected() != 1 {
-			if _, err := conn.Exec(ctx, fmt.Sprintf(`
-						INSERT INTO balance_recalculation_worker(user_id,enabled,last_mining_started_at,last_mining_ended_at, hash_code, worker_index) 
-																		   VALUES($3,TRUE,$1,$2, $4, %[1]v);`,
-				r.workerIndex(ctx)),
-				ms.LastMiningStartedAt.Time,
-				ms.LastMiningEndedAt.Time,
-				userID,
-				userHashCode,
-			); err != nil {
-				return ErrRaceCondition
+		if err != nil {
+			if storagev2.IsErr(err, storagev2.ErrNotFound) {
+				if _, err := conn.Exec(ctx, fmt.Sprintf(`
+				INSERT INTO balance_recalculation_worker(user_id,enabled,last_mining_started_at,last_mining_ended_at, hash_code, worker_index) 
+																   VALUES($3,TRUE,$1,$2, $4, %[1]v);`,
+					r.workerIndex(ctx)),
+					ms.LastMiningStartedAt.Time,
+					ms.LastMiningEndedAt.Time,
+					userID,
+					userHashCode,
+				); err != nil {
+					return ErrRaceCondition
+				}
 			}
+
+			return errors.Wrapf(err, "failed to update balance_recalculation_worker for worker index:%v and userId:%v", r.workerIndex(ctx), userID)
 		}
 		if _, err := conn.Exec(ctx, fmt.Sprintf(
 			`INSERT INTO blockchain_balance_synchronization_worker(user_id, hash_code, worker_index) VALUES ($1,$2,%[1]v) ON CONFLICT (worker_index, user_id) DO NOTHING;`, r.workerIndex(ctx)),
@@ -336,7 +341,7 @@ func (r *repository) trySendMiningSessionMessage(ctx context.Context, userID str
 			}
 		)
 		dlq := &MiningSessionDLQ{ID: uuid.NewString(), UserID: userID, Message: string(valueBytes)}
-		_, insertErr := storage.Exec(ctx, r.dbV2,
+		_, insertErr := storagev2.Exec(ctx, r.dbV2,
 			`INSERT INTO mining_sessions_dlq (id, user_id, message,hash_code) VALUES ($1,$2,$3, $4)`, dlq.ID, dlq.UserID, dlq.Message, 0)
 		return multierror.Append( //nolint:wrapcheck // Not needed.
 			errors.Wrapf(err, "failed to send a new mining session message: %#v", sess),
@@ -409,12 +414,12 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		T0HashCode, TMinus1HashCode int64
 	}
 	//nolint:revive // Nope.
-	t0tMinus1, err := storage.Get[referrals](ctx, s.dbV2, sql, *ms.UserID)
+	t0tMinus1, err := storagev2.Get[referrals](ctx, s.dbV2, sql, *ms.UserID)
 	if err != nil || (t0tMinus1.T0UserID == "" && t0tMinus1.TMinus1UserID == "") {
 		return errors.Wrapf(err, "failed to select for t0/t-1 information for userID:%v", *ms.UserID)
 	}
 
-	return errors.Wrapf(storage.DoInTransaction(ctx, s.dbV2, func(conn storage.QueryExecer) error {
+	return errors.Wrapf(storagev2.DoInTransaction(ctx, s.dbV2, func(conn storagev2.QueryExecer) error {
 		if _, err := conn.Exec(ctx, `INSERT INTO processed_mining_sessions(session_number, user_id) VALUES ($1, $2);`,
 			s.sessionNumber(ms.LastNaturalMiningStartedAt),
 			*ms.UserID,
@@ -512,7 +517,7 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 		`, strings.Join(tMinus1UserIDs, ",")))
 	}
 
-	err := storage.DoInTransaction(ctx, r.dbV2, func(conn storage.QueryExecer) error {
+	err := storagev2.DoInTransaction(ctx, r.dbV2, func(conn storagev2.QueryExecer) error {
 		if _, err := conn.Exec(ctx, fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) VALUES %[1]v;`,
 			strings.Join(processedMiningSessionValues, ",")),
 		); err != nil {
@@ -532,7 +537,7 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 		return nil
 	})
 	if err != nil {
-		if storage.IsErr(err, storage.ErrDuplicate, "pkey") {
+		if storagev2.IsErr(err, storagev2.ErrDuplicate, "pkey") {
 			return nil
 		}
 		return errors.Wrapf(err, "failed to eval script to decrement active_referrals for t0&t-1, for %#v", usersThatStoppedMining)

@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/coin"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -67,12 +67,12 @@ SELECT (CASE WHEN hide_ranking = TRUE THEN 1 ELSE 2 END)
 FROM users 
 WHERE user_id = $1`, registrationICEFlakeBonusAmount)
 
-	resp, err := storage.Select[RankingSummary](ctx, r.dbV2, sql, userID)
+	resp, err := storagev2.Select[RankingSummary](ctx, r.dbV2, sql, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select miner global rank for userID:%v", userID)
 	}
 	if len(resp) == 1 {
-		return nil, storage.ErrRelationNotFound
+		return nil, storagev2.ErrRelationNotFound
 	}
 	if resp[1].GlobalRank == 1 && userID != requestingUserID(ctx) {
 		return nil, ErrGlobalRankHidden
@@ -120,7 +120,7 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 								 b.amount_w0 DESC
 						LIMIT $2 OFFSET $3`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
 	keyword = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
-	resp, err := storage.Select[Miner](ctx, r.dbV2, sql, keyword, limit, offset)
+	resp, err := storagev2.Select[Miner](ctx, r.dbV2, sql, keyword, limit, offset)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keyword, offset, offset+limit)
 	}
@@ -144,7 +144,7 @@ func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]
 									 b.amount_w1 DESC,
 									 b.amount_w0 DESC
               				LIMIT $1 OFFSET $2`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	resp, err := storage.Select[Miner](ctx, r.dbV2, sql, limit, offset)
+	resp, err := storagev2.Select[Miner](ctx, r.dbV2, sql, limit, offset)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
 	}
@@ -327,10 +327,10 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		BonusPercentageRemaining uint64
 		NewsSeen                 uint64
 	}
-	resp, err := storage.Get[respStruct](ctx, r.dbV2, sql, params...)
+	resp, err := storagev2.Get[respStruct](ctx, r.dbV2, sql, params...)
 	if err != nil {
-		if storage.IsErr(err, storage.ErrNotFound) {
-			return nil, errors.Wrapf(storage.ErrRelationNotFound, "failed to select for mining summary for userID:%v", userID)
+		if storagev2.IsErr(err, storagev2.ErrNotFound) {
+			return nil, errors.Wrapf(storagev2.ErrRelationNotFound, "failed to select for mining summary for userID:%v", userID)
 		}
 
 		return nil, errors.Wrapf(err, "failed to select for mining summary for userID:%v", userID)

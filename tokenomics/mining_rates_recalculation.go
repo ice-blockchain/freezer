@@ -26,7 +26,7 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker_", usr.ID, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
