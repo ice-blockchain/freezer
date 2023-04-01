@@ -158,16 +158,16 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFla
 		args                         = make([]any, 0)
 		now                          = time.Now()
 	)
-	paramCount := 1
+	paramCounter := 1
 	for duration := stdlibtime.Duration(0); duration < consecutiveDurationsRequired; duration++ {
 		relativeTime := now.Add(-duration * r.cfg.AdoptionMilestoneSwitch.Duration)
 		args = append(args, r.totalActiveUsersGlobalChildKey(&relativeTime))
-		keyParams = append(keyParams, fmt.Sprintf("$%d", paramCount))
-		paramCount++
+		keyParams = append(keyParams, fmt.Sprintf("$%d", paramCounter))
+		paramCounter++
 	}
 	args = append(args, time.New(now.Add(-consecutiveDurationsRequired*r.cfg.AdoptionMilestoneSwitch.Duration)).Time)
 	args = append(args, consecutiveDurationsRequired)
-	paramCount += 1
+	paramCounter += 1
 	sql := fmt.Sprintf(`SELECT x.achieved_at,
 							   x.base_mining_rate,
 							   x.milestone,
@@ -184,7 +184,7 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFla
 							  GROUP BY next_adoption.achieved_at, next_adoption.base_mining_rate, next_adoption.milestone
 							) x
 							  WHERE x.consecutive_durations = $%[4]v::bigint
-							    AND x.achieved_at IS NULL`, strings.Join(keyParams, ","), currentAdoptionSQL(), paramCount-1, paramCount)
+							    AND x.achieved_at IS NULL`, strings.Join(keyParams, ","), currentAdoptionSQL(), paramCounter-1, paramCounter)
 	resp, err := storagev2.Select[Adoption[coin.ICEFlake]](ctx, r.dbV2, sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to select if the next adoption is achieved")
@@ -205,8 +205,7 @@ func (r *repository) switchToNextAdoption(ctx context.Context, nextAdoption *Ado
 			SET achieved_at = $1
 			WHERE milestone = $2
 			AND achieved_at IS NULL`
-	affectedRows, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.AchievedAt.Time, nextAdoption.Milestone)
-	if err != nil || affectedRows == 0 {
+	if _, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.AchievedAt.Time, nextAdoption.Milestone); err != nil {
 		return errors.Wrapf(err,
 			"failed to update the next adoption to switch to it, achievedAt:%v, milestone: %v", nextAdoption.AchievedAt, nextAdoption.Milestone)
 	}
@@ -223,8 +222,7 @@ func (r *repository) revertSwitchToNextAdoption(ctx context.Context, nextAdoptio
 			SET achieved_at = NULL
 			WHERE milestone = $1
 			AND achieved_at IS NOT NULL AND achieved_at = $2`
-	resp, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.Milestone, nextAdoption.AchievedAt)
-	if err != nil || resp == 0 {
+	if _, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.Milestone, nextAdoption.AchievedAt); err != nil {
 		return errors.Wrapf(err, "failed to revert to update the next adoption to switch to it, milestone:%v, achievedAt:%v",
 			nextAdoption.Milestone, nextAdoption.AchievedAt)
 	}

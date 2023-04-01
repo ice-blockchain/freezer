@@ -52,8 +52,8 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		  ON b.user_id = x.user_id
 		 AND b.negative = FALSE
 		 AND b.type = $4
-		 AND b.type_detail IN ('','%[3]v_' || x.referred_by,'%[4]v','%[5]v')
-		 AND b.worker_index = %[1]v`, r.workerIndex(ctx), totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail) //nolint:lll // .
+		 AND b.type_detail IN ('','%[1]v_' || x.referred_by,'%[2]v','%[3]v')
+		 AND b.worker_index = $5`, r.workerIndex(ctx), t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail) //nolint:lll // .
 	type (
 		B    = balance
 		resp struct {
@@ -62,7 +62,8 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 			BalanceWorkerStarted                  bool
 		}
 	)
-	res, err := storagev2.Select[resp](ctx, r.dbV2, sql, userID)
+	wIdx := r.workerIndex(ctx)
+	res, err := storagev2.Select[resp](ctx, r.dbV2, sql, wIdx, userID, wIdx, totalNoPreStakingBonusBalanceType, wIdx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select user's balances for user_id:%v", userID)
 	}
@@ -417,29 +418,37 @@ func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate *coin.ICEFlake)
 }
 
 func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL params and error handling. Control coupling is ok here.
-	ctx context.Context, workerIndex int16, insert bool, updatedAt *time.Time, balances ...*balance,
+	ctx context.Context, workerIndex int16, updatedAt *time.Time, balances ...*balance,
 ) error {
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	values := make([]string, 0, len(balances))
+	paramCounter := 1
+	args := make([]any, 0)
+	fieldCount := 8
+	values := make([]string, 0, fieldCount*len(balances))
 	for _, bal := range balances {
 		if bal.Amount.IsNil() {
 			bal.Amount = coin.ZeroICEFlakes()
 		}
 		amount, err := bal.Amount.Uint.Marshal()
 		log.Panic(err) //nolint:revive // Intended.
-		values = append(values, fmt.Sprintf(`(%[1]v,'%[2]v',%[3]v,'%[4]v',%[5]v,'%[6]v','%[7]v','%[8]v')`,
-			updatedAt.UnixNano(), string(amount), bal.UserID, bal.TypeDetail, bal.Type, bal.Negative, bal.HashCode, workerIndex))
+		var macroses []string
+		for i := 0; i < fieldCount; i++ {
+			macroses = append(macroses, fmt.Sprintf("$%d", paramCounter))
+			paramCounter++
+		}
+		values = append(values, fmt.Sprintf("(%s)", strings.Join(macroses, ",")))
+		args = append(args, updatedAt.Time, string(amount), bal.UserID, bal.TypeDetail, bal.Type, bal.Negative, bal.HashCode, workerIndex)
 	}
-
 	sql := fmt.Sprintf(`INSERT INTO balances_worker (updated_at,amount,user_id,type_detail,type,negative,hash_code,worker_index)
-			VALUES %v
-			ON CONFLICT (user_id,type_detail,type,negative,worker_index) DO UPDATE SET
-				updated_at=excluded.updated_at,
-				amount=coalesce(excluded.amount, '0')`, strings.Join(values, ","))
-	affectedRows, err := storagev2.Exec(ctx, r.dbV2, sql)
-	if err != nil && affectedRows == 0 {
+							VALUES %v
+						ON CONFLICT (user_id,type_detail,type,negative,worker_index)
+							DO UPDATE
+								SET updated_at		= EXCLUDED.updated_at,
+								amount         	  	= EXCLUDED.amount
+							WHERE COALESCE(balances_worker.amount,'') != coalesce(EXCLUDED.amount,'')`, strings.Join(values, ","))
+	if _, err := storagev2.Exec(ctx, r.dbV2, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed insert/update at %v balances:%#v for workerIndex:%v", updatedAt, balances, workerIndex)
 	}
 
@@ -456,8 +465,7 @@ func (r *repository) deleteBalances(ctx context.Context, workerIndex int16, bala
 			bal.UserID, bal.Negative, bal.Type, bal.TypeDetail))
 	}
 	sql := fmt.Sprintf(`DELETE FROM balances WHERE %v`, strings.Join(values, " OR "))
-	affectedRows, err := storagev2.Exec(ctx, r.dbV2, sql)
-	if err != nil && affectedRows == 0 {
+	if _, err := storagev2.Exec(ctx, r.dbV2, sql); err != nil {
 		return errors.Wrapf(err, "failed to DELETE from balances for values:%#v", values)
 	}
 
@@ -507,8 +515,7 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	}
 	sql := `INSERT INTO processed_add_balance_commands(user_id, key) VALUES($1, $2)
 						ON CONFLICT (user_id, key) DO NOTHING`
-	affectedRows, err := storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID)
-	if err != nil || affectedRows == 0 {
+	if _, err = storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMANDS for userID:%v, key: %v)", val.UserID, val.EventID)
 	}
 	var (
@@ -524,7 +531,7 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	}
 	bal.HashCode, bal.WorkerIndex = hashCode, workerIndex
 	err = errors.Wrapf(retry(ctx, func() error {
-		if err = s.insertOrReplaceBalances(ctx, workerIndex, true, time.New(message.Timestamp), bal); err != nil {
+		if err = s.insertOrReplaceBalances(ctx, workerIndex, time.New(message.Timestamp), bal); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
@@ -536,9 +543,8 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	}), "permanently failed to insertBalance:%#v", bal)
 	if err != nil {
 		sql := `DELETE FROM processed_add_balance_commands WHERE user_id = $1 AND key = $2`
-		affectedRows, err := storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID)
-		if err != nil || affectedRows == 0 {
-			return errors.Wrapf(err, "failed to delete PROCESSED_ADD_BALANCE_COMMAND(%v,%v)", val.UserID, val.EventID)
+		if _, err := storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID); err != nil {
+			return errors.Wrapf(err, "failed to delete PROCESSED_ADD_BALANCE_COMMANDS(%v,%v)", val.UserID, val.EventID)
 		}
 	}
 

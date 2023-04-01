@@ -193,7 +193,7 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
-	if err := s.insertOrReplaceBalances(ctx, workerIndex, false, now, balancesForReplace...); err != nil {
+	if err := s.insertOrReplaceBalances(ctx, workerIndex, now, balancesForReplace...); err != nil {
 		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)
 	}
 	if err := s.deleteBalances(ctx, workerIndex, balancesForDelete...); err != nil {
