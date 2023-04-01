@@ -15,7 +15,6 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
 	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
@@ -26,7 +25,7 @@ func (r *repository) GetAdoptionSummary(ctx context.Context) (as *AdoptionSummar
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
 	key := r.totalActiveUsersGlobalParentKey(time.Now().Time)
-	if as.TotalActiveUsers, err = r.getGlobalUnsignedValue(ctx, key); err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if as.TotalActiveUsers, err = r.getGlobalUnsignedValue(ctx, key); err != nil && !errors.Is(err, storagev2.ErrNotFound) {
 		return nil, errors.Wrapf(err, "failed to get totalActiveUsers getGlobalUnsignedValue for key:%v", key)
 	}
 	if as.Milestones, err = getAllAdoptions[coin.ICE](ctx, r.dbV2); err != nil {
@@ -56,7 +55,7 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 		return nil
 	}
 	if err = r.switchToNextAdoption(ctx, nextAdoption); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, storagev2.ErrNotFound) {
 			return nil // This is a concurrency check. Multiple goroutines will try to update it, but only the 1st will succeed.
 		}
 
@@ -133,7 +132,7 @@ func (r *repository) getCurrentAdoption(ctx context.Context) (*Adoption[coin.ICE
 		return nil, errors.Wrap(err, "failed to select for the current adoption")
 	}
 	if len(resp) == 0 || resp[0] == nil || resp[0].Milestone == 0 { //nolint:revive // Nope.
-		return nil, storage.ErrNotFound // Should never happen.
+		return nil, storagev2.ErrNotFound // Should never happen.
 	}
 
 	return resp[0], nil
