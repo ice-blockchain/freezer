@@ -33,7 +33,7 @@ FROM (SELECT x.amount_w0,
 				   amount_w2,
 				   amount_w3
 			FROM balances
-			WHERE user_id = :user_id
+			WHERE user_id = $1
 			UNION ALL
 			SELECT %[1]v AS amount_w0,
 				   0 AS amount_w1,
@@ -44,13 +44,13 @@ FROM (SELECT x.amount_w0,
 	JOIN balances AS others
 		ON	(
 			 CASE
-			   WHEN others.amount_w3 == this.amount_w3
+			   WHEN others.amount_w3 = this.amount_w3
 				   THEN (
 						 CASE
-							WHEN others.amount_w2 == this.amount_w2
+							WHEN others.amount_w2 = this.amount_w2
 								THEN (
 									  CASE
-										 WHEN others.amount_w1 == this.amount_w1
+										 WHEN others.amount_w1 = this.amount_w1
 											 THEN (others.amount_w0 >= this.amount_w0)
 										 ELSE others.amount_w1 > this.amount_w1
 									  END
@@ -61,15 +61,14 @@ FROM (SELECT x.amount_w0,
 			   ELSE others.amount_w3 > this.amount_w3
 			 END
 			)
-		AND others.user_id != :user_id
+		AND others.user_id != $1
 UNION ALL
-SELECT (CASE WHEN hide_ranking == TRUE THEN 1 ELSE 2 END)
+SELECT (CASE WHEN hide_ranking = TRUE THEN 1 ELSE 2 END)
 FROM users 
-WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	resp := make([]*RankingSummary, 0, 1+1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+WHERE user_id = $1`, registrationICEFlakeBonusAmount)
+
+	resp, err := storage.Select[RankingSummary](ctx, r.dbV2, sql, userID)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select miner global rank for userID:%v", userID)
 	}
 	if len(resp) == 1 {
@@ -103,29 +102,28 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 	sql := fmt.Sprintf(`SELECT b.amount,
 							   u.user_id,
 							   u.username,
-							   %[2]v AS profile_picture_url
+							   %[1]v AS profile_picture_url
 						FROM users u
 							JOIN balances b
 								ON u.user_id = b.user_id
 						WHERE (
-								( u.username IS NOT NULL AND u.username LIKE :keyword ESCAPE '\' )
+								( u.username IS NOT NULL AND u.username LIKE $1 ESCAPE '\' )
 								OR
-								( u.first_name IS NOT NULL AND u.first_name != '' AND LOWER(u.first_name) LIKE :keyword ESCAPE '\' )
+								( u.first_name IS NOT NULL AND u.first_name != '' AND LOWER(u.first_name) LIKE $1 ESCAPE '\' )
 								OR
-								( u.last_name IS NOT NULL AND u.last_name != '' AND LOWER(u.last_name) LIKE :keyword ESCAPE '\' )
+								( u.last_name IS NOT NULL AND u.last_name != '' AND LOWER(u.last_name) LIKE $1 ESCAPE '\' )
 							  )
 							  AND u.hide_ranking = FALSE
 						ORDER BY b.amount_w3 DESC,
 								 b.amount_w2 DESC,
 								 b.amount_w1 DESC,
 								 b.amount_w0 DESC
-						LIMIT %[1]v OFFSET :offset`, limit, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	params := make(map[string]any, 1+1)
-	params["offset"] = offset
-	params["keyword"] = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
-	resp := make([]*Miner, 0, limit)
-	err := errors.Wrapf(r.db.PrepareExecuteTyped(sql, params, &resp), "failed to select for top miners for params:%#v", params)
-
+						LIMIT $2 OFFSET $3`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
+	keyword = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
+	resp, err := storage.Select[Miner](ctx, r.dbV2, sql, keyword, limit, offset)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keyword, offset, offset+limit)
+	}
 	return resp, err
 }
 
@@ -136,7 +134,7 @@ func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]
 	sql := fmt.Sprintf(`SELECT b.amount,
 							   u.user_id,
 							   u.username,
-							   %[2]v AS profile_picture_url
+							   %[1]v AS profile_picture_url
 							FROM balances b
 								JOIN users u
 								    ON u.user_id = b.user_id
@@ -145,11 +143,9 @@ func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]
 									 b.amount_w2 DESC,
 									 b.amount_w1 DESC,
 									 b.amount_w0 DESC
-              				LIMIT %[1]v OFFSET :offset`, limit, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	params := make(map[string]any, 1)
-	params["offset"] = offset
-	resp := make([]*Miner, 0, limit)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+              				LIMIT $1 OFFSET $2`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
+	resp, err := storage.Select[Miner](ctx, r.dbV2, sql, limit, offset)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
 	}
 
@@ -193,7 +189,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
 			 x.user_id
 			 FROM ( SELECT CAST($1 AS VARCHAR) AS user_id ) x
-				 LEFT JOIN pre_stakings_%[1]v st
+				 LEFT JOIN pre_stakings st
 						ON st.user_id = x.user_id
 			 GROUP BY x.user_id 
 	 ) x
@@ -201,69 +197,69 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		  ON u.user_id = x.user_id
    		JOIN extra_bonus_start_date sd 
 		  ON sd.key = 0
-   LEFT	JOIN extra_bonus_processing_worker_%[1]v eb_worker
+   LEFT	JOIN extra_bonus_processing_worker eb_worker
 		  ON eb_worker.user_id = x.user_id
-   LEFT JOIN active_referrals_%[1]v ar_worker
+   LEFT JOIN active_referrals ar_worker
 		  ON ar_worker.user_id = x.user_id
    LEFT JOIN extra_bonuses eb 
           ON eb.ix = ($2::bigint + (eb_worker.utc_offset * $4::bigint) - sd.value) / $3::bigint
 		 AND $2::bigint + (eb_worker.utc_offset * $4::bigint) > sd.value
 		 AND eb.bonus > 0
-   LEFT JOIN extra_bonuses_worker_%[1]v ebw
+   LEFT JOIN extra_bonuses_worker ebw
 		  ON eb.ix = ebw.extra_bonus_index
 		 AND $2::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (ebw.extra_bonus_index * $3::bigint)) - $8::bigint - ((ebw.offset_value * $5::bigint) / $10::bigint) < $9::bigint
 		 AND $2::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (ebw.extra_bonus_index * $3::bigint)) - $8::bigint - ((ebw.offset_value * $5::bigint) / $10::bigint) > 0
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years
-   LEFT JOIN balances_worker_%[1]v btotal
+   LEFT JOIN balances_worker btotal
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND btotal.user_id = u.user_id
 	     AND btotal.negative = FALSE
 	     AND btotal.type = %[3]v
 	     AND btotal.type_detail = ''
-   LEFT JOIN balances_worker_%[1]v bt0
+   LEFT JOIN balances_worker bt0
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND bt0.user_id = u.user_id
 	     AND bt0.negative = FALSE
 	     AND bt0.type = %[3]v
 	     AND bt0.type_detail = '%[4]v_' || u.referred_by
-   LEFT JOIN balances_worker_%[1]v bt1
+   LEFT JOIN balances_worker bt1
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND bt1.user_id = u.user_id
 	     AND bt1.negative = FALSE
 	     AND bt1.type = %[3]v
 	     AND bt1.type_detail = '%[5]v'
-   LEFT JOIN balances_worker_%[1]v bt2
+   LEFT JOIN balances_worker bt2
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND bt2.user_id = u.user_id
 	     AND bt2.negative = FALSE
 	     AND bt2.type = %[3]v
 	     AND bt2.type_detail = '%[6]v'
-   LEFT JOIN balances_worker_%[1]v aggressive_degradation_btotal
+   LEFT JOIN balances_worker aggressive_degradation_btotal
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND aggressive_degradation_btotal.user_id = u.user_id
 	     AND aggressive_degradation_btotal.negative = FALSE
 	     AND aggressive_degradation_btotal.type = %[3]v
 	     AND aggressive_degradation_btotal.type_detail = '%[7]v'
-   LEFT JOIN balances_worker_%[1]v aggressive_degradation_bt0
+   LEFT JOIN balances_worker aggressive_degradation_bt0
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND aggressive_degradation_bt0.user_id = u.user_id
 	     AND aggressive_degradation_bt0.negative = FALSE
 	     AND aggressive_degradation_bt0.type = %[3]v
 	     AND aggressive_degradation_bt0.type_detail = '%[4]v_' || u.referred_by || '_'
-   LEFT JOIN balances_worker_%[1]v aggressive_degradation_bt1
+   LEFT JOIN balances_worker aggressive_degradation_bt1
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND aggressive_degradation_bt1.user_id = u.user_id
 	     AND aggressive_degradation_bt1.negative = FALSE
 	     AND aggressive_degradation_bt1.type = %[3]v
 	     AND aggressive_degradation_bt1.type_detail = '%[8]v'
-   LEFT JOIN balances_worker_%[1]v aggressive_degradation_bt2
+   LEFT JOIN balances_worker aggressive_degradation_bt2
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND aggressive_degradation_bt2.user_id = u.user_id
 	     AND aggressive_degradation_bt2.negative = FALSE
 	     AND aggressive_degradation_bt2.type = %[3]v
 	     AND aggressive_degradation_bt2.type_detail = '%[9]v'
-   LEFT JOIN balances_worker_%[1]v degradation_btotalt0t1t2
+   LEFT JOIN balances_worker degradation_btotalt0t1t2
 		  ON (u.last_mining_ended_at IS NOT NULL AND EXTRACT(epoch from u.last_mining_ended_at)*%[11]v < $2::bigint )
 	     AND degradation_btotalt0t1t2.user_id = u.user_id
 	     AND degradation_btotalt0t1t2.negative = FALSE
@@ -274,7 +270,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	     AND t0.user_id != x.user_id
 	  	 AND t0.last_mining_ended_at IS NOT NULL
 	  	 AND EXTRACT(epoch from t0.last_mining_ended_at)*%[11]v  > $2::bigint`,
-		r.workerIndex(ctx),
+		0,
 		currentAdoptionSQL(),
 		totalNoPreStakingBonusBalanceType,
 		t0BalanceTypeDetail,
