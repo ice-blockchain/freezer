@@ -7,14 +7,13 @@ import (
 	"fmt"
 
 	"github.com/goccy/go-json"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
@@ -47,14 +46,11 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
-	}
-	sql := `DELETE FROM users
- 			WHERE user_id = :user_id`
-	params := make(map[string]any, 1)
-	params["user_id"] = usr.ID
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
+	// if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
+	// 	return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
+	// }
+	affectedRows, err := storagev2.Exec(ctx, s.dbV2, `DELETE FROM users WHERE user_id = $1`, usr.ID)
+	if err != nil || affectedRows == 0 {
 		return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
 	}
 
@@ -98,21 +94,18 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 							  AND negative_tminus1_balance.negative = TRUE
 							  AND negative_tminus1_balance.type = %[2]v
 							  AND negative_tminus1_balance.type_detail =  '%[4]v_' || tminus1.user_id
-					    WHERE u.user_id = :user_id`,
+					    WHERE u.user_id = $1`,
 		usr.HashCode%uint64(s.cfg.WorkerCount),
 		totalNoPreStakingBonusBalanceType,
 		reverseT0BalanceTypeDetail,
 		reverseTMinus1BalanceTypeDetail)
-	params := make(map[string]any, 1)
-	params["user_id"] = usr.ID
 	type resp struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // .
 		TotalReverseT0Amount, TotalReverseTMinus1Amount,
 		NegativeReverseT0Amount, NegativeReverseTMinus1Amount *coin.ICEFlake
 		T0UserID, TMinus1UserID string
 	}
-	res := make([]*resp, 0, 1)
-	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
+	res, err := storagev2.Select[resp](ctx, s.dbV2, sql, usr.ID)
+	if err != nil {
 		return errors.Wrapf(err, "failed to get reverse t0 and t-1 balance information for userID:%v", usr.ID)
 	}
 	if len(res) == 0 {
@@ -168,7 +161,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) (er
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	if err = s.updateUser(ctx, usr); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, storagev2.ErrNotFound) {
 			err = errors.Wrapf(s.insertUser(ctx, usr), "failed to insert user:%#v", usr)
 		}
 	}
@@ -180,34 +173,24 @@ func (s *usersTableSource) updateUser(ctx context.Context, usr *users.User) (err
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	const fieldCount = 10
+	sql := `UPDATE users SET updated_at = $1, referred_by = $2, username = $3, first_name = $4, last_name = $5, 
+						     profile_picture_name = $6, mining_blockchain_account_address = $7,
+							 blockchain_account_address = $8, hide_ranking = $9, verified = $10
+				   WHERE user_id = $11`
 	verified := false
 	if usr.Verified != nil && *usr.Verified {
 		verified = true
 	}
-	ops := make([]tarantool.Op, 0, fieldCount)
-	//nolint:gomnd // Not magic numbers, those are field indices.
-	ops = append(ops,
-		tarantool.Op{Op: "=", Field: 1, Arg: usr.UpdatedAt},
-		tarantool.Op{Op: "=", Field: 10, Arg: usr.ReferredBy},
-		tarantool.Op{Op: "=", Field: 11, Arg: usr.Username},
-		tarantool.Op{Op: "=", Field: 12, Arg: usr.FirstName},
-		tarantool.Op{Op: "=", Field: 13, Arg: usr.LastName},
-		tarantool.Op{Op: "=", Field: 14, Arg: s.pictureClient.StripDownloadURL(usr.ProfilePictureURL)},
-		tarantool.Op{Op: "=", Field: 15, Arg: usr.MiningBlockchainAccountAddress},
-		tarantool.Op{Op: "=", Field: 16, Arg: usr.BlockchainAccountAddress},
-		tarantool.Op{Op: "=", Field: 18, Arg: s.hideRanking(usr)},
-		tarantool.Op{Op: "=", Field: 19, Arg: verified})
-	res := make([]*user, 0, 1)
-	key := tarantool.StringKey{S: usr.ID}
-	if err = storage.CheckNoSQLDMLErr(s.db.UpdateTyped("USERS", "pk_unnamed_USERS_1", key, ops, &res)); err == nil && (len(res) == 0 || res[0].UserID == "") { //nolint:lll,revive // Wrong.
-		err = storage.ErrNotFound
+	affectedRows, err := storagev2.Exec(ctx, s.dbV2, sql, usr.UpdatedAt.Time, usr.ReferredBy, usr.Username, usr.FirstName, usr.LastName,
+		usr.ProfilePictureURL, usr.MiningBlockchainAccountAddress, usr.BlockchainAccountAddress, s.hideRanking(usr), verified, usr.ID)
+	if err == nil && affectedRows == 0 {
+		err = storagev2.ErrNotFound
 	}
-	if err == nil {
-		if err = s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr); err != nil {
-			err = errors.Wrapf(err, "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr)
-		}
-	}
+	// if err == nil {
+	// 	if err = s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr); err != nil {
+	// 		err = errors.Wrapf(err, "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr)
+	// 	}
+	// }
 
 	return err
 }
@@ -216,27 +199,34 @@ func (s *usersTableSource) insertUser(ctx context.Context, usr *users.User) erro
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	if err := storage.CheckNoSQLDMLErr(s.db.InsertTyped("USERS", s.user(usr), &[]*user{})); err != nil {
+	sql := `INSERT INTO users(created_at, updated_at, user_id, referred_by, username,
+							 first_name, last_name, profile_picture_name, mining_blockchain_account_address, blockchain_account_address,
+							 hash_code, hide_ranking, verified)
+					    VALUES($1, $2, $3, $4,  $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+	u := s.user(usr)
+	affectedRows, err := storagev2.Exec(ctx, s.dbV2, sql, u.CreatedAt.Time, u.UpdatedAt.Time, u.UserID, u.ReferredBy, u.Username, u.FirstName, u.LastName,
+		u.ProfilePictureURL, u.MiningBlockchainAccountAddress, u.BlockchainAccountAddress, int64(u.HashCode), u.HideRanking, u.Verified)
+	if err != nil || affectedRows == 0 {
 		if errors.Is(err, storage.ErrDuplicate) {
 			return s.updateUser(ctx, usr)
 		}
 
 		return errors.Wrapf(err, "failed to insert user %#v", usr)
 	}
-	if err := s.doAfterCreate(ctx, usr); err != nil {
-		revertCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
-		defer cancel()
-		revertErr := errors.Wrapf(s.deleteUser(revertCtx, usr), //nolint:contextcheck // It might be cancelled.
-			"failed to delete userID:%v as a rollback for failed doAfterCreate", usr.ID)
-		if revertErr != nil && errors.Is(revertErr, storage.ErrNotFound) {
-			revertErr = nil
-		}
+	// if err := s.doAfterCreate(ctx, usr); err != nil {
+	// 	revertCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
+	// 	defer cancel()
+	// 	revertErr := errors.Wrapf(s.deleteUser(revertCtx, usr), //nolint:contextcheck // It might be cancelled.
+	// 		"failed to delete userID:%v as a rollback for failed doAfterCreate", usr.ID)
+	// 	if revertErr != nil && errors.Is(revertErr, storagev2.ErrNotFound) {
+	// 		revertErr = nil
+	// 	}
 
-		return multierror.Append( //nolint:wrapcheck // Not needed.
-			errors.Wrapf(err, "failed to run doAfterCreate for:%#v", usr),
-			revertErr,
-		).ErrorOrNil()
-	}
+	// 	return multierror.Append( //nolint:wrapcheck // Not needed.
+	// 		errors.Wrapf(err, "failed to run doAfterCreate for:%#v", usr),
+	// 		revertErr,
+	// 	).ErrorOrNil()
+	// }
 
 	return nil
 }
