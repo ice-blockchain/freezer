@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"math/rand"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -170,7 +170,7 @@ func (r *repository) mustPopulateExtraBonusWorker(workerIndex int16, extraBonuse
 	}
 	sql := fmt.Sprintf(`INSERT INTO extra_bonuses_worker (worker_index,extra_bonus_index,offset_value) 
 													     VALUES %[1]v
-							   ON CONFLICT DO NOTHING`, strings.Join(values, ","))
+							   ON CONFLICT (worker_index, extra_bonus_index) DO NOTHING`, strings.Join(values, ","))
 	_, err := storagev2.Exec(context.Background(), r.dbV2, sql, args...)
 	log.Panic(errors.Wrapf(err, "failed to initialize extra_bonuses_%[1]v", workerIndex))
 }

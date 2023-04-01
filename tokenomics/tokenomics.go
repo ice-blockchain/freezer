@@ -209,7 +209,7 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if _, err := p.db.Ping(); err != nil {
+	if err := p.dbV2.Ping(ctx); err != nil {
 		return errors.Wrap(err, "[health-check] failed to ping DB")
 	}
 	type ts struct {

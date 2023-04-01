@@ -4,13 +4,13 @@ package tokenomics
 
 import (
 	"context"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
 func (r *repository) getGlobalUnsignedValue(ctx context.Context, key string) (uint64, error) {

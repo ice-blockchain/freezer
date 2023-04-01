@@ -262,8 +262,8 @@ github.com/ice-blockchain/eskimo v1.106.0 h1:w17Ro42U5SAjUk796anQD/TTK8OhstJ9TMi
 github.com/ice-blockchain/eskimo v1.106.0/go.mod h1:umEdb6A6BT32B7mxHjePtOAUaMdK3BYazfMRrrftUgY=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb h1:8TnFP3mc7O+tc44kv2e0/TpZKnEVUaKH+UstwfBwRkk=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb/go.mod h1:ZsQU7i3mxhgBBu43Oev7WPFbIjP4TniN/b1UPNGbrq8=
-github.com/ice-blockchain/wintr v1.106.0 h1:LdkkzXzZXluHKoNh94hXgNXcOhnwA6O4GfkTEpIPG4A=
-github.com/ice-blockchain/wintr v1.106.0/go.mod h1:vpRXW0GxtN8lkJqFCm61qNYs7ujd15AFFz1JrQwJQ8U=
+github.com/ice-blockchain/wintr v1.107.0 h1:UQIyApDaLIgcEg0yYNjTjq44luZc8shms790QVHgIBs=
+github.com/ice-blockchain/wintr v1.107.0/go.mod h1:vno01Q/od281NKYtImYwKIRnwRxz2XvrIUMoCS49rGc=
 github.com/imdario/mergo v0.3.15 h1:M8XP7IuFNsqUx6VPK2P9OSmsYsI/YFaGil0uD21V3dM=
 github.com/imdario/mergo v0.3.15/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/imroc/req/v3 v3.33.2 h1:mqphLIo++p+IPYdjgP/Wd5rqXUjKvuEIst2U+EsLIwQ=

@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"strings"
 	stdlibtime "time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -234,7 +234,14 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 	}
 	sql := fmt.Sprintf(`INSERT INTO balances (amount,amount_w0,amount_w1,amount_w2,amount_w3,user_id) 
 											 VALUES %v 
-						ON CONFLICT DO NOTHING`, strings.Join(values, ","))
+						ON CONFLICT (user_id) 
+							 DO UPDATE
+								   SET amount = EXCLUDED.amount,
+									   amount_w0 = EXCLUDED.amount_w0,
+									   amount_w1 = EXCLUDED.amount_w1,
+									   amount_w2 = EXCLUDED.amount_w2,
+									   amount_w3 = EXCLUDED.amount_w3
+							 WHERE balances.amount != EXCLUDED.amount`, strings.Join(values, ","))
 	if _, err := storagev2.Exec(ctx, s.dbV2, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed to replace into balances, values:%#v", values)
 	}
@@ -283,7 +290,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateLastIteratio
 }
 
 func (r *repository) updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || usr.MiningBlockchainAccountAddress == "" {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	const table = "blockchain_balance_synchronization_worker"

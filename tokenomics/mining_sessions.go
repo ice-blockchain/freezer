@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/ice-blockchain/wintr/time"
 	"strings"
 	stdlibtime "time"
 
@@ -18,6 +17,7 @@ import (
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	storage "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/terror"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of handling.

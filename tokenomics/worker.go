@@ -5,10 +5,11 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"strings"
 
 	"github.com/pkg/errors"
+
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
 func (r *repository) initializeWorker(ctx context.Context, table, userID string, workerIndex int16) (err error) {
@@ -16,14 +17,13 @@ func (r *repository) initializeWorker(ctx context.Context, table, userID string,
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	sql := fmt.Sprintf(`INSERT INTO %v(worker_index,user_id) VALUES ($1,$2)
-						ON CONFLICT (worker_index,user_id) 
-								DO NOTHING`, table)
+						ON CONFLICT (worker_index,user_id) DO NOTHING`, table)
 	_, err = storagev2.Exec(ctx, r.dbV2, sql, workerIndex, userID)
 
 	return errors.Wrapf(err, "failed to %v, for userID:%v", sql, userID)
 }
 
-func (r *repository) updateWorkerFields( //nolint:funlen // .
+func (r *repository) updateWorkerFields(
 	ctx context.Context, workerIndex int16, table string, updateKV map[string]any, userIDs ...string,
 ) (err error) {
 	if ctx.Err() != nil || len(userIDs) == 0 {
@@ -39,7 +39,8 @@ func (r *repository) updateWorkerFields( //nolint:funlen // .
 	}
 	sql := fmt.Sprintf(`UPDATE %[1]v
 					    SET %[2]v
-					    WHERE worker_index = $1 AND user_id = ANY($2)`, table, strings.Join(fields, ","))
+					    WHERE worker_index = $1 
+					      AND user_id = ANY($2)`, table, strings.Join(fields, ","))
 	if _, uErr := storagev2.Exec(ctx, r.dbV2, sql, args...); uErr != nil {
 		return errors.Wrapf(uErr, "failed to UPDATE %v%v updateKV :%#v, for userIDs:%#v", table, workerIndex, updateKV, userIDs)
 	}
