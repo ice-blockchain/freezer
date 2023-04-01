@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/goccy/go-json"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -46,9 +47,9 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	// if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
-	// 	return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
-	// }
+	if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
+		return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
+	}
 	affectedRows, err := storagev2.Exec(ctx, s.dbV2, `DELETE FROM users WHERE user_id = $1`, usr.ID)
 	if err != nil || affectedRows == 0 {
 		return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
@@ -186,11 +187,11 @@ func (s *usersTableSource) updateUser(ctx context.Context, usr *users.User) (err
 	if err == nil && affectedRows == 0 {
 		err = storagev2.ErrNotFound
 	}
-	// if err == nil {
-	// 	if err = s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr); err != nil {
-	// 		err = errors.Wrapf(err, "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr)
-	// 	}
-	// }
+	if err == nil {
+		if err = s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr); err != nil {
+			err = errors.Wrapf(err, "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr)
+		}
+	}
 
 	return err
 }
@@ -213,20 +214,20 @@ func (s *usersTableSource) insertUser(ctx context.Context, usr *users.User) erro
 
 		return errors.Wrapf(err, "failed to insert user %#v", usr)
 	}
-	// if err := s.doAfterCreate(ctx, usr); err != nil {
-	// 	revertCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
-	// 	defer cancel()
-	// 	revertErr := errors.Wrapf(s.deleteUser(revertCtx, usr), //nolint:contextcheck // It might be cancelled.
-	// 		"failed to delete userID:%v as a rollback for failed doAfterCreate", usr.ID)
-	// 	if revertErr != nil && errors.Is(revertErr, storagev2.ErrNotFound) {
-	// 		revertErr = nil
-	// 	}
+	if err := s.doAfterCreate(ctx, usr); err != nil {
+		revertCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
+		defer cancel()
+		revertErr := errors.Wrapf(s.deleteUser(revertCtx, usr), //nolint:contextcheck // It might be cancelled.
+			"failed to delete userID:%v as a rollback for failed doAfterCreate", usr.ID)
+		if revertErr != nil && errors.Is(revertErr, storagev2.ErrNotFound) {
+			revertErr = nil
+		}
 
-	// 	return multierror.Append( //nolint:wrapcheck // Not needed.
-	// 		errors.Wrapf(err, "failed to run doAfterCreate for:%#v", usr),
-	// 		revertErr,
-	// 	).ErrorOrNil()
-	// }
+		return multierror.Append( //nolint:wrapcheck // Not needed.
+			errors.Wrapf(err, "failed to run doAfterCreate for:%#v", usr),
+			revertErr,
+		).ErrorOrNil()
+	}
 
 	return nil
 }
