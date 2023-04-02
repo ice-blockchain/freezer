@@ -242,16 +242,15 @@ type (
 		UserID                                                        users.UserID
 		T0, T1, T2, ExtraBonus, PreStakingAllocation, PreStakingBonus uint64
 	}
-	//nolint:govet // If we change the order it will mess up something unexpected. Will fix later.
 	balance struct {
 		UpdatedAt   *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		Amount      *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`
 		UserID      string         `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		TypeDetail  string         `json:"typeDetail,omitempty" example:"/2022-01-03"`
-		Type        balanceType    `json:"type,omitempty" example:"1"`
-		Negative    bool           `json:"negative,omitempty" example:"false"`
 		HashCode    int64          `json:"hashCode,omitempty" example:"11"`
 		WorkerIndex int16          `json:"workerIndex,omitempty" example:"11"`
+		Type        balanceType    `json:"type,omitempty" example:"1"`
+		Negative    bool           `json:"negative,omitempty" example:"false"`
 	}
 	miningSummary struct {
 		LastNaturalMiningStartedAt                    *time.Time     `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`

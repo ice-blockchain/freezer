@@ -24,8 +24,8 @@ func (r *repository) GetBalanceSummary( //nolint:funlen // Better to be grouped 
 ) (*BalanceSummary, error) {
 	sql := fmt.Sprintf(`
 SELECT b.*,
-	   x.pre_staking_allocation,
-	   st_b.bonus AS pre_staking_bonus,
+	   coalesce(x.pre_staking_allocation,0) AS pre_staking_allocation,
+	   coalesce(st_b.bonus,0) AS pre_staking_bonus,
        (bal_worker.last_iteration_finished_at IS NOT NULL AND bal_worker.last_mining_ended_at IS NOT NULL) AS balance_worker_started
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,

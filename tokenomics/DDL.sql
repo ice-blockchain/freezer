@@ -276,10 +276,10 @@ create table if not exists balances_worker
     amount        text not null default '0',
     user_id       text not null references users(user_id) on delete cascade,
     type_detail   text not null default '',
-    type          smallint not null check (type >= 0),
-    negative      boolean not null default false,
     hash_code     bigint not null,
     worker_index  smallint not null check (worker_index >= 0),
+    type          smallint not null check (type >= 0),
+    negative      boolean not null default false,
     primary key (worker_index, user_id, negative, type, type_detail)
 ) partition by list (worker_index);
 ----
