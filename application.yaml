@@ -130,11 +130,18 @@ tokenomics: &tokenomics
     duration: 60s
     consecutiveDurationsRequired: 7
     activeUserMilestones:
-      - 2
-      - 4
-      - 6
-      - 8
-      - 10
+      - users: 0
+        baseMiningRate: 320000000000
+      - users: 2
+        baseMiningRate: 160000000000
+      - users: 4
+        baseMiningRate: 80000000000
+      - users: 6
+        baseMiningRate: 40000000000
+      - users: 8
+        baseMiningRate: 20000000000
+      - users: 10
+        baseMiningRate: 10000000000
   extraBonuses:
     duration: 24m
     utcOffsetDuration: 6s
