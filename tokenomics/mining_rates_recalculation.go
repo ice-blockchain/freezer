@@ -241,7 +241,7 @@ func (r *repository) calculateICEFlakeMiningRates(
 	baseMiningRate *coin.ICEFlake, row *latestMiningRateCalculationSQLRow, negativeMiningRate *coin.ICEFlake,
 ) (miningRates *MiningRates[coin.ICEFlake]) {
 	miningRates = new(MiningRates[coin.ICEFlake])
-
+	miningRates.UserID = row.UserID
 	if !negativeMiningRate.IsNil() {
 		miningRates.Type = NegativeMiningRateType
 		if row.PreStakingAllocation != percentage100 {
