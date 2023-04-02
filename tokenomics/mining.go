@@ -90,14 +90,8 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 						FROM users u
 							JOIN balances b
 								ON u.user_id = b.user_id
-						WHERE (
-								( u.username IS NOT NULL AND u.username LIKE $1 ESCAPE '\' )
-								OR
-								( u.first_name IS NOT NULL AND u.first_name != '' AND u.first_name ILIKE $1 ESCAPE '\' )
-								OR
-								( u.last_name IS NOT NULL AND u.last_name != '' AND u.last_name ILIKE $1 ESCAPE '\' )
-							  )
-							  AND u.hide_ranking = FALSE
+						WHERE u.lookup LIKE $1 ESCAPE '\'
+						  AND u.hide_ranking = FALSE
 						ORDER BY b.amount_w3 DESC,
 								 b.amount_w2 DESC,
 								 b.amount_w1 DESC,

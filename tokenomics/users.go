@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
@@ -117,7 +118,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 				T1:     res.TotalReverseT0Amount,
 				UserID: res.T0UserID,
 			},
-			EventID: fmt.Sprintf("t1_referral_account_deletion_positive_balance_%v", usr.ID),
+			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
 		})
 	}
 	if !res.NegativeReverseT0Amount.IsZero() {
@@ -127,7 +128,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 				T1:     res.NegativeReverseT0Amount,
 				UserID: res.T0UserID,
 			},
-			EventID:  fmt.Sprintf("t1_referral_account_deletion_negative_balance_%v", usr.ID),
+			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
 			Negative: &negative,
 		})
 	}
@@ -137,7 +138,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 				T2:     res.TotalReverseTMinus1Amount,
 				UserID: res.TMinus1UserID,
 			},
-			EventID: fmt.Sprintf("t2_referral_account_deletion_positive_balance_%v", usr.ID),
+			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
 		})
 	}
 	if !res.NegativeReverseTMinus1Amount.IsZero() {
@@ -147,7 +148,7 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 				T2:     res.NegativeReverseTMinus1Amount,
 				UserID: res.TMinus1UserID,
 			},
-			EventID:  fmt.Sprintf("t2_referral_account_deletion_negative_balance_%v", usr.ID),
+			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
 			Negative: &negative,
 		})
 	}
@@ -159,8 +160,8 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := `INSERT INTO users (created_at, updated_at, user_id, referred_by, username, first_name, last_name, profile_picture_name, mining_blockchain_account_address, blockchain_account_address, hash_code  , hide_ranking, verified)
-					   VALUES ($1		 , $2		 , $3	  , $4		   , $5	     , $6		 , $7	    , $8			      , $9								 , $10					     , $11::bigint, $12			, $13)
+	sql := `INSERT INTO users (created_at, updated_at, user_id, referred_by, username, first_name, last_name, lookup, profile_picture_name, mining_blockchain_account_address, blockchain_account_address, hash_code  , hide_ranking, verified)
+					   VALUES ($1		 , $2		 , $3	  , $4		   , $5	     , $6		 , $7	    , $8    , $9			      , $10								 , $11					     , $12::bigint, $13			, $14)
 		    ON CONFLICT (user_id)
 		    	DO UPDATE
 		    		  SET updated_at 						= EXCLUDED.updated_at,
@@ -168,6 +169,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		    		  	  username 							= EXCLUDED.username,
 		    		  	  first_name 						= EXCLUDED.first_name,
 		    		  	  last_name 						= EXCLUDED.last_name,
+		    		  	  lookup 						    = EXCLUDED.lookup,
 		    		  	  profile_picture_name 				= EXCLUDED.profile_picture_name,
 		    		  	  mining_blockchain_account_address = EXCLUDED.mining_blockchain_account_address,
 		    		  	  blockchain_account_address 		= EXCLUDED.blockchain_account_address,
@@ -176,6 +178,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			  		   OR coalesce(users.username,'') 							!= coalesce(EXCLUDED.username,'')
 			  		   OR coalesce(users.first_name,'') 						!= coalesce(EXCLUDED.first_name,'')
 			  		   OR coalesce(users.last_name,'') 							!= coalesce(EXCLUDED.last_name,'')
+			  		   OR coalesce(users.lookup,'') 							!= coalesce(EXCLUDED.lookup,'')
 			  		   OR coalesce(users.profile_picture_name,'') 				!= coalesce(EXCLUDED.profile_picture_name,'')
 			  		   OR coalesce(users.mining_blockchain_account_address,'') 	!= coalesce(EXCLUDED.mining_blockchain_account_address,'')
 			  		   OR coalesce(users.blockchain_account_address,'') 		!= coalesce(EXCLUDED.blockchain_account_address,'')
@@ -193,6 +196,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		usr.Username,
 		usr.FirstName,
 		usr.LastName,
+		strings.ToLower(fmt.Sprintf("%v%v%v", usr.Username, usr.FirstName, usr.LastName)),
 		s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
 		usr.MiningBlockchainAccountAddress,
 		usr.BlockchainAccountAddress,
@@ -203,13 +207,14 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		return errors.Wrapf(err, "failed to replace user:%#v", usr)
 	}
 
-	return multierror.Append(
+	return multierror.Append( //nolint:wrapcheck // Not needed.
 		errors.Wrapf(s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr), "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr), //nolint:lll // .
 		errors.Wrapf(s.initializeBalanceRecalculationWorker(ctx, usr), "failed to initializeBalanceRecalculationWorker for %#v", usr),
 		errors.Wrapf(s.initializeMiningRatesRecalculationWorker(ctx, usr), "failed to initializeMiningRatesRecalculationWorker for %#v", usr),
 		errors.Wrapf(s.initializeBlockchainBalanceSynchronizationWorker(ctx, usr), "failed to initializeBlockchainBalanceSynchronizationWorker for %#v", usr),
 		errors.Wrapf(s.initializeExtraBonusProcessingWorker(ctx, usr), "failed to initializeExtraBonusProcessingWorker for %#v", usr),
-		errors.Wrapf(s.awardRegistrationICECoinsBonus(ctx, usr), "failed to awardRegistrationICECoinsBonus for %#v", usr))
+		errors.Wrapf(s.awardRegistrationICECoinsBonus(ctx, usr), "failed to awardRegistrationICECoinsBonus for %#v", usr),
+	).ErrorOrNil()
 }
 
 func (*usersTableSource) hideRanking(usr *users.User) (hideRanking bool) {
@@ -235,7 +240,7 @@ func (s *usersTableSource) awardRegistrationICECoinsBonus(ctx context.Context, u
 			Total:  coin.NewAmountUint64(registrationICEFlakeBonusAmount),
 			UserID: usr.ID,
 		},
-		EventID: "registration_ice_bonus",
+		EventID: registrationICEBonusEventID,
 	}
 
 	return errors.Wrapf(s.sendAddBalanceCommandMessage(ctx, cmd), "failed to sendAddBalanceCommandMessage for %#v", cmd)

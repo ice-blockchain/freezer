@@ -184,7 +184,7 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := `DELETE FROM processed_mining_sessions WHERE session_number < :session_number`
+	sql := `DELETE FROM processed_mining_sessions WHERE session_number < $1`
 	if _, err := storage.Exec(ctx, p.db, sql, p.sessionNumber(time.New(time.Now().Add(-24*stdlibtime.Hour)))); err != nil {
 		return errors.Wrap(err, "failed to delete old data from processed_mining_sessions")
 	}

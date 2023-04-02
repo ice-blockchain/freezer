@@ -9,7 +9,6 @@ import (
 	"strings"
 	stdlibtime "time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 
@@ -23,46 +22,39 @@ import (
 func (r *repository) GetBalanceSummary( //nolint:funlen,gocognit // Better to be grouped together.
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	sql := fmt.Sprintf(`
 SELECT b.*,
 	   x.pre_staking_allocation,
 	   st_b.bonus AS pre_staking_bonus,
-       bal_worker.last_iteration_finished_at IS NOT NULL AND bal_worker.last_mining_ended_at IS NOT NULL
+       (bal_worker.last_iteration_finished_at IS NOT NULL AND bal_worker.last_mining_ended_at IS NOT NULL) AS balance_worker_started
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
 			 u.user_id,
 			 u.referred_by
 	  FROM users u
 		 LEFT JOIN pre_stakings st
-		        ON st.user_id = u.user_id
-				AND st.worker_index = $1
+		  		ON st.worker_index = $1
+		       AND st.user_id = u.user_id
       WHERE u.user_id = $2
 	  GROUP BY u.user_id
 	 ) x
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years
-   JOIN balance_recalculation_worker bal_worker
-		  ON bal_worker.user_id = x.user_id
-		  AND bal_worker.worker_index = $3
+        JOIN balance_recalculation_worker bal_worker
+		  ON bal_worker.worker_index = $1
+		 AND bal_worker.user_id = x.user_id
    LEFT JOIN balances_worker b	
-		  ON b.user_id = x.user_id
+		  ON b.worker_index = $1
+		 AND b.user_id = x.user_id
 		 AND b.negative = FALSE
-		 AND b.type = $4
-		 AND b.type_detail IN ('','%[1]v_' || x.referred_by,'%[2]v','%[3]v')
-		 AND b.worker_index = $5`, r.workerIndex(ctx), t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail) //nolint:lll // .
-	type (
-		B    = balance
-		resp struct {
-			*B
-			PreStakingAllocation, PreStakingBonus uint64
-			BalanceWorkerStarted                  bool
-		}
-	)
-	wIdx := r.workerIndex(ctx)
-	res, err := storage.Select[resp](ctx, r.db, sql, wIdx, userID, wIdx, totalNoPreStakingBonusBalanceType, wIdx)
+		 AND b.type = %[1]v
+		 AND b.type_detail IN ('','%[2]v_' || x.referred_by,'%[3]v','%[4]v')`, totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail) //nolint:lll // .
+	type B = balance
+	res, err := storage.Select[struct {
+		*B
+		PreStakingAllocation, PreStakingBonus uint64
+		BalanceWorkerStarted                  bool
+	}](ctx, r.db, sql, r.workerIndex(ctx), userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select user's balances for user_id:%v", userID)
 	}
@@ -129,26 +121,20 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	mappedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
 	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
 	typeDetails := make([]string, 0, mappedLimit*2) //nolint:gomnd // Cuz we account for tz diff.
-	args := make([]any, 0)
-	args = append(args, userID, totalNoPreStakingBonusBalanceType)
-	paramsCount := 1 + 1 + 1
 	for ix := stdlibtime.Duration(0); ix < stdlibtime.Duration(cap(typeDetails)); ix++ {
 		date := start.Add((ix + stdlibtime.Duration(mappedOffset-mappedLimit)) * factor * r.cfg.GlobalAggregationInterval.Child)
-		args = append(args, fmt.Sprintf("/%v", date.Format(r.cfg.globalAggregationIntervalChildDateFormat())))
-		typeDetails = append(typeDetails, fmt.Sprintf("$%d", paramsCount))
-		paramsCount++
+		typeDetails = append(typeDetails, fmt.Sprintf("/%v", date.Format(r.cfg.globalAggregationIntervalChildDateFormat())))
 	}
-	args = append(args, r.workerIndex(ctx))
 	sql := fmt.Sprintf(`SELECT *
 						FROM balances_worker
-						WHERE user_id = $1
+						WHERE worker_index = $1 
+						  AND user_id = $2
  					      AND (negative = TRUE OR negative = FALSE)
-						  AND type = $2
-						  AND type_detail in (%[1]v)
-						  AND worker_index = $%[2]v`, strings.Join(typeDetails, ","), paramsCount)
-	res, err := storage.Select[balance](ctx, r.db, sql, args...)
+						  AND type = %[1]v
+						  AND type_detail = ANY($3)`, totalNoPreStakingBonusBalanceType)
+	res, err := storage.Select[balance](ctx, r.db, sql, r.workerIndex(ctx), userID, typeDetails)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to select balance history for params:%#v", args...)
+		return nil, errors.Wrapf(err, "failed to select balance history for userID:%v, typeDetails:%#v", userID, typeDetails)
 	}
 	if len(res) == 0 {
 		return make([]*BalanceHistoryEntry, 0, 0), nil //nolint:gosimple // Nope.
@@ -416,59 +402,58 @@ func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate *coin.ICEFlake)
 	}
 }
 
-func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL params and error handling. Control coupling is ok here.
-	ctx context.Context, workerIndex int16, updatedAt *time.Time, balances ...*balance,
+func (r *repository) replaceBalances(
+	ctx context.Context, db storage.QueryExecer, workerIndex int16, updatedAt *time.Time, balances ...*balance,
 ) error {
-	if ctx.Err() != nil || len(balances) == 0 {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
+	if len(balances) == 0 {
+		return nil
 	}
-	paramCounter := 1
-	args := make([]any, 0)
-	fieldCount := 8
-	values := make([]string, 0, fieldCount*len(balances))
-	for _, bal := range balances {
+	const fieldCount = 6
+	args := append(make([]any, 0, 1+1+(fieldCount*len(balances))), *updatedAt.Time, workerIndex)
+	values := make([]string, 0, len(balances))
+	for ix, bal := range balances {
 		if bal.Amount.IsNil() {
 			bal.Amount = coin.ZeroICEFlakes()
 		}
 		amount, err := bal.Amount.Uint.Marshal()
 		log.Panic(err) //nolint:revive // Intended.
-		var macroses []string
-		for i := 0; i < fieldCount; i++ {
-			macroses = append(macroses, fmt.Sprintf("$%d", paramCounter))
-			paramCounter++
-		}
-		values = append(values, fmt.Sprintf("(%s)", strings.Join(macroses, ",")))
-		args = append(args, updatedAt.Time, string(amount), bal.UserID, bal.TypeDetail, bal.Type, bal.Negative, bal.HashCode, workerIndex)
+		values = append(values, fmt.Sprintf("($1,$%[1]v,$%[2]v,$%[3]v,$%[4]v,$%[5]v,$%[6]v,$2)",
+			fieldCount*ix+3, fieldCount*ix+4, fieldCount*ix+5, fieldCount*ix+6, fieldCount*ix+7, fieldCount*ix+8)) //nolint:gomnd // .
+		args = append(args, string(amount), bal.UserID, bal.TypeDetail, bal.Type, bal.Negative, bal.HashCode)
 	}
-	sql := fmt.Sprintf(`INSERT INTO balances_worker (updated_at,amount,user_id,type_detail,type,negative,hash_code,worker_index)
-							VALUES %v
-						ON CONFLICT (user_id,type_detail,type,negative,worker_index)
+	sql := fmt.Sprintf(`INSERT INTO balances_worker (updated_at,amount,user_id,type_detail,type,negative,hash_code,worker_index) 
+													VALUES %[1]v
+						ON CONFLICT (worker_index, user_id, negative, type, type_detail)
 							DO UPDATE
 								SET updated_at		= EXCLUDED.updated_at,
-								amount         	  	= EXCLUDED.amount
+									amount          = EXCLUDED.amount
 							WHERE COALESCE(balances_worker.amount,'') != coalesce(EXCLUDED.amount,'')`, strings.Join(values, ","))
-	if _, err := storage.Exec(ctx, r.db, sql, args...); err != nil {
-		return errors.Wrapf(err, "failed insert/update at %v balances:%#v for workerIndex:%v", updatedAt, balances, workerIndex)
+	if db == nil {
+		db = r.db
 	}
+	_, err := storage.Exec(ctx, db, sql, args...)
 
-	return nil
+	return errors.Wrapf(err, "failed at %v to replacesBalances for workerIndex:%v, balances:%#v", updatedAt, workerIndex, balances)
 }
 
 func (r *repository) deleteBalances(ctx context.Context, workerIndex int16, balances ...*balance) error {
 	if ctx.Err() != nil || len(balances) == 0 {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
+	const fieldCount = 4
 	values := make([]string, 0, len(balances))
-	for _, bal := range balances {
-		values = append(values, fmt.Sprintf(`(user_id = '%[1]v' AND negative = %[2]v AND type = %[3]v AND type_detail = '%[4]v')`,
-			bal.UserID, bal.Negative, bal.Type, bal.TypeDetail))
+	args := append(make([]any, 0, fieldCount*len(balances)), workerIndex)
+	for ix, bal := range balances {
+		values = append(values, fmt.Sprintf(`(user_id = $%[1]v AND negative = $%[2]v AND type = $%[3]v AND type_detail = $%[4]v)`,
+			fieldCount*ix+2, fieldCount*ix+3, fieldCount*ix+4, fieldCount*ix+5)) //nolint:gomnd // .
+		args = append(args, bal.UserID, bal.Negative, bal.Type, bal.TypeDetail)
 	}
-	sql := fmt.Sprintf(`DELETE FROM balances WHERE %v`, strings.Join(values, " OR "))
-	if _, err := storage.Exec(ctx, r.db, sql); err != nil {
-		return errors.Wrapf(err, "failed to DELETE from balances for values:%#v", values)
-	}
+	sql := fmt.Sprintf(`DELETE FROM balances 
+					    WHERE worker_index = $1
+					      AND (%v)`, strings.Join(values, " OR "))
+	_, err := storage.Exec(ctx, r.db, sql, args...)
 
-	return nil
+	return errors.Wrapf(err, "failed to DELETE from balances for args:%#v", args)
 }
 
 func (r *repository) sendAddBalanceCommandMessage(ctx context.Context, cmd *AddBalanceCommand) error {
@@ -489,65 +474,35 @@ func (r *repository) sendAddBalanceCommandMessage(ctx context.Context, cmd *AddB
 	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
 }
 
-func (s *addBalanceCommandsSource) Process(ctx context.Context, message *messagebroker.Message) error { //nolint:funlen // .
-	if ctx.Err() != nil {
+func (s *addBalanceCommandsSource) Process(ctx context.Context, message *messagebroker.Message) error {
+	if ctx.Err() != nil || len(message.Value) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
-	if len(message.Value) == 0 {
-		return nil
-	}
 	var val AddBalanceCommand
-	if err := json.UnmarshalContext(ctx, message.Value, &val); err != nil {
+	if err := json.UnmarshalContext(ctx, message.Value, &val); err != nil || val.UserID == "" {
 		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(message.Value), &val)
-	}
-	if val.UserID == "" {
-		return nil
 	}
 	bal, err := s.balance(ctx, &val)
 	if err != nil {
-		return errors.Wrapf(err, "failed to build balance from %#v", val)
+		return errors.Wrapf(err, "failed to build balance from %#v", &val)
 	}
-	type processedAddBalanceCommand struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		UserID   string
-		Key      string
-	}
-	sql := `INSERT INTO processed_add_balance_commands(user_id, key) VALUES($1, $2)
-						ON CONFLICT (user_id, key) DO NOTHING`
-	if _, err = storage.Exec(ctx, s.db, sql, val.UserID, val.EventID); err != nil {
-		return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMANDS for userID:%v, key: %v)", val.UserID, val.EventID)
-	}
-	var (
-		workerIndex int16
-		hashCode    int64
-	)
 	if err = retry(ctx, func() error {
-		workerIndex, hashCode, err = s.getWorker(ctx, val.UserID)
+		bal.WorkerIndex, bal.HashCode, err = s.getWorker(ctx, val.UserID)
 
 		return errors.Wrapf(err, "failed to getWorker for userID:%v", val.UserID)
 	}); err != nil {
 		return errors.Wrapf(err, "permanently failed to getWorker for userID:%v", val.UserID)
 	}
-	bal.HashCode, bal.WorkerIndex = hashCode, workerIndex
-	err = errors.Wrapf(retry(ctx, func() error {
-		if err = s.insertOrReplaceBalances(ctx, workerIndex, time.New(message.Timestamp), bal); err != nil {
-			if errors.Is(err, storage.ErrRelationNotFound) {
-				return err
-			}
 
-			return errors.Wrapf(backoff.Permanent(err), "failed to insertBalance:%#v", bal)
+	return errors.Wrapf(storage.DoInTransaction(ctx, s.db, func(conn storage.QueryExecer) error {
+		sql := `INSERT INTO processed_add_balance_commands(user_id, key) VALUES($1, $2)`
+		if _, err = storage.Exec(ctx, conn, sql, val.UserID, val.EventID); err != nil {
+			return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMANDS for userID:%v, key: %v", val.UserID, val.EventID)
 		}
 
-		return nil
-	}), "permanently failed to insertBalance:%#v", bal)
-	if err != nil {
-		sql := `DELETE FROM processed_add_balance_commands WHERE user_id = $1 AND key = $2`
-		if _, err := storage.Exec(ctx, s.db, sql, val.UserID, val.EventID); err != nil {
-			return errors.Wrapf(err, "failed to delete PROCESSED_ADD_BALANCE_COMMANDS(%v,%v)", val.UserID, val.EventID)
-		}
-	}
-
-	return err
+		return errors.Wrapf(s.replaceBalances(ctx, conn, bal.WorkerIndex, time.New(message.Timestamp), bal),
+			"failed to replace balance for: %#v", bal)
+	}), "addBalanceCommands transaction failed")
 }
 
 func (s *addBalanceCommandsSource) balance(ctx context.Context, cmd *AddBalanceCommand) (*balance, error) {
@@ -555,19 +510,20 @@ func (s *addBalanceCommandsSource) balance(ctx context.Context, cmd *AddBalanceC
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	bal := &balance{
-		UserID: cmd.UserID,
-		Type:   pendingXBalanceType,
+		UserID:     cmd.UserID,
+		Type:       pendingXBalanceType,
+		TypeDetail: fmt.Sprintf("%v_%v", rootBalanceTypeDetail, cmd.EventID),
 	}
 	if cmd.Negative != nil && *cmd.Negative {
 		bal.Negative = *cmd.Negative
 	}
 	if !cmd.T1.IsNil() {
 		bal.Amount = cmd.T1
-		bal.TypeDetail = t1BalanceTypeDetail
+		bal.TypeDetail = fmt.Sprintf("%v_%v", t1BalanceTypeDetail, cmd.EventID)
 	}
 	if !cmd.T2.IsNil() {
 		bal.Amount = cmd.T2
-		bal.TypeDetail = t2BalanceTypeDetail
+		bal.TypeDetail = fmt.Sprintf("%v_%v", t2BalanceTypeDetail, cmd.EventID)
 	}
 	if !cmd.Total.IsNil() {
 		bal.Amount = cmd.Total

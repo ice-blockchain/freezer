@@ -22,21 +22,19 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
-	err := retry(ctx, func() error {
+
+	return errors.Wrapf(retry(ctx, func() error {
 		if err := r.initializeWorker(ctx, "extra_bonus_processing_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
 
 			return errors.Wrapf(backoff.Permanent(err),
-				"failed to initializeExtraBonusProcessingWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+				"failed to initializeExtraBonusProcessingWorker for userID:%v", usr.ID)
 		}
 
 		return nil
-	})
-
-	return errors.Wrapf(err, "permanently failed to initializeExtraBonusProcessingWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+	}), "permanently failed to initializeExtraBonusProcessingWorker for userID:%v", usr.ID)
 }
 
 func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {

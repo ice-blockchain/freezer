@@ -81,6 +81,7 @@ create table if not exists users
     profile_picture_name                                    text,
     mining_blockchain_account_address                       text,
     blockchain_account_address                              text,
+    lookup                                                  text,
     hash_code                                               bigint not null,
     hide_ranking                                            boolean not null default false,
     verified                                                boolean not null default false
@@ -88,7 +89,7 @@ create table if not exists users
 ----
 create index if not exists users_referred_by_idx ON users (referred_by);
 ----
-create index if not exists top_miners_lookup_idx ON users (username,first_name,last_name);
+create index if not exists top_miners_lookup_idx ON users (lookup);
 ----
 --************************************************************************************************************************************
 -- balances
@@ -102,7 +103,7 @@ create table if not exists balances
     user_id    text not null primary key references users(user_id) on delete cascade
 );
 ----
-create index if not exists balances_amount_words_ix ON balances (amount_w3, amount_w2, amount_w1, amount_w0);
+create index if not exists balances_amount_words_ix ON balances (amount_w3 DESC, amount_w2 DESC, amount_w1 DESC, amount_w0 DESC);
 ----
 --************************************************************************************************************************************
 -- processed_add_balance_commands

@@ -25,7 +25,8 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	err := retry(ctx, func() error {
+
+	return errors.Wrapf(retry(ctx, func() error {
 		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
@@ -35,9 +36,7 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 		}
 
 		return nil
-	})
-
-	return errors.Wrapf(err, "permanently failed to initializeBalanceRecalculationWorker for userID:%v", usr.ID)
+	}), "permanently failed to initializeBalanceRecalculationWorker for userID:%v", usr.ID)
 }
 
 func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
@@ -171,11 +170,8 @@ FROM ( SELECT user_id
 			fmt.Sprintf("/%v", now.Add(s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())),
 		})
 	resp, err := storage.Select[balanceRecalculationRow](ctx, s.db, sql, args...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,now:%#v", workerIndex, now)
-	}
 
-	return resp, nil
+	return resp, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,now:%#v", workerIndex, now)
 }
 
 func (s *balanceRecalculationTriggerStreamSource) updateBalances(
@@ -191,7 +187,7 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
-	if err := s.insertOrReplaceBalances(ctx, workerIndex, now, balancesForReplace...); err != nil {
+	if err := s.replaceBalances(ctx, nil, workerIndex, now, balancesForReplace...); err != nil {
 		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)
 	}
 	if err := s.deleteBalances(ctx, workerIndex, balancesForDelete...); err != nil {
@@ -258,7 +254,7 @@ func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 				} else {
 					existing.add(row.B.Amount)
 				}
-			case row.B.TypeDetail == "":
+			case strings.HasPrefix(row.B.TypeDetail, rootBalanceTypeDetail):
 				if _, found := aggregatedPendingTotalBalancesPerUser[userID]; !found {
 					aggregatedPendingTotalBalancesPerUser[userID] = make(map[bool]*balance, 1+1)
 				}

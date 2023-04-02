@@ -24,7 +24,8 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	err := retry(ctx, func() error {
+
+	return errors.Wrapf(retry(ctx, func() error {
 		if err := r.initializeWorker(ctx, "blockchain_balance_synchronization_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
@@ -35,9 +36,7 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 		}
 
 		return nil
-	})
-
-	return errors.Wrapf(err, "permanently failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v", usr.ID)
+	}), "permanently failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v", usr.ID)
 }
 
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.Context) {
@@ -173,10 +172,10 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		 AND b.user_id = not_started_yet_bal_worker.user_id
 	     AND b.negative = FALSE
 	     AND b.type = %[2]v
-	     AND b.type_detail = ''`, totalNoPreStakingBonusBalanceType, pendingXBalanceType)
+	     AND b.type_detail = '%[3]v_%[4]v'`, totalNoPreStakingBonusBalanceType, pendingXBalanceType, rootBalanceTypeDetail, registrationICEBonusEventID)
 	var (
 		now         = *time.Now().Time
-		limit       = maxICEBlockchainConcurrentOperations / s.cfg.WorkerCount
+		limit       = maxICEBlockchainConcurrentOperations / int(s.cfg.WorkerCount)
 		typeDetails = make([]string, 0, 1+1)
 	)
 	for i := stdlibtime.Duration(0); i <= 1; i++ {
@@ -185,12 +184,9 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	}
 	args := append(make([]any, 0, 1+1+1), workerIndex, limit, typeDetails)
 	res, err := storage.Select[latestBalanceSQLRow](ctx, s.db, sql, args...)
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"failed to select a batch of latest information about latest calculating balances for workerIndex:%v,typeDetails:%#v", workerIndex, typeDetails)
-	}
 
-	return res, nil
+	return res, errors.Wrapf(err,
+		"failed to select a batch of latest information about latest calculating balances for workerIndex:%v,typeDetails:%#v", workerIndex, typeDetails)
 }
 
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //nolint:funlen // Mostly mappings.
