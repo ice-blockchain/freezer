@@ -23,7 +23,14 @@ func (r *repository) GetBalanceSummary( //nolint:funlen // Better to be grouped 
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {
 	sql := fmt.Sprintf(`
-SELECT b.*,
+SELECT  b.updated_at,
+    	b.amount,
+    	coalesce(b.user_id,'') AS user_id,
+    	coalesce(b.type_detail,'') AS type_detail,
+    	coalesce(b.hash_code,0) AS hash_code,
+    	coalesce(b.worker_index,0) AS worker_index ,
+    	coalesce(b.type,0) AS type,
+    	coalesce(b.negative,false) AS negative,
 	   coalesce(x.pre_staking_allocation,0) AS pre_staking_allocation,
 	   coalesce(st_b.bonus,0) AS pre_staking_bonus,
        (bal_worker.last_iteration_finished_at IS NOT NULL AND bal_worker.last_mining_ended_at IS NOT NULL) AS balance_worker_started
