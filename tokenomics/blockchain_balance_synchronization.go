@@ -15,8 +15,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -25,21 +24,20 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "blockchain_balance_synchronization_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "blockchain_balance_synchronization_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
 
 			return errors.Wrapf(backoff.Permanent(err),
-				"failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+				"failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v", usr.ID)
 		}
 
 		return nil
 	})
 
-	return errors.Wrapf(err, "permanently failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+	return errors.Wrapf(err, "permanently failed to initializeBlockchainBalanceSynchronizationWorker for userID:%v", usr.ID)
 }
 
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.Context) {
@@ -186,7 +184,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		typeDetails = append(typeDetails, fmt.Sprintf("@%v", dateFormat))
 	}
 	args := append(make([]any, 0, 1+1+1), workerIndex, limit, typeDetails)
-	res, err := storagev2.Select[latestBalanceSQLRow](ctx, s.dbV2, sql, args...)
+	res, err := storage.Select[latestBalanceSQLRow](ctx, s.db, sql, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err,
 			"failed to select a batch of latest information about latest calculating balances for workerIndex:%v,typeDetails:%#v", workerIndex, typeDetails)
@@ -242,7 +240,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 									   amount_w2 = EXCLUDED.amount_w2,
 									   amount_w3 = EXCLUDED.amount_w3
 							 WHERE balances.amount != EXCLUDED.amount`, strings.Join(values, ","))
-	if _, err := storagev2.Exec(ctx, s.dbV2, sql, args...); err != nil {
+	if _, err := storage.Exec(ctx, s.db, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed to replace into balances, values:%#v", values)
 	}
 	if len(blockchainMessages) != 0 { //nolint:revive,staticcheck // .

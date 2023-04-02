@@ -16,12 +16,6 @@ import (
 )
 
 func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*RankingSummary, error) { //nolint:funlen // A lot of SQL.
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if true {
-		return &RankingSummary{}, nil
-	}
 	sql := fmt.Sprintf(`
 SELECT count(others.user_id) + 1 AS global_rank
 FROM (SELECT x.amount_w0,
@@ -66,13 +60,12 @@ UNION ALL
 SELECT (CASE WHEN hide_ranking = TRUE THEN 1 ELSE 2 END)
 FROM users 
 WHERE user_id = $1`, registrationICEFlakeBonusAmount)
-
-	resp, err := storagev2.Select[RankingSummary](ctx, r.dbV2, sql, userID)
+	resp, err := storage.Select[RankingSummary](ctx, r.db, sql, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select miner global rank for userID:%v", userID)
 	}
 	if len(resp) == 1 {
-		return nil, storagev2.ErrRelationNotFound
+		return nil, storage.ErrRelationNotFound
 	}
 	if resp[1].GlobalRank == 1 && userID != requestingUserID(ctx) {
 		return nil, ErrGlobalRankHidden
@@ -82,12 +75,6 @@ WHERE user_id = $1`, registrationICEFlakeBonusAmount)
 }
 
 func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if true {
-		return make([]*Miner, 0), nil
-	}
 	if keyword == "" {
 		return r.getTopMiners(ctx, limit, offset)
 	} else { //nolint:revive // Nope.
@@ -96,9 +83,6 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 }
 
 func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	sql := fmt.Sprintf(`SELECT b.amount as balance,
 							   u.user_id,
 							   u.username,
@@ -109,9 +93,9 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 						WHERE (
 								( u.username IS NOT NULL AND u.username LIKE $1 ESCAPE '\' )
 								OR
-								( u.first_name IS NOT NULL AND u.first_name != '' AND LOWER(u.first_name) LIKE $1 ESCAPE '\' )
+								( u.first_name IS NOT NULL AND u.first_name != '' AND u.first_name ILIKE $1 ESCAPE '\' )
 								OR
-								( u.last_name IS NOT NULL AND u.last_name != '' AND LOWER(u.last_name) LIKE $1 ESCAPE '\' )
+								( u.last_name IS NOT NULL AND u.last_name != '' AND u.last_name ILIKE $1 ESCAPE '\' )
 							  )
 							  AND u.hide_ranking = FALSE
 						ORDER BY b.amount_w3 DESC,
@@ -120,36 +104,28 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 								 b.amount_w0 DESC
 						LIMIT $2 OFFSET $3`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
 	keyword = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
-	resp, err := storagev2.Select[Miner](ctx, r.dbV2, sql, keyword, limit, offset)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keyword, offset, offset+limit)
-	}
-	return resp, err
+	resp, err := storage.Select[Miner](ctx, r.db, sql, keyword, limit, offset)
+
+	return resp, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keyword, offset, offset+limit)
 }
 
-func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]*Miner, error) { //nolint:revive // .
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
+func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]*Miner, error) {
 	sql := fmt.Sprintf(`SELECT b.amount as balance,
 							   u.user_id,
 							   u.username,
 							   %[1]v AS profile_picture_url
-							FROM balances b
-								JOIN users u
-								    ON u.user_id = b.user_id
-									AND u.hide_ranking = FALSE
-							ORDER BY b.amount_w3 DESC,
-									 b.amount_w2 DESC,
-									 b.amount_w1 DESC,
-									 b.amount_w0 DESC
-              				LIMIT $1 OFFSET $2`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	resp, err := storagev2.Select[Miner](ctx, r.dbV2, sql, limit, offset)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
-	}
+						FROM balances b
+							JOIN users u
+								ON u.user_id = b.user_id
+								AND u.hide_ranking = FALSE
+						ORDER BY b.amount_w3 DESC,
+								 b.amount_w2 DESC,
+								 b.amount_w1 DESC,
+								 b.amount_w0 DESC
+						LIMIT $1 OFFSET $2`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
+	resp, err := storage.Select[Miner](ctx, r.db, sql, limit, offset)
 
-	return resp, nil
+	return resp, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
 }
 
 //nolint:funlen,lll // .

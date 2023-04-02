@@ -15,7 +15,7 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -25,10 +25,10 @@ func (r *repository) GetAdoptionSummary(ctx context.Context) (as *AdoptionSummar
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
 	key := r.totalActiveUsersGlobalParentKey(time.Now().Time)
-	if as.TotalActiveUsers, err = r.getGlobalUnsignedValue(ctx, key); err != nil && !errors.Is(err, storagev2.ErrNotFound) {
+	if as.TotalActiveUsers, err = r.getGlobalUnsignedValue(ctx, key); err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, errors.Wrapf(err, "failed to get totalActiveUsers getGlobalUnsignedValue for key:%v", key)
 	}
-	if as.Milestones, err = getAllAdoptions[coin.ICE](ctx, r.dbV2); err != nil {
+	if as.Milestones, err = getAllAdoptions[coin.ICE](ctx, r.db); err != nil {
 		return nil, errors.Wrapf(err, "failed to get all adoption milestones")
 	}
 
@@ -55,7 +55,7 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 		return nil
 	}
 	if err = r.switchToNextAdoption(ctx, nextAdoption); err != nil {
-		if errors.Is(err, storagev2.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return nil // This is a concurrency check. Multiple goroutines will try to update it, but only the 1st will succeed.
 		}
 
@@ -80,7 +80,7 @@ func (r *repository) notifyAdoptionChange(ctx context.Context, nextAdoption *Ado
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
 	adoption, err := r.getAdoption(ctx, nextAdoption.Milestone-1)
-	if err != nil && !errors.Is(err, storagev2.ErrNotFound) {
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return errors.Wrapf(err, "failed to get adoption for milestone:%v", nextAdoption.Milestone-1)
 	}
 	snapshot := &AdoptionSnapshot{Adoption: nextAdoption, Before: adoption}
@@ -95,18 +95,18 @@ func (r *repository) getAdoption(ctx context.Context, milestone uint64) (*Adopti
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
-	resp, err := storagev2.Get[Adoption[coin.ICEFlake]](ctx, r.dbV2, `SELECT * FROM adoption WHERE milestone = $1`, milestone)
+	resp, err := storage.Get[Adoption[coin.ICEFlake]](ctx, r.db, `SELECT * FROM adoption WHERE milestone = $1`, milestone)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get the adoption by milestone:%v", milestone)
 	}
 	if resp.Milestone == 0 {
-		return nil, storagev2.ErrNotFound
+		return nil, storage.ErrNotFound
 	}
 
 	return resp, nil
 }
 
-func getAllAdoptions[DENOM coin.ICEFlake | coin.ICE](ctx context.Context, dbV2 *storagev2.DB) ([]*Adoption[DENOM], error) {
+func getAllAdoptions[DENOM coin.ICEFlake | coin.ICE](ctx context.Context, db *storage.DB) ([]*Adoption[DENOM], error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
@@ -114,8 +114,8 @@ func getAllAdoptions[DENOM coin.ICEFlake | coin.ICE](ctx context.Context, dbV2 *
 					base_mining_rate,
 					milestone,
 					total_active_users
-		FROM adoption LIMIT $1`
-	resp, err := storagev2.Select[Adoption[DENOM]](ctx, dbV2, sql, lastAdoptionMilestone)
+		FROM adoption`
+	resp, err := storage.Select[Adoption[DENOM]](ctx, db, sql)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to select for all adoptions")
 	}
@@ -127,12 +127,12 @@ func (r *repository) getCurrentAdoption(ctx context.Context) (*Adoption[coin.ICE
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "context failed")
 	}
-	resp, err := storagev2.Select[Adoption[coin.ICEFlake]](ctx, r.dbV2, currentAdoptionSQL())
+	resp, err := storage.Select[Adoption[coin.ICEFlake]](ctx, r.db, currentAdoptionSQL())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to select for the current adoption")
 	}
 	if len(resp) == 0 || resp[0] == nil || resp[0].Milestone == 0 { //nolint:revive // Nope.
-		return nil, storagev2.ErrNotFound // Should never happen.
+		return nil, storage.ErrNotFound // Should never happen.
 	}
 
 	return resp[0], nil
@@ -185,7 +185,7 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFla
 							) x
 							  WHERE x.consecutive_durations = $%[4]v::bigint
 							    AND x.achieved_at IS NULL`, strings.Join(keyParams, ","), currentAdoptionSQL(), paramCounter-1, paramCounter)
-	resp, err := storagev2.Select[Adoption[coin.ICEFlake]](ctx, r.dbV2, sql, args...)
+	resp, err := storage.Select[Adoption[coin.ICEFlake]](ctx, r.db, sql, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to select if the next adoption is achieved")
 	}
@@ -205,7 +205,7 @@ func (r *repository) switchToNextAdoption(ctx context.Context, nextAdoption *Ado
 			SET achieved_at = $1
 			WHERE milestone = $2
 			AND achieved_at IS NULL`
-	if _, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.AchievedAt.Time, nextAdoption.Milestone); err != nil {
+	if _, err := storage.Exec(ctx, r.db, sql, nextAdoption.AchievedAt.Time, nextAdoption.Milestone); err != nil {
 		return errors.Wrapf(err,
 			"failed to update the next adoption to switch to it, achievedAt:%v, milestone: %v", nextAdoption.AchievedAt, nextAdoption.Milestone)
 	}
@@ -222,7 +222,7 @@ func (r *repository) revertSwitchToNextAdoption(ctx context.Context, nextAdoptio
 			SET achieved_at = NULL
 			WHERE milestone = $1
 			AND achieved_at IS NOT NULL AND achieved_at = $2`
-	if _, err := storagev2.Exec(ctx, r.dbV2, sql, nextAdoption.Milestone, nextAdoption.AchievedAt); err != nil {
+	if _, err := storage.Exec(ctx, r.db, sql, nextAdoption.Milestone, nextAdoption.AchievedAt); err != nil {
 		return errors.Wrapf(err, "failed to revert to update the next adoption to switch to it, milestone:%v, achievedAt:%v",
 			nextAdoption.Milestone, nextAdoption.AchievedAt)
 	}

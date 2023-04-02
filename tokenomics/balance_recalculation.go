@@ -16,8 +16,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -26,20 +25,19 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "balance_recalculation_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
 
-			return errors.Wrapf(backoff.Permanent(err), "failed to initializeBalanceRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+			return errors.Wrapf(backoff.Permanent(err), "failed to initializeBalanceRecalculationWorker for userID:%v", usr.ID)
 		}
 
 		return nil
 	})
 
-	return errors.Wrapf(err, "permanently failed to initializeBalanceRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+	return errors.Wrapf(err, "permanently failed to initializeBalanceRecalculationWorker for userID:%v", usr.ID)
 }
 
 func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
@@ -172,7 +170,7 @@ FROM ( SELECT user_id
 			fmt.Sprintf("/%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat())),
 			fmt.Sprintf("/%v", now.Add(s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())),
 		})
-	resp, err := storagev2.Select[balanceRecalculationRow](ctx, s.dbV2, sql, args...)
+	resp, err := storage.Select[balanceRecalculationRow](ctx, s.db, sql, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,now:%#v", workerIndex, now)
 	}
@@ -543,7 +541,7 @@ func (s *balanceRecalculationTriggerStreamSource) stopWorkerForUsers(
 					    SET enabled = FALSE
 					    WHERE worker_index = $1 AND (%v)`, strings.Join(conditions, " OR "))
 
-	if _, err := storagev2.Exec(ctx, s.dbV2, sql, args...); err != nil {
+	if _, err := storage.Exec(ctx, s.db, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed to update balance_recalculation_worker_%v SET enabled = FALSE for conditions:%#v", workerIndex, conditions)
 	}
 

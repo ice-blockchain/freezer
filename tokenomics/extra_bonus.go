@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -42,7 +42,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		now.Add(r.cfg.ExtraBonuses.Duration),
 		now.Add(-r.cfg.ExtraBonuses.ClaimWindow),
 		bonus.AvailableExtraBonus)
-	affectedRows, err := storagev2.Exec(ctx, r.dbV2, sql, args...)
+	affectedRows, err := storage.Exec(ctx, r.db, sql, args...)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update extra_bonus_processing_worker to claim bonus for args:%#v", args)
 	}
@@ -96,11 +96,11 @@ func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time,
 		r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow,
 		r.cfg.WorkerCount,
 		now.Add(-r.cfg.ExtraBonuses.ClaimWindow))
-	res, err := storagev2.Get[struct {
+	res, err := storage.Get[struct {
 		LastMiningStartedAt, LastMiningEndedAt        *time.Time
 		NewsSeen, FlatBonus, BonusPercentageRemaining uint64
 		AlreadyClaimed                                bool
-	}](ctx, r.dbV2, sql, args...)
+	}](ctx, r.db, sql, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select for available extra bonus for userID:%v", userID)
 	}
@@ -171,7 +171,7 @@ func (r *repository) mustPopulateExtraBonusWorker(workerIndex int16, extraBonuse
 	sql := fmt.Sprintf(`INSERT INTO extra_bonuses_worker (worker_index,extra_bonus_index,offset_value) 
 													     VALUES %[1]v
 							   ON CONFLICT (worker_index, extra_bonus_index) DO NOTHING`, strings.Join(values, ","))
-	_, err := storagev2.Exec(context.Background(), r.dbV2, sql, args...)
+	_, err := storage.Exec(context.Background(), r.db, sql, args...)
 	log.Panic(errors.Wrapf(err, "failed to initialize extra_bonuses_%[1]v", workerIndex))
 }
 
@@ -210,7 +210,7 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 					DO UPDATE 
 						  SET utc_offset = EXCLUDED.utc_offset
 					WHERE utc_offset != EXCLUDED.utc_offset`
-	_, err = storagev2.Exec(ctx, s.dbV2, sql, workerIndex, dm.UserID, hashCode, int16(duration/stdlibtime.Minute))
+	_, err = storage.Exec(ctx, s.db, sql, workerIndex, dm.UserID, hashCode, int16(duration/stdlibtime.Minute))
 
 	return errors.Wrapf(err, "failed to update users' timezone for %#v", &dm)
 }
@@ -229,7 +229,7 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 	if vn.UserID == "" {
 		return nil
 	}
-	if _, err = storagev2.Exec(ctx, s.dbV2, `INSERT INTO processed_seen_news (user_id,news_id) VALUES ($1, $2)`, vn.UserID, vn.NewsID); err != nil {
+	if _, err = storage.Exec(ctx, s.db, `INSERT INTO processed_seen_news (user_id,news_id) VALUES ($1, $2)`, vn.UserID, vn.NewsID); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_SEEN_NEWS:%#v", &vn)
 	}
 	var (
@@ -248,7 +248,7 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 			ON CONFLICT (worker_index, user_id) 
 					DO UPDATE 
 						  SET news_seen = news_seen + 1`
-	_, err = storagev2.Exec(ctx, s.dbV2, sql, workerIndex, vn.UserID, hashCode)
+	_, err = storage.Exec(ctx, s.db, sql, workerIndex, vn.UserID, hashCode)
 
 	return errors.Wrapf(err, "failed to update users' newsSeen count for %#v", &vn)
 }

@@ -14,8 +14,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -24,20 +23,18 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
-	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
+
+	return errors.Wrapf(retry(ctx, func() error {
+		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
 
-			return errors.Wrapf(backoff.Permanent(err), "failed to initializeMiningRatesRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+			return errors.Wrapf(backoff.Permanent(err), "failed to initializeMiningRatesRecalculationWorker for userID:%v", usr.ID)
 		}
 
 		return nil
-	})
-
-	return errors.Wrapf(err, "permanently failed to initializeMiningRatesRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+	}), "permanently failed to initializeMiningRatesRecalculationWorker for userID:%v", usr.ID)
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
@@ -215,12 +212,9 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		aggressiveDegradationT1ReferenceBalanceTypeDetail,
 		aggressiveDegradationT2ReferenceBalanceTypeDetail,
 		degradationT0T1T2TotalReferenceBalanceTypeDetail)
-	res, err := storagev2.Select[latestMiningRateCalculationSQLRow](ctx, s.dbV2, sql, workerIndex, miningRatesRecalculationBatchSize, *now.Time)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
-	}
+	res, err := storage.Select[latestMiningRateCalculationSQLRow](ctx, s.db, sql, workerIndex, miningRatesRecalculationBatchSize, *now.Time)
 
-	return res, nil
+	return res, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) sendMiningRatesMessage(ctx context.Context, mnrs *MiningRates[coin.ICEFlake]) error {

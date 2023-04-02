@@ -13,8 +13,7 @@ import (
 
 	"github.com/ice-blockchain/eskimo/users"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -25,7 +24,7 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 	}
 	workerIndex := int16(usr.HashCode % uint64(r.cfg.WorkerCount))
 	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "extra_bonus_processing_worker", usr.ID, usr.HashCode, workerIndex); err != nil {
+		if err := r.initializeWorker(ctx, "extra_bonus_processing_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
@@ -130,11 +129,11 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 		s.cfg.ExtraBonuses.DelayedClaimPenaltyWindow,
 		stdlibtime.Duration(float64(s.cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds())*networkLagDelta),
 		now.Add(-s.cfg.ExtraBonuses.ClaimWindow))
-	resp, err := storagev2.Select[struct {
+	resp, err := storage.Select[struct {
 		LastMiningStartedAt, LastMiningEndedAt                         *time.Time
 		UserID                                                         string
 		NewsSeen, FlatBonus, BonusPercentageRemaining, ExtraBonusIndex uint64
-	}](ctx, s.dbV2, sql, args...)
+	}](ctx, s.db, sql, args...)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "failed to select for availableExtraBonuses for workerIndex:%v", workerIndex)
 	}

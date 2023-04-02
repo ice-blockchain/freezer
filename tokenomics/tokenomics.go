@@ -16,52 +16,39 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func New(ctx context.Context, cancel context.CancelFunc) Repository {
+func New(ctx context.Context, _ context.CancelFunc) Repository {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
-	db := storage.MustConnect(ctx, cancel, getDDL(ddl, &cfg, true), applicationYamlKey)
-	dbV2 := storagev2.MustConnect(ctx, "", applicationYamlKey)
+	db := storage.MustConnect(ctx, "", applicationYamlKey)
 
 	return &repository{
-		cfg: &cfg,
-		shutdown: func() error {
-			return multierror.Append(db.Close(), dbV2.Close())
-		},
+		cfg:           &cfg,
+		shutdown:      db.Close,
 		db:            db,
-		dbV2:          dbV2,
 		pictureClient: picture.New(applicationYamlKey),
 	}
 }
 
-func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { //nolint:funlen // A lot of startup & shutdown ceremony.
+func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
-	var mbConsumer messagebroker.Client
 	prc := &processor{repository: &repository{
-		cfg: &cfg,
-		db: storage.MustConnect(context.Background(), func() { //nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-			if mbConsumer != nil {
-				log.Error(errors.Wrap(mbConsumer.Close(), "failed to close mbConsumer due to db premature cancellation"))
-			}
-			cancel()
-		}, getDDL(ddl, &cfg, true), applicationYamlKey),
-		dbV2:          storagev2.MustConnect(ctx, getDDL(ddlV2, &cfg, false), applicationYamlKey),
+		cfg:           &cfg,
+		db:            storage.MustConnect(ctx, getDDL(ddl, &cfg), applicationYamlKey),
 		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
 	//nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-	mbConsumer = messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
+	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
 		&usersTableSource{processor: prc},
 		&globalTableSource{processor: prc},
 		&miningSessionsTableSource{processor: prc},
@@ -69,7 +56,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 		&viewedNewsSource{processor: prc},
 		&deviceMetadataTableSource{processor: prc},
 	)
-	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db, prc.dbV2)
+	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
 	prc.initializeExtraBonusWorkers()
 	prc.mustNotifyCurrentAdoption(ctx)
@@ -79,40 +66,39 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	return prc
 }
 
-func getDDL(ddl string, cfg *config, v1 bool) string { //nolint:revive // We need it cuz of different types.
+func getDDL(ddl string, cfg *config) string { //nolint:revive // We need it cuz of different types.
 	extraBonusesValues := make([]string, 0, len(cfg.ExtraBonuses.FlatValues))
 	for ix, value := range cfg.ExtraBonuses.FlatValues {
 		extraBonusesValues = append(extraBonusesValues, fmt.Sprintf("(%v,%v)", ix, value))
 	}
 	now := time.Now()
-	adoptionStart := now.Add(-24 * stdlibtime.Hour)
-	dailyBonusStart := now.Add(-1 * users.NanosSinceMidnight(now)).UnixNano()
-	args := make([]any, 0, len(cfg.AdoptionMilestoneSwitch.ActiveUserMilestones)+1+1+1+1)
-	if v1 {
-		args = append(args, adoptionStart.UnixNano())
-	} else {
-		args = append(args, adoptionStart.UTC().Format("2006-01-02 15:04:05"))
-	}
-	args = append(args, cfg.WorkerCount-1, strings.Join(extraBonusesValues, ","), dailyBonusStart)
-	for ix := range cfg.AdoptionMilestoneSwitch.ActiveUserMilestones {
-		args = append(args, cfg.AdoptionMilestoneSwitch.ActiveUserMilestones[ix])
+	adoptionValues := make([]string, 0, len(cfg.AdoptionMilestoneSwitch.ActiveUserMilestones))
+	for ix, milestone := range cfg.AdoptionMilestoneSwitch.ActiveUserMilestones {
+		achievedAtDate := "null"
+		if ix == 0 {
+			achievedAtDate = fmt.Sprintf("'%v'", now.Add(-24*stdlibtime.Hour).UTC().Format("2006-01-02 15:04:05"))
+		}
+		adoptionValues = append(adoptionValues, fmt.Sprintf("(%v,%v,'%v',%v)", ix+1, milestone.Users, milestone.BaseMiningRate, achievedAtDate))
 	}
 
-	return fmt.Sprintf(ddl, args...)
+	return fmt.Sprintf(ddl,
+		cfg.WorkerCount-1,
+		strings.Join(extraBonusesValues, ","),
+		now.Add(-1*users.NanosSinceMidnight(now)).UnixNano(),
+		strings.Join(adoptionValues, ","))
 }
 
 func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, dbV2 *storagev2.DB, otherClosers ...func() error) func() error {
+func closeAll(mbConsumer, mbProducer messagebroker.Client, db *storage.DB, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
-		err3 := errors.Wrap(dbV2.Close(), "closing dbV2 connection failed")
-		err4 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
-		errs := make([]error, 0, 1+1+1+1+len(otherClosers))
-		errs = append(errs, err1, err2, err3, err4)
+		err3 := errors.Wrap(mbProducer.Close(), "closing message broker producer connection failed")
+		errs := make([]error, 0, 1+1+1+len(otherClosers))
+		errs = append(errs, err1, err2, err3)
 		for _, closeOther := range otherClosers {
 			if err := closeOther(); err != nil {
 				errs = append(errs, err)
@@ -141,7 +127,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	log.Info("trying to start streams")
 	const key = "streams-processing-exclusive-lock"
 	tuple := &users.GlobalUnsigned{Key: key, Value: uint64(time.Now().UnixNano())}
-	if err := storage.CheckNoSQLDMLErr(p.db.InsertTyped("GLOBAL", tuple, &[]*users.GlobalUnsigned{})); err != nil {
+	if err := p.insertGlobalUnsignedValue(ctx, tuple, false); err != nil {
 		log.Error(errors.Wrapf(err, "failed to start streams, because failed to insert into global: %#v", tuple))
 		const waitDuration = 5 * stdlibtime.Second
 		stdlibtime.Sleep(waitDuration)
@@ -151,7 +137,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	}
 	log.Info("streams started")
 	defer func() {
-		log.Error(errors.Wrapf(storage.CheckNoSQLDMLErr(p.db.DeleteTyped("GLOBAL", "pk_unnamed_GLOBAL_1", tarantool.StringKey{S: key}, &[]*users.GlobalUnsigned{})), "failed to delete GLOBAL(%v)", key)) //nolint:lll // .
+		log.Error(errors.Wrapf(p.deleteGlobalUnsignedValue(ctx, key), "failed to deleteGlobalUnsignedValue(%v)", key))
 	}()
 	streamsCtx, cancelStreams := context.WithCancel(ctx)
 	p.streamsDoneWg = new(sync.WaitGroup)
@@ -199,9 +185,7 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	sql := `DELETE FROM processed_mining_sessions WHERE session_number < :session_number`
-	params := make(map[string]any, 1)
-	params["session_number"] = p.sessionNumber(time.New(time.Now().Add(-24 * stdlibtime.Hour)))
-	if _, err := storage.CheckSQLDMLResponse(p.db.PrepareExecute(sql, params)); err != nil {
+	if _, err := storage.Exec(ctx, p.db, sql, p.sessionNumber(time.New(time.Now().Add(-24*stdlibtime.Hour)))); err != nil {
 		return errors.Wrap(err, "failed to delete old data from processed_mining_sessions")
 	}
 
@@ -209,7 +193,7 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if err := p.dbV2.Ping(ctx); err != nil {
+	if err := p.db.Ping(ctx); err != nil {
 		return errors.Wrap(err, "[health-check] failed to ping DB")
 	}
 	type ts struct {

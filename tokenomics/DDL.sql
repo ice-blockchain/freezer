@@ -24,7 +24,7 @@ create table if not exists extra_bonuses
 );
 ----
 insert into extra_bonuses (ix, bonus)
-                    values %[3]v
+                    values %[2]v
 on conflict(ix) do nothing;
 ----
 --************************************************************************************************************************************
@@ -44,7 +44,7 @@ create table if not exists extra_bonus_start_date
 );
 ----
 insert into extra_bonus_start_date (key, value)
-                            values (0,   %[4]v)
+                            values (0,   %[3]v)
 on conflict(key) do nothing;
 ----
 --************************************************************************************************************************************
@@ -57,13 +57,7 @@ create table if not exists adoption
     total_active_users      bigint not null check (total_active_users >= 0)
 );
 ----
-insert into adoption (milestone, total_active_users, base_mining_rate, achieved_at)
-              values (1,         0,                  '16000000000',          '%[1]v'),
-                     (2,         %[5]v,              '8000000000',            null),
-                     (3,         %[6]v,              '4000000000',            null),
-                     (4,         %[7]v,              '2000000000',            null),
-                     (5,         %[8]v,              '1000000000',            null),
-                     (6,         %[9]v,              '500000000',             null)
+insert into adoption (milestone, total_active_users, base_mining_rate, achieved_at) values %[4]v
 on conflict(milestone) do nothing;
 ----
 --************************************************************************************************************************************
@@ -176,20 +170,6 @@ END
 $$ LANGUAGE plpgsql;
 ----
 --************************************************************************************************************************************
--- mining_sessions_dlq
-create table if not exists mining_sessions_dlq
-(
-    id              text not null,
-    user_id         text not null references users(user_id) on delete cascade,
-    message         text not null,
-    hash_code       bigint not null,
-    worker_index    smallint not null check (worker_index >= 0),
-    primary key(worker_index, id)
-) partition by list (worker_index);
-----
-select createListWorkerPartition('mining_sessions_dlq'::text,%[2]v::smallint);
-----
---************************************************************************************************************************************
 -- extra_bonuses_worker
 create table if not exists extra_bonuses_worker
 (
@@ -199,7 +179,7 @@ create table if not exists extra_bonuses_worker
     primary key(worker_index, extra_bonus_index)
 ) partition by list (worker_index);
 ----
-select createListWorkerPartition('extra_bonuses_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('extra_bonuses_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- pre_stakings
@@ -216,7 +196,7 @@ create table if not exists pre_stakings
 ----
 create index if not exists pre_stakings_years_idx ON pre_stakings(worker_index,years);
 ----
-select createListWorkerPartition('pre_stakings'::text,%[2]v::smallint);
+select createListWorkerPartition('pre_stakings'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- balance_recalculation_workers
@@ -234,7 +214,7 @@ create table if not exists balance_recalculation_worker
 ----
 create index if not exists balance_recalculation_worker_iterator_ix ON balance_recalculation_worker(worker_index,enabled,last_iteration_finished_at);
 ----
-select createListWorkerPartition('balance_recalculation_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('balance_recalculation_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- mining_rates_recalculation_workers
@@ -249,7 +229,7 @@ create table if not exists mining_rates_recalculation_worker
 ----
 create index if not exists mining_rates_recalculation_worker_last_iteration_finished_at_ix ON mining_rates_recalculation_worker(worker_index,last_iteration_finished_at);
 ----
-select createListWorkerPartition('mining_rates_recalculation_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('mining_rates_recalculation_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- blockchain_balance_synchronization_workers
@@ -265,7 +245,7 @@ create table if not exists blockchain_balance_synchronization_worker
 ----
 create index if not exists blockchain_balance_synchronization_worker_last_iteration_finished_at_ix ON blockchain_balance_synchronization_worker(worker_index,last_iteration_finished_at);
 ----
-select createListWorkerPartition('blockchain_balance_synchronization_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('blockchain_balance_synchronization_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- extra_bonus_processing_workers
@@ -285,7 +265,7 @@ create table if not exists extra_bonus_processing_worker
 ----
 create index if not exists extra_bonus_processing_worker_iterator_ix ON extra_bonus_processing_worker(worker_index,last_extra_bonus_index_notified);
 ----
-select createListWorkerPartition('extra_bonus_processing_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('extra_bonus_processing_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- balances_worker
@@ -302,7 +282,7 @@ create table if not exists balances_worker
     primary key (worker_index, user_id, negative, type, type_detail)
 ) partition by list (worker_index);
 ----
-select createListWorkerPartition('balances_worker'::text,%[2]v::smallint);
+select createListWorkerPartition('balances_worker'::text,%[1]v::smallint);
 ----
 --************************************************************************************************************************************
 -- active_referrals
@@ -316,4 +296,4 @@ create table if not exists active_referrals
     primary key (worker_index, user_id)
 ) partition by list (worker_index);
 ----
-select createListWorkerPartition('active_referrals'::text,%[2]v::smallint);
+select createListWorkerPartition('active_referrals'::text,%[1]v::smallint);

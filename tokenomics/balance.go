@@ -15,8 +15,7 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -63,7 +62,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		}
 	)
 	wIdx := r.workerIndex(ctx)
-	res, err := storagev2.Select[resp](ctx, r.dbV2, sql, wIdx, userID, wIdx, totalNoPreStakingBonusBalanceType, wIdx)
+	res, err := storage.Select[resp](ctx, r.db, sql, wIdx, userID, wIdx, totalNoPreStakingBonusBalanceType, wIdx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select user's balances for user_id:%v", userID)
 	}
@@ -147,7 +146,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 						  AND type = $2
 						  AND type_detail in (%[1]v)
 						  AND worker_index = $%[2]v`, strings.Join(typeDetails, ","), paramsCount)
-	res, err := storagev2.Select[balance](ctx, r.dbV2, sql, args...)
+	res, err := storage.Select[balance](ctx, r.db, sql, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select balance history for params:%#v", args...)
 	}
@@ -155,7 +154,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 		return make([]*BalanceHistoryEntry, 0, 0), nil //nolint:gosimple // Nope.
 	}
 
-	adoptions, gErr := getAllAdoptions[coin.ICEFlake](ctx, r.dbV2)
+	adoptions, gErr := getAllAdoptions[coin.ICEFlake](ctx, r.db)
 	if gErr != nil {
 		return nil, errors.Wrap(gErr, "failed to getAllAdoptions")
 	}
@@ -448,7 +447,7 @@ func (r *repository) insertOrReplaceBalances( //nolint:revive // Alot of SQL par
 								SET updated_at		= EXCLUDED.updated_at,
 								amount         	  	= EXCLUDED.amount
 							WHERE COALESCE(balances_worker.amount,'') != coalesce(EXCLUDED.amount,'')`, strings.Join(values, ","))
-	if _, err := storagev2.Exec(ctx, r.dbV2, sql, args...); err != nil {
+	if _, err := storage.Exec(ctx, r.db, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed insert/update at %v balances:%#v for workerIndex:%v", updatedAt, balances, workerIndex)
 	}
 
@@ -465,7 +464,7 @@ func (r *repository) deleteBalances(ctx context.Context, workerIndex int16, bala
 			bal.UserID, bal.Negative, bal.Type, bal.TypeDetail))
 	}
 	sql := fmt.Sprintf(`DELETE FROM balances WHERE %v`, strings.Join(values, " OR "))
-	if _, err := storagev2.Exec(ctx, r.dbV2, sql); err != nil {
+	if _, err := storage.Exec(ctx, r.db, sql); err != nil {
 		return errors.Wrapf(err, "failed to DELETE from balances for values:%#v", values)
 	}
 
@@ -515,7 +514,7 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	}
 	sql := `INSERT INTO processed_add_balance_commands(user_id, key) VALUES($1, $2)
 						ON CONFLICT (user_id, key) DO NOTHING`
-	if _, err = storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID); err != nil {
+	if _, err = storage.Exec(ctx, s.db, sql, val.UserID, val.EventID); err != nil {
 		return errors.Wrapf(err, "failed to insert PROCESSED_ADD_BALANCE_COMMANDS for userID:%v, key: %v)", val.UserID, val.EventID)
 	}
 	var (
@@ -543,7 +542,7 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 	}), "permanently failed to insertBalance:%#v", bal)
 	if err != nil {
 		sql := `DELETE FROM processed_add_balance_commands WHERE user_id = $1 AND key = $2`
-		if _, err := storagev2.Exec(ctx, s.dbV2, sql, val.UserID, val.EventID); err != nil {
+		if _, err := storage.Exec(ctx, s.db, sql, val.UserID, val.EventID); err != nil {
 			return errors.Wrapf(err, "failed to delete PROCESSED_ADD_BALANCE_COMMANDS(%v,%v)", val.UserID, val.EventID)
 		}
 	}

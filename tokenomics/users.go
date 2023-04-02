@@ -13,7 +13,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
@@ -49,11 +49,9 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
 		return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
 	}
-	if _, err := storagev2.Exec(ctx, s.dbV2, `DELETE FROM users WHERE user_id = $1`, usr.ID); err != nil {
-		return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
-	}
+	_, err := storage.Exec(ctx, s.db, `DELETE FROM users WHERE user_id = $1`, usr.ID)
 
-	return nil
+	return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
 }
 
 func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, usr *users.User) error { //nolint:funlen // .
@@ -100,13 +98,13 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 							  AND tminus1.user_id IS NOT NULL
 							  AND negative_tminus1_balance.type_detail =  '%[3]v_' || tminus1.user_id
 					    WHERE u.user_id = $2`, totalNoPreStakingBonusBalanceType, reverseT0BalanceTypeDetail, reverseTMinus1BalanceTypeDetail)
-	res, err := storagev2.Get[struct {
+	res, err := storage.Get[struct {
 		TotalReverseT0Amount, TotalReverseTMinus1Amount,
 		NegativeReverseT0Amount, NegativeReverseTMinus1Amount *coin.ICEFlake
 		T0UserID, TMinus1UserID string
-	}](ctx, s.dbV2, sql, int16(usr.HashCode%uint64(s.cfg.WorkerCount)), usr.ID)
+	}](ctx, s.db, sql, int16(usr.HashCode%uint64(s.cfg.WorkerCount)), usr.ID)
 	if err != nil {
-		if storagev2.IsErr(err, storagev2.ErrNotFound) {
+		if storage.IsErr(err, storage.ErrNotFound) {
 			return nil
 		}
 
@@ -201,7 +199,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		int64(usr.HashCode),
 		s.hideRanking(usr),
 		verified)
-	if _, err := storagev2.Exec(ctx, s.dbV2, sql, args...); err != nil {
+	if _, err := storage.Exec(ctx, s.db, sql, args...); err != nil {
 		return errors.Wrapf(err, "failed to replace user:%#v", usr)
 	}
 

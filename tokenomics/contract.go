@@ -12,10 +12,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -33,9 +32,9 @@ const (
 )
 
 var (
-	ErrNotFound                                        = storagev2.ErrNotFound
-	ErrRelationNotFound                                = storagev2.ErrRelationNotFound
-	ErrDuplicate                                       = storagev2.ErrDuplicate
+	ErrNotFound                                        = storage.ErrNotFound
+	ErrRelationNotFound                                = storage.ErrRelationNotFound
+	ErrDuplicate                                       = storage.ErrDuplicate
 	ErrNegativeMiningProgressDecisionRequired          = errors.New("you have negative mining progress, please decide what to do with it")
 	ErrRaceCondition                                   = errors.New("race condition")
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
@@ -198,19 +197,13 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey                  = "tokenomics"
-	dayFormat, hourFormat, minuteFormat = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
-
-	pgTimeFormat = "2006-01-02 15:04:05.000000"
-
-	pgMicrosecordsPrecision = 1e6
-
+	applicationYamlKey                                         = "tokenomics"
+	dayFormat, hourFormat, minuteFormat                        = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
 	totalActiveUsersGlobalKey                                  = "TOTAL_ACTIVE_USERS"
 	requestingUserIDCtxValueKey                                = "requestingUserIDCtxValueKey"
 	userHashCodeCtxValueKey                                    = "userHashCodeCtxValueKey"
 	percentage100                                              = uint64(100)
 	registrationICEFlakeBonusAmount                            = 10 * uint64(coin.Denomination)
-	lastAdoptionMilestone                                      = 6
 	miningRatesRecalculationBatchSize                          = 10
 	balanceRecalculationBatchSize                              = 10
 	extraBonusProcessingBatchSize                              = 100
@@ -241,10 +234,8 @@ const (
 
 // .
 var (
-	//go:embed DDL.lua
-	ddl string
 	//go:embed DDL.sql
-	ddlV2 string
+	ddl string
 )
 
 type (
@@ -356,8 +347,7 @@ type (
 	repository struct {
 		cfg           *config
 		shutdown      func() error
-		db            tarantool.Connector
-		dbV2          *storagev2.DB
+		db            *storage.DB
 		mb            messagebroker.Client
 		pictureClient picture.Client
 	}
@@ -371,7 +361,10 @@ type (
 	config struct {
 		messagebroker.Config    `mapstructure:",squash"` //nolint:tagliatelle // Nope.
 		AdoptionMilestoneSwitch struct {
-			ActiveUserMilestones         []uint64            `yaml:"activeUserMilestones"`
+			ActiveUserMilestones []struct {
+				Users          uint64 `yaml:"users"`
+				BaseMiningRate uint64 `yaml:"baseMiningRate"`
+			} `yaml:"activeUserMilestones"`
 			ConsecutiveDurationsRequired uint64              `yaml:"consecutiveDurationsRequired"`
 			Duration                     stdlibtime.Duration `yaml:"duration"`
 		} `yaml:"adoptionMilestoneSwitch"`

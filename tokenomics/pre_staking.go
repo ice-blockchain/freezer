@@ -9,14 +9,11 @@ import (
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (resp *PreStakingSummary, err error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	sql := `SELECT st.created_at,
 				   st.user_id,
 				   MAX(st.years) AS years,
@@ -31,17 +28,12 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (r
 			WHERE st.worker_index = $1 
 			  AND st.user_id = $2
 			GROUP BY st.worker_index,st.user_id,st.hash_code,st.created_at,st_b.bonus`
-	if resp, err = storagev2.Get[PreStakingSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID); err != nil {
-		return nil, errors.Wrapf(err, "failed to select for pre-staking summary for userID:%v", userID)
-	}
+	resp, err = storage.Get[PreStakingSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
 
-	return resp, nil
+	return resp, errors.Wrapf(err, "failed to select for pre-staking summary for userID:%v", userID)
 }
 
 func (r *repository) getAllPreStakingSummaries(ctx context.Context, userID string) (resp []*PreStakingSummary, err error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	sql := `SELECT st.*,
 				   st_b.bonus	
 			FROM pre_stakings st
@@ -51,17 +43,12 @@ func (r *repository) getAllPreStakingSummaries(ctx context.Context, userID strin
 			WHERE st.worker_index = $1 
 			  AND st.user_id = $2
 			ORDER BY st.created_at`
-	if resp, err = storagev2.Select[PreStakingSummary](ctx, r.dbV2, sql, r.workerIndex(ctx), userID); err != nil {
-		return nil, errors.Wrapf(err, "failed to select all pre-staking summaries for userID:%v", userID)
-	}
+	resp, err = storage.Select[PreStakingSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
 
-	return
+	return resp, errors.Wrapf(err, "failed to select all pre-staking summaries for userID:%v", userID)
 }
 
 func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStakingSummary) error { //nolint:funlen,gocognit // Can't properly split it further.
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	existing, err := r.GetPreStakingSummary(ctx, st.UserID)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return errors.Wrapf(err, "failed to GetPreStakingSummary for userID:%v", st.UserID)
@@ -77,16 +64,16 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 			return ErrDecreasingPreStakingAllocationOrYearsNotAllowed
 		}
 	}
-	res, err := storagev2.Get[struct{ Bonus uint64 }](ctx, r.dbV2, `SELECT bonus FROM pre_staking_bonuses WHERE years = $1`, st.Years)
+	res, err := storage.Get[struct{ Bonus uint64 }](ctx, r.db, `SELECT bonus FROM pre_staking_bonuses WHERE years = $1`, st.Years)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get pre-staking bonus for years:%v", st.Years)
 	}
 	st.CreatedAt, st.Bonus = time.Now(), res.Bonus
 
-	return errors.Wrap(storagev2.DoInTransaction(ctx, r.dbV2, func(conn storagev2.QueryExecer) error {
+	return errors.Wrap(storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
 		sql := `INSERT INTO pre_stakings (created_at, user_id, years, allocation, hash_code , worker_index) 
 							      VALUES ($1        , $2     , $3   , $4        , $5::bigint, $6)`
-		if _, err = storagev2.Exec(ctx, conn, sql, *st.CreatedAt.Time, st.UserID, st.Years, st.Allocation, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
+		if _, err = storage.Exec(ctx, conn, sql, *st.CreatedAt.Time, st.UserID, st.Years, st.Allocation, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
 			return errors.Wrapf(err, "failed to insertNewPreStaking:%#v", st)
 		}
 		ss := &PreStakingSnapshot{PreStakingSummary: st, Before: existing}
