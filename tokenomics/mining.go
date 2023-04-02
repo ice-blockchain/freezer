@@ -146,11 +146,11 @@ SELECT u.last_natural_mining_started_at,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
 	   ar_worker.t1,
 	   ar_worker.t2,
-	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at,'1999-01-08 04:05:06') > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
+	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at,'1999-01-08 04:05:06'::timestamp) > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
 	   COALESCE(x.pre_staking_allocation,0) AS pre_staking_allocation,
 	   COALESCE(st_b.bonus,0) AS pre_staking_bonus,
 	   COALESCE(eb.bonus,0) AS flat_bonus,
-	   (CASE WHEN (eb_worker.user_id IS NOT NULL AND ebw.extra_bonus_index IS NOT NULL AND $13 > coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06'))
+	   (CASE WHEN (eb_worker.user_id IS NOT NULL AND ebw.extra_bonus_index IS NOT NULL AND $13 > coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06'::timestamp))
 				THEN (100 - (25 *  ((CASE WHEN ($4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12)) < $10::bigint THEN 0 ELSE ($4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12)) END)/$11::bigint)))
 	   		 ELSE 0
 	    END) AS bonus_percentage_remaining,

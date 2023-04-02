@@ -34,7 +34,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		        extra_bonus_ended_at = $4
           	WHERE worker_index = $1
               AND user_id = $2
-              AND $5 > coalesce(extra_bonus_started_at,'1999-01-08 04:05:06')`
+              AND $5 > coalesce(extra_bonus_started_at,'1999-01-08 04:05:06'::timestamp)`
 	args := append(make([]any, 0, 6),
 		r.workerIndex(ctx),
 		ebs.UserID,
@@ -64,7 +64,7 @@ func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time,
 				   eb_worker.news_seen,
 				   b.bonus AS flat_bonus,
 				   (100 - (25 *  ((CASE WHEN ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11)) < $9::bigint THEN 0 ELSE ($3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $8::bigint) / $11)) END)/$10::bigint))) AS bonus_percentage_remaining,
-				   $12 < coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06') AS already_claimed
+				   $12 < coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06'::timestamp) AS already_claimed
 			FROM extra_bonus_start_date sd
 				JOIN extra_bonus_processing_worker eb_worker
 				  ON eb_worker.worker_index = $1

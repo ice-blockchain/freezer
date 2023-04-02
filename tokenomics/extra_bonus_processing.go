@@ -110,7 +110,7 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 				 AND $3::bigint + (eb_worker.utc_offset * $4::bigint) - (sd.value + (e.extra_bonus_index * $5::bigint)) - $6::bigint - ((e.offset_value * $7::bigint) / $9) > 0
 			WHERE eb_worker.worker_index = $1
 			  AND (eb_worker.last_extra_bonus_index_notified IS NULL OR eb_worker.last_extra_bonus_index_notified < b.ix)
-			  AND $12 > coalesce(eb_worker.extra_bonus_started_at, '1999-01-08 04:05:06') 
+			  AND $12 > coalesce(eb_worker.extra_bonus_started_at, '1999-01-08 04:05:06'::timestamp) 
 			LIMIT $2`
 	now := time.Now()
 	const networkLagDelta, argCount = 1.3, 12

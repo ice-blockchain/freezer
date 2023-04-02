@@ -141,7 +141,7 @@ SELECT u.last_mining_ended_at,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
 	   coalesce(ar_worker.t1,0) AS t1,
 	   coalesce(ar_worker.t2,0) AS t2,
-	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at, '1999-01-08 04:05:06') > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus, 
+	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at, '1999-01-08 04:05:06'::timestamp) > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus, 
 	   coalesce(x.pre_staking_allocation,0) AS pre_staking_allocation,
 	   coalesce(st_b.bonus,0) AS pre_staking_bonus
 FROM (SELECT MAX(st.years) AS pre_staking_years,

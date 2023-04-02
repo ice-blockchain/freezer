@@ -233,7 +233,7 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 								   %[1]v							   
 								   last_free_mining_session_awarded_at = $4
 							   WHERE user_id = $5
-								 AND COALESCE(last_mining_ended_at,'1999-01-08 04:05:06') = COALESCE($6,'1999-01-08 04:05:06')
+								 AND COALESCE(last_mining_ended_at,'1999-01-08 04:05:06'::timestamp) = COALESCE($6,'1999-01-08 04:05:06'::timestamp)
 								 %[2]v`, rollbackUsedAt, rollbackUsedAtCondition)
 		if rowsAffected, err := conn.Exec(ctx, sql,
 			ms.LastNaturalMiningStartedAt.Time,
@@ -254,8 +254,8 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 							  last_mining_started_at = EXCLUDED.last_mining_started_at,
 							  last_mining_ended_at = EXCLUDED.last_mining_ended_at
 						WHERE balance_recalculation_worker.enabled != EXCLUDED.enabled
-						   OR coalesce(balance_recalculation_worker.last_mining_started_at,'1999-01-08 04:05:06') != EXCLUDED.last_mining_started_at
-						   OR coalesce(balance_recalculation_worker.last_mining_ended_at,'1999-01-08 04:05:06') != EXCLUDED.last_mining_ended_at`
+						   OR coalesce(balance_recalculation_worker.last_mining_started_at,'1999-01-08 04:05:06'::timestamp) != EXCLUDED.last_mining_started_at
+						   OR coalesce(balance_recalculation_worker.last_mining_ended_at,'1999-01-08 04:05:06'::timestamp) != EXCLUDED.last_mining_ended_at`
 		if _, err := conn.Exec(ctx, sql,
 			userID,
 			ms.LastMiningStartedAt.Time,
