@@ -81,10 +81,10 @@ type (
 		LastMiningEndedAt, T0LastMiningEndedAt, TMinus1LastMiningEndedAt,
 		PreviousMiningEndedAt, T0PreviousMiningEndedAt, TMinus1PreviousMiningEndedAt,
 		RollbackUsedAt, T0RollbackUsedAt, TMinus1RollbackUsedAt *time.Time
-		BaseMiningRate                   *coin.ICEFlake
-		UUserID, T0UserID, TMinus1UserID string
-		T0, T1, T2, ExtraBonus           uint64
-		T0HashCode, TMinus1HashCode      int64
+		BaseMiningRate                         *coin.ICEFlake
+		UUserID, T0UserID, TMinus1UserID       string
+		T0, T1, T2, ExtraBonus                 uint64
+		UHashCode, T0HashCode, TMinus1HashCode int64
 	}
 	B                       = balance
 	balanceRecalculationRow struct {
@@ -128,6 +128,7 @@ SELECT b.*,
 	   coalesce(ar_worker.t1,0) AS t1,
 	   coalesce(ar_worker.t2,0) AS t2,
 	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at, '1999-01-08 04:05:06'::timestamp) > $1 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
+	   coalesce(u.hash_code,0) AS u_hash_code,	
 	   coalesce(t0.hash_code,0) AS t0_hash_code,	
 	   coalesce(tminus1.hash_code,0) AS t_minus1_hash_code
 FROM ( SELECT user_id
@@ -180,7 +181,7 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "context failed")
 	}
-	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, usersThatStoppedMining := s.recalculateBalances(now, batch) //nolint:lll // .
+	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, usersThatStoppedMining := s.recalculateBalances(now, workerIndex, batch) //nolint:lll // .
 	if err := s.decrementActiveReferralCountForT0AndTMinus1(ctx, usersThatStoppedMining...); err != nil {
 		return errors.Wrapf(err, "failed to decrementActiveReferralCountForT0AndTMinus1 for:%#v", usersThatStoppedMining)
 	}
@@ -205,7 +206,7 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 
 //nolint:funlen,gocognit,gocritic,gocyclo,revive,cyclop,maintidx // .
 func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
-	now *time.Time, rows []*balanceRecalculationRow,
+	now *time.Time, workerIndex int16, rows []*balanceRecalculationRow,
 ) (balancesForReplace, balancesForDelete []*balance, processingStoppedForUserIDs map[string]*time.Time, dayOffStartedEvents []*FreeMiningSessionStarted, userIDs []string, usersThatStoppedMining []*userThatStoppedMining) { //nolint:lll // .
 	balancesForReplace = make([]*balance, 0, len(rows))
 	balancesForDelete = make([]*balance, 0, 0) //nolint:gosimple // Nope.
@@ -343,6 +344,8 @@ func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 					bal.TypeDetail == details.reverseTMinus1TypeDetail()) {
 				zeroBalancesRequiredToStop[balPK] = bal.Amount
 			}
+			bal.WorkerIndex = workerIndex
+			bal.HashCode = details.UHashCode
 			if bal.Amount.IsZero() {
 				balancesForDelete = append(balancesForDelete, bal)
 			}

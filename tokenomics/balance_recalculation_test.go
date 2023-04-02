@@ -870,7 +870,7 @@ func TestBalanceRecalculationTriggerStreamSource_recalculateBalances(t *testing.
 		BalanceRecalculationDetails: details,
 	}}
 	now = time.New(now.Add(1 * stdlibtime.Hour))
-	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, _ := source.recalculateBalances(now, balances)
+	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, _ := source.recalculateBalances(now, 0, balances)
 	expectedBalancesForReplace := []*balance{{
 		UpdatedAt:  now,
 		Amount:     coin.NewAmountUint64(32_000_000_000),
@@ -990,7 +990,7 @@ func TestBalanceRecalculationTriggerStreamSource_recalculateBalances(t *testing.
 		balances = append(balances, &balanceRecalculationRow{BalanceRecalculationDetails: details, B: expectedBalancesForReplace[i]})
 	}
 	now = time.New(now.Add(1 * stdlibtime.Hour))
-	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, _ = source.recalculateBalances(now, balances)
+	balancesForReplace, balancesForDelete, processingStoppedForUserIDs, dayOffStartedEvents, userIDs, _ = source.recalculateBalances(now, 0, balances)
 	expectedBalancesForReplace = []*balance{{
 		UpdatedAt:  now,
 		Amount:     coin.NewAmountUint64(64_000_000_000),

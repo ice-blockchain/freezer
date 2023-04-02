@@ -108,7 +108,8 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 								  AND negative_t2_balance.type = %[1]v
 								  AND negative_t2_balance.type_detail = '%[4]v'
 						WHERE u.user_id = $2
-						GROUP BY u.user_id`, totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
+						GROUP BY u.user_id,negative_balance.amount,negative_t0_balance.amount,negative_t1_balance.amount,negative_t2_balance.amount`,
+		totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
 	resp, err := storage.Get[miningSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
 	if err != nil && storage.IsErr(err, storage.ErrNotFound) {
 		return nil, ErrRelationNotFound
@@ -381,7 +382,7 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 									     VALUES (1 , $1     , $2       , $3)
 				   ON CONFLICT (worker_index, user_id)
 							DO UPDATE
-								  SET t2 = t2 + EXCLUDED.t2`
+								  SET t2 = active_referrals.t2 + EXCLUDED.t2`
 			tMinus1WorkerIndex := int16(uint64(referees.TMinus1HashCode) % uint64(s.cfg.WorkerCount))
 			if _, err = conn.Exec(ctx, sql, referees.TMinus1UserID, referees.TMinus1HashCode, tMinus1WorkerIndex); err != nil {
 				return errors.Wrapf(err, "failed to increment t2 active_referrals for userId:%v", referees.TMinus1UserID)
