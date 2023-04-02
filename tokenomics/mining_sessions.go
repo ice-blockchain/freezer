@@ -28,7 +28,6 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
 	}
 	now := time.Now()
-	nowValue := now.Time
 	if old.LastMiningEndedAt != nil &&
 		old.LastNaturalMiningStartedAt != nil &&
 		old.LastMiningEndedAt.After(*now.Time) &&
@@ -47,7 +46,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	return errors.Wrapf(retry(ctx, func() error {
 		summary, gErr := r.GetMiningSummary(ctx, userID)
 		if gErr == nil {
-			if summary.MiningSession == nil || summary.MiningSession.StartedAt == nil || summary.MiningSession.StartedAt.UnixMicro() != nowValue.UnixMicro() {
+			if summary.MiningSession == nil || summary.MiningSession.StartedAt == nil || summary.MiningSession.StartedAt.UnixMicro() != now.UnixMicro() {
 				gErr = ErrNotFound
 			} else {
 				*ms = *summary
@@ -371,7 +370,7 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 									     VALUES (1 , $1     , $2       , $3)
 				   ON CONFLICT (worker_index, user_id)
 							DO UPDATE
-								  SET t1 = t1 + EXCLUDED.t1`
+								  SET t1 = active_referrals.t1 + EXCLUDED.t1`
 			t0WorkerIndex := int16(uint64(referees.T0HashCode) % uint64(s.cfg.WorkerCount))
 			if _, err = conn.Exec(ctx, sql, referees.T0UserID, referees.T0HashCode, t0WorkerIndex); err != nil {
 				return errors.Wrapf(err, "failed to increment t1 active_referrals for userId:%v", referees.T0UserID)
