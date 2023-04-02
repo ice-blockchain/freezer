@@ -32,11 +32,6 @@ tokenomics: &tokenomics
     primaryURL: postgresql://root:pass@localhost:5432/ice
     replicaURLs:
       - postgresql://root:pass@localhost:5432/ice
-  db: &tokenomicsDatabase
-    urls:
-      - localhost:3401
-    user: admin
-    password: pass
   messageBroker: &tokenomicsMessageBroker
     consumerGroup: freezer-local
     createTopics: true
@@ -173,5 +168,3 @@ tokenomics_test:
     <<: *tokenomicsMessageBroker
     consumingTopics: *tokenomicsMessageBrokerTopics
     consumerGroup: freezer-local-test
-  db:
-    <<: *tokenomicsDatabase
