@@ -5,16 +5,16 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
@@ -50,112 +50,105 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
 		return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
 	}
-	sql := `DELETE FROM users
- 			WHERE user_id = :user_id`
-	params := make(map[string]any, 1)
-	params["user_id"] = usr.ID
-	if _, err := storage.CheckSQLDMLResponse(s.db.PrepareExecute(sql, params)); err != nil {
-		return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
-	}
+	_, err := storage.Exec(ctx, s.db, `DELETE FROM users WHERE user_id = $1`, usr.ID)
 
-	return nil
+	return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
 }
 
 func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, usr *users.User) error { //nolint:funlen // .
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := fmt.Sprintf(`SELECT reverse_t0_balance.amount,
-								reverse_tminus1_balance.amount,
-								negative_t0_balance.amount,
-								negative_tminus1_balance.amount,
-				   			    t0.user_id,
-								tminus1.user_id 
+	sql := fmt.Sprintf(`SELECT reverse_t0_balance.amount AS total_reverse_t0_amount,
+								reverse_tminus1_balance.amount AS total_reverse_t_minus1_amount,
+								negative_t0_balance.amount AS negative_reverse_t0_amount,
+								negative_tminus1_balance.amount AS negative_reverse_t_minus1_amount,
+				   			    t0.user_id AS t0_user_id,
+								coalesce(tminus1.user_id,'') AS t_minus1_user_id
 						FROM users u
 							 JOIN users t0
 							   ON t0.user_id = u.referred_by
 							  AND t0.user_id != u.user_id
-							 JOIN users tminus1
+						LEFT JOIN users tminus1
 							   ON tminus1.user_id = t0.referred_by
 							  AND tminus1.user_id != t0.user_id
-						LEFT JOIN balances_%[1]v reverse_t0_balance
-							   ON reverse_t0_balance.user_id = u.user_id
+						LEFT JOIN balances_worker reverse_t0_balance
+							   ON reverse_t0_balance.worker_index = $1
+							  AND reverse_t0_balance.user_id = u.user_id
 							  AND reverse_t0_balance.negative = FALSE
-							  AND reverse_t0_balance.type = %[2]v
-							  AND reverse_t0_balance.type_detail =  '%[3]v_' || t0.user_id
-						LEFT JOIN balances_%[1]v reverse_tminus1_balance
-							   ON reverse_tminus1_balance.user_id = u.user_id
+							  AND reverse_t0_balance.type = %[1]v
+							  AND reverse_t0_balance.type_detail =  '%[2]v_' || t0.user_id
+						LEFT JOIN balances_worker reverse_tminus1_balance
+							   ON reverse_tminus1_balance.worker_index = $1
+							  AND reverse_tminus1_balance.user_id = u.user_id
 							  AND reverse_tminus1_balance.negative = FALSE
-							  AND reverse_tminus1_balance.type = %[2]v
-							  AND reverse_tminus1_balance.type_detail =  '%[4]v_' || tminus1.user_id
-						LEFT JOIN balances_%[1]v negative_t0_balance
-							   ON negative_t0_balance.user_id = u.user_id
+							  AND reverse_tminus1_balance.type = %[1]v
+							  AND tminus1.user_id IS NOT NULL
+							  AND reverse_tminus1_balance.type_detail =  '%[3]v_' || tminus1.user_id
+						LEFT JOIN balances_worker negative_t0_balance
+							   ON negative_t0_balance.worker_index = $1
+							  AND negative_t0_balance.user_id = u.user_id
 							  AND negative_t0_balance.negative = TRUE
-							  AND negative_t0_balance.type = %[2]v
-							  AND negative_t0_balance.type_detail =  '%[3]v_' || t0.user_id
-						LEFT JOIN balances_%[1]v negative_tminus1_balance
-							   ON negative_tminus1_balance.user_id = u.user_id
+							  AND negative_t0_balance.type = %[1]v
+							  AND negative_t0_balance.type_detail =  '%[2]v_' || t0.user_id
+						LEFT JOIN balances_worker negative_tminus1_balance
+							   ON negative_tminus1_balance.worker_index = $1
+							  AND negative_tminus1_balance.user_id = u.user_id
 							  AND negative_tminus1_balance.negative = TRUE
-							  AND negative_tminus1_balance.type = %[2]v
-							  AND negative_tminus1_balance.type_detail =  '%[4]v_' || tminus1.user_id
-					    WHERE u.user_id = :user_id`,
-		usr.HashCode%s.cfg.WorkerCount,
-		totalNoPreStakingBonusBalanceType,
-		reverseT0BalanceTypeDetail,
-		reverseTMinus1BalanceTypeDetail)
-	params := make(map[string]any, 1)
-	params["user_id"] = usr.ID
-	type resp struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // .
+							  AND negative_tminus1_balance.type = %[1]v
+							  AND tminus1.user_id IS NOT NULL
+							  AND negative_tminus1_balance.type_detail =  '%[3]v_' || tminus1.user_id
+					    WHERE u.user_id = $2`, totalNoPreStakingBonusBalanceType, reverseT0BalanceTypeDetail, reverseTMinus1BalanceTypeDetail)
+	res, err := storage.Get[struct {
 		TotalReverseT0Amount, TotalReverseTMinus1Amount,
 		NegativeReverseT0Amount, NegativeReverseTMinus1Amount *coin.ICEFlake
 		T0UserID, TMinus1UserID string
-	}
-	res := make([]*resp, 0, 1)
-	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
+	}](ctx, s.db, sql, int16(usr.HashCode%uint64(s.cfg.WorkerCount)), usr.ID)
+	if err != nil {
+		if storage.IsErr(err, storage.ErrNotFound) {
+			return nil
+		}
+
 		return errors.Wrapf(err, "failed to get reverse t0 and t-1 balance information for userID:%v", usr.ID)
 	}
-	if len(res) == 0 {
-		return nil
-	}
 	cmds := make([]*AddBalanceCommand, 0, 1+1+1+1)
-	if !res[0].TotalReverseT0Amount.IsZero() {
+	if !res.TotalReverseT0Amount.IsZero() {
 		cmds = append(cmds, &AddBalanceCommand{
 			Balances: &Balances[coin.ICEFlake]{
-				T1:     res[0].TotalReverseT0Amount,
-				UserID: res[0].T0UserID,
+				T1:     res.TotalReverseT0Amount,
+				UserID: res.T0UserID,
 			},
-			EventID: fmt.Sprintf("t1_referral_account_deletion_positive_balance_%v", usr.ID),
+			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
 		})
 	}
-	if !res[0].NegativeReverseT0Amount.IsZero() {
+	if !res.NegativeReverseT0Amount.IsZero() {
 		negative := true
 		cmds = append(cmds, &AddBalanceCommand{
 			Balances: &Balances[coin.ICEFlake]{
-				T1:     res[0].NegativeReverseT0Amount,
-				UserID: res[0].T0UserID,
+				T1:     res.NegativeReverseT0Amount,
+				UserID: res.T0UserID,
 			},
-			EventID:  fmt.Sprintf("t1_referral_account_deletion_negative_balance_%v", usr.ID),
+			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
 			Negative: &negative,
 		})
 	}
-	if !res[0].TotalReverseTMinus1Amount.IsZero() {
+	if !res.TotalReverseTMinus1Amount.IsZero() {
 		cmds = append(cmds, &AddBalanceCommand{
 			Balances: &Balances[coin.ICEFlake]{
-				T2:     res[0].TotalReverseTMinus1Amount,
-				UserID: res[0].TMinus1UserID,
+				T2:     res.TotalReverseTMinus1Amount,
+				UserID: res.TMinus1UserID,
 			},
-			EventID: fmt.Sprintf("t2_referral_account_deletion_positive_balance_%v", usr.ID),
+			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
 		})
 	}
-	if !res[0].NegativeReverseTMinus1Amount.IsZero() {
+	if !res.NegativeReverseTMinus1Amount.IsZero() {
 		negative := true
 		cmds = append(cmds, &AddBalanceCommand{
 			Balances: &Balances[coin.ICEFlake]{
-				T2:     res[0].NegativeReverseTMinus1Amount,
-				UserID: res[0].TMinus1UserID,
+				T2:     res.NegativeReverseTMinus1Amount,
+				UserID: res.TMinus1UserID,
 			},
-			EventID:  fmt.Sprintf("t2_referral_account_deletion_negative_balance_%v", usr.ID),
+			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
 			Negative: &negative,
 		})
 	}
@@ -163,105 +156,66 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 	return errors.Wrapf(executeBatchConcurrently(ctx, s.sendAddBalanceCommandMessage, cmds), "failed to sendAddBalanceCommandMessages for %#v", cmds)
 }
 
-func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) (err error) {
+//nolint:funlen,lll // .
+func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	if err = s.updateUser(ctx, usr); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			err = errors.Wrapf(s.insertUser(ctx, usr), "failed to insert user:%#v", usr)
-		}
-	}
-
-	return errors.Wrapf(err, "failed to update user:%#v", usr)
-}
-
-func (s *usersTableSource) updateUser(ctx context.Context, usr *users.User) (err error) { //nolint:funlen // .
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	const fieldCount = 10
+	sql := `INSERT INTO users (created_at, updated_at, user_id, referred_by, username, first_name, last_name, lookup, profile_picture_name, mining_blockchain_account_address, blockchain_account_address, hash_code  , hide_ranking, verified)
+					   VALUES ($1		 , $2		 , $3	  , $4		   , $5	     , $6		 , $7	    , $8    , $9			      , $10								 , $11					     , $12::bigint, $13			, $14)
+		    ON CONFLICT (user_id)
+		    	DO UPDATE
+		    		  SET updated_at 						= EXCLUDED.updated_at,
+		    		  	  referred_by 						= EXCLUDED.referred_by,
+		    		  	  username 							= EXCLUDED.username,
+		    		  	  first_name 						= EXCLUDED.first_name,
+		    		  	  last_name 						= EXCLUDED.last_name,
+		    		  	  lookup 						    = EXCLUDED.lookup,
+		    		  	  profile_picture_name 				= EXCLUDED.profile_picture_name,
+		    		  	  mining_blockchain_account_address = EXCLUDED.mining_blockchain_account_address,
+		    		  	  blockchain_account_address 		= EXCLUDED.blockchain_account_address,
+		    		  	  hide_ranking 						= EXCLUDED.hide_ranking
+			  		WHERE coalesce(users.referred_by,'') 						!= coalesce(EXCLUDED.referred_by,'')
+			  		   OR coalesce(users.username,'') 							!= coalesce(EXCLUDED.username,'')
+			  		   OR coalesce(users.first_name,'') 						!= coalesce(EXCLUDED.first_name,'')
+			  		   OR coalesce(users.last_name,'') 							!= coalesce(EXCLUDED.last_name,'')
+			  		   OR coalesce(users.lookup,'') 							!= coalesce(EXCLUDED.lookup,'')
+			  		   OR coalesce(users.profile_picture_name,'') 				!= coalesce(EXCLUDED.profile_picture_name,'')
+			  		   OR coalesce(users.mining_blockchain_account_address,'') 	!= coalesce(EXCLUDED.mining_blockchain_account_address,'')
+			  		   OR coalesce(users.blockchain_account_address,'') 		!= coalesce(EXCLUDED.blockchain_account_address,'')
+			  		   OR coalesce(users.hide_ranking,false) 					!= coalesce(EXCLUDED.hide_ranking,false)
+			  		   OR coalesce(users.verified,false) 						!= coalesce(EXCLUDED.verified,false)`
 	verified := false
 	if usr.Verified != nil && *usr.Verified {
 		verified = true
 	}
-	ops := make([]tarantool.Op, 0, fieldCount)
-	//nolint:gomnd // Not magic numbers, those are field indices.
-	ops = append(ops,
-		tarantool.Op{Op: "=", Field: 1, Arg: usr.UpdatedAt},
-		tarantool.Op{Op: "=", Field: 10, Arg: usr.ReferredBy},
-		tarantool.Op{Op: "=", Field: 11, Arg: usr.Username},
-		tarantool.Op{Op: "=", Field: 12, Arg: usr.FirstName},
-		tarantool.Op{Op: "=", Field: 13, Arg: usr.LastName},
-		tarantool.Op{Op: "=", Field: 14, Arg: s.pictureClient.StripDownloadURL(usr.ProfilePictureURL)},
-		tarantool.Op{Op: "=", Field: 15, Arg: usr.MiningBlockchainAccountAddress},
-		tarantool.Op{Op: "=", Field: 16, Arg: usr.BlockchainAccountAddress},
-		tarantool.Op{Op: "=", Field: 18, Arg: s.hideRanking(usr)},
-		tarantool.Op{Op: "=", Field: 19, Arg: verified})
-	res := make([]*user, 0, 1)
-	key := tarantool.StringKey{S: usr.ID}
-	if err = storage.CheckNoSQLDMLErr(s.db.UpdateTyped("USERS", "pk_unnamed_USERS_1", key, ops, &res)); err == nil && (len(res) == 0 || res[0].UserID == "") { //nolint:lll,revive // Wrong.
-		err = storage.ErrNotFound
-	}
-	if err == nil {
-		if err = s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr); err != nil {
-			err = errors.Wrapf(err, "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr)
-		}
+	args := append(make([]any, 0, 13), //nolint:gomnd // .
+		*usr.CreatedAt.Time,
+		*usr.UpdatedAt.Time,
+		usr.ID,
+		usr.ReferredBy,
+		usr.Username,
+		usr.FirstName,
+		usr.LastName,
+		strings.ToLower(fmt.Sprintf("%v%v%v", usr.Username, usr.FirstName, usr.LastName)),
+		s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
+		usr.MiningBlockchainAccountAddress,
+		usr.BlockchainAccountAddress,
+		int64(usr.HashCode),
+		s.hideRanking(usr),
+		verified)
+	if _, err := storage.Exec(ctx, s.db, sql, args...); err != nil {
+		return errors.Wrapf(err, "failed to replace user:%#v", usr)
 	}
 
-	return err
-}
-
-func (s *usersTableSource) insertUser(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if err := storage.CheckNoSQLDMLErr(s.db.InsertTyped("USERS", s.user(usr), &[]*user{})); err != nil {
-		if errors.Is(err, storage.ErrDuplicate) {
-			return s.updateUser(ctx, usr)
-		}
-
-		return errors.Wrapf(err, "failed to insert user %#v", usr)
-	}
-	if err := s.doAfterCreate(ctx, usr); err != nil {
-		revertCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
-		defer cancel()
-		revertErr := errors.Wrapf(s.deleteUser(revertCtx, usr), //nolint:contextcheck // It might be cancelled.
-			"failed to delete userID:%v as a rollback for failed doAfterCreate", usr.ID)
-		if revertErr != nil && errors.Is(revertErr, storage.ErrNotFound) {
-			revertErr = nil
-		}
-
-		return multierror.Append( //nolint:wrapcheck // Not needed.
-			errors.Wrapf(err, "failed to run doAfterCreate for:%#v", usr),
-			revertErr,
-		).ErrorOrNil()
-	}
-
-	return nil
-}
-
-func (s *usersTableSource) user(usr *users.User) *user {
-	verified := false
-	if usr.Verified != nil && *usr.Verified {
-		verified = true
-	}
-
-	return &user{
-		CreatedAt:                      usr.CreatedAt,
-		UpdatedAt:                      usr.UpdatedAt,
-		UserID:                         usr.ID,
-		ReferredBy:                     usr.ReferredBy,
-		Username:                       usr.Username,
-		FirstName:                      usr.FirstName,
-		LastName:                       usr.LastName,
-		ProfilePictureURL:              s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
-		MiningBlockchainAccountAddress: usr.MiningBlockchainAccountAddress,
-		BlockchainAccountAddress:       usr.BlockchainAccountAddress,
-		HashCode:                       usr.HashCode,
-		HideRanking:                    s.hideRanking(usr),
-		Verified:                       verified,
-	}
+	return multierror.Append( //nolint:wrapcheck // Not needed.
+		errors.Wrapf(s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr), "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr), //nolint:lll // .
+		errors.Wrapf(s.initializeBalanceRecalculationWorker(ctx, usr), "failed to initializeBalanceRecalculationWorker for %#v", usr),
+		errors.Wrapf(s.initializeMiningRatesRecalculationWorker(ctx, usr), "failed to initializeMiningRatesRecalculationWorker for %#v", usr),
+		errors.Wrapf(s.initializeBlockchainBalanceSynchronizationWorker(ctx, usr), "failed to initializeBlockchainBalanceSynchronizationWorker for %#v", usr),
+		errors.Wrapf(s.initializeExtraBonusProcessingWorker(ctx, usr), "failed to initializeExtraBonusProcessingWorker for %#v", usr),
+		errors.Wrapf(s.awardRegistrationICECoinsBonus(ctx, usr), "failed to awardRegistrationICECoinsBonus for %#v", usr),
+	).ErrorOrNil()
 }
 
 func (*usersTableSource) hideRanking(usr *users.User) (hideRanking bool) {
@@ -278,29 +232,6 @@ func (*usersTableSource) hideRanking(usr *users.User) (hideRanking bool) {
 	return hideRanking
 }
 
-func (s *usersTableSource) doAfterCreate(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if err := s.initializeBalanceRecalculationWorker(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to initializeBalanceRecalculationWorker for %#v", usr)
-	}
-
-	if err := s.initializeMiningRatesRecalculationWorker(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to initializeMiningRatesRecalculationWorker for %#v", usr)
-	}
-
-	if err := s.initializeBlockchainBalanceSynchronizationWorker(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to initializeBlockchainBalanceSynchronizationWorker for %#v", usr)
-	}
-
-	if err := s.initializeExtraBonusProcessingWorker(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to initializeExtraBonusProcessingWorker for %#v", usr)
-	}
-
-	return errors.Wrapf(s.awardRegistrationICECoinsBonus(ctx, usr), "failed to awardRegistrationBonus for %#v", usr)
-}
-
 func (s *usersTableSource) awardRegistrationICECoinsBonus(ctx context.Context, usr *users.User) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -310,7 +241,7 @@ func (s *usersTableSource) awardRegistrationICECoinsBonus(ctx context.Context, u
 			Total:  coin.NewAmountUint64(registrationICEFlakeBonusAmount),
 			UserID: usr.ID,
 		},
-		EventID: "registration_ice_bonus",
+		EventID: registrationICEBonusEventID,
 	}
 
 	return errors.Wrapf(s.sendAddBalanceCommandMessage(ctx, cmd), "failed to sendAddBalanceCommandMessage for %#v", cmd)

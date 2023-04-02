@@ -14,7 +14,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -23,28 +23,26 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	workerIndex := usr.HashCode % r.cfg.WorkerCount
-	err := retry(ctx, func() error {
-		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker_", usr.ID, workerIndex); err != nil {
+
+	return errors.Wrapf(retry(ctx, func() error {
+		if err := r.initializeWorker(ctx, "mining_rates_recalculation_worker", usr.ID, usr.HashCode); err != nil {
 			if errors.Is(err, storage.ErrRelationNotFound) {
 				return err
 			}
 
-			return errors.Wrapf(backoff.Permanent(err), "failed to initializeMiningRatesRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+			return errors.Wrapf(backoff.Permanent(err), "failed to initializeMiningRatesRecalculationWorker for userID:%v", usr.ID)
 		}
 
 		return nil
-	})
-
-	return errors.Wrapf(err, "permanently failed to initializeMiningRatesRecalculationWorker for userID:%v,workerIndex:%v", usr.ID, workerIndex)
+	}), "permanently failed to initializeMiningRatesRecalculationWorker for userID:%v", usr.ID)
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("miningRatesRecalculationTriggerStreamSource started")
 	defer log.Info("miningRatesRecalculationTriggerStreamSource stopped")
-	workerIndexes := make([]uint64, s.cfg.WorkerCount) //nolint:makezero // Intended.
+	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
 	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = uint64(i)
+		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
 		stdlibtime.Sleep(refreshMiningRatesProcessingSeedingStreamEmitFrequency)
@@ -54,7 +52,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context)
 	}
 }
 
-func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex uint64) (err error) {
+func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context.Context, workerIndex int16) (err error) {
 	if ignoredCtx.Err() != nil {
 		return errors.Wrap(ignoredCtx.Err(), "unexpected deadline while processing message")
 	}
@@ -75,7 +73,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) process(ignoredCtx context
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) getLatestMiningRates( //nolint:funlen,gocognit // .
-	ctx context.Context, workerIndex uint64, now *time.Time,
+	ctx context.Context, workerIndex int16, now *time.Time,
 ) ([]*MiningRates[coin.ICEFlake], error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -102,7 +100,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) getLatestMiningRates( //no
 					Add(row.AggressiveDegradationReferenceT2Amount)
 				negativeMiningRate = s.calculateDegradation(s.cfg.GlobalAggregationInterval.Child, referenceAmount, true)
 			} else {
-				negativeMiningRate = s.calculateDegradation(s.cfg.GlobalAggregationInterval.Child, row.DegradationReferenceTotalT1T2Amount, false)
+				negativeMiningRate = s.calculateDegradation(s.cfg.GlobalAggregationInterval.Child, row.DegradationReferenceTotalT0T1T2Amount, false)
 			}
 			if negativeMiningRate.IsNil() {
 				negativeMiningRate = coin.ZeroICEFlakes()
@@ -116,107 +114,107 @@ func (s *miningRatesRecalculationTriggerStreamSource) getLatestMiningRates( //no
 
 type (
 	latestMiningRateCalculationSQLRow struct {
-		_msgpack                                  struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		LastMiningEndedAt                         *time.Time
 		AggressiveDegradationReferenceTotalAmount *coin.ICEFlake
 		AggressiveDegradationReferenceT0Amount    *coin.ICEFlake
 		AggressiveDegradationReferenceT1Amount    *coin.ICEFlake
 		AggressiveDegradationReferenceT2Amount    *coin.ICEFlake
-		DegradationReferenceTotalT1T2Amount       *coin.ICEFlake
+		DegradationReferenceTotalT0T1T2Amount     *coin.ICEFlake
 		userMiningRateRecalculationParameters
 	}
 )
 
 func (s *miningRatesRecalculationTriggerStreamSource) getUserMiningRateCalculationParametersNewBatch( //nolint:funlen,gocritic// .
-	ctx context.Context, workerIndex uint64, now *time.Time,
+	ctx context.Context, workerIndex int16, now *time.Time,
 ) ([]*latestMiningRateCalculationSQLRow, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	sql := fmt.Sprintf(`
 SELECT u.last_mining_ended_at,
-	   aggressive_degradation_btotal.amount AS aggressive_degradation_btotal_amount,
-	   aggressive_degradation_bt0.amount AS aggressive_degradation_bt0_amount,
-	   aggressive_degradation_bt1.amount AS aggressive_degradation_bt1_amount,
-	   aggressive_degradation_bt2.amount AS aggressive_degradation_bt2_amount,
-	   degradation_btotalt0t1t2.amount AS degradation_btotalt0t1t2_amount,
+	   aggressive_degradation_btotal.amount AS aggressive_degradation_reference_total_amount,
+	   aggressive_degradation_bt0.amount AS aggressive_degradation_reference_t0_amount,
+	   aggressive_degradation_bt1.amount AS aggressive_degradation_reference_t1_amount,
+	   aggressive_degradation_bt2.amount AS aggressive_degradation_reference_t2_amount,
+	   degradation_btotalt0t1t2.amount AS degradation_reference_total_t0_t1_t2_amount,
 	   u.user_id,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
-	   ar_worker.t1,
-	   ar_worker.t2,
-	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus, 
-	   x.pre_staking_allocation,
-	   st_b.bonus
+	   coalesce(ar_worker.t1,0) AS t1,
+	   coalesce(ar_worker.t2,0) AS t2,
+	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at, '1999-01-08 04:05:06'::timestamp) > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus, 
+	   coalesce(x.pre_staking_allocation,0) AS pre_staking_allocation,
+	   coalesce(st_b.bonus,0) AS pre_staking_bonus
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
 			 x.user_id
 	  FROM ( SELECT user_id
-		     FROM mining_rates_recalculation_worker_%[2]v
+		     FROM mining_rates_recalculation_worker
+			 WHERE worker_index = $1
 		     ORDER BY last_iteration_finished_at
-		     LIMIT %[1]v ) x
-			 LEFT JOIN pre_stakings_%[2]v st
-					ON st.user_id = x.user_id
+		     LIMIT $2 ) x
+			 LEFT JOIN pre_stakings st
+					ON st.worker_index = $1
+				   AND st.user_id = x.user_id
 	  GROUP BY x.user_id
 	 ) x
 	    JOIN users u
 		  ON u.user_id = x.user_id
-   LEFT JOIN extra_bonus_processing_worker_%[2]v eb_worker
-		  ON eb_worker.user_id = x.user_id
-   LEFT JOIN active_referrals_%[2]v ar_worker
-		  ON ar_worker.user_id = x.user_id
+   LEFT JOIN extra_bonus_processing_worker eb_worker
+		  ON eb_worker.worker_index = $1
+		 AND eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals ar_worker
+		  ON ar_worker.worker_index = $1
+		 AND ar_worker.user_id = x.user_id
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years
-   LEFT JOIN balances_%[2]v aggressive_degradation_btotal
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+   LEFT JOIN balances_worker aggressive_degradation_btotal
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
 		 AND aggressive_degradation_btotal.user_id = u.user_id
 		 AND aggressive_degradation_btotal.negative = FALSE
-		 AND aggressive_degradation_btotal.type = %[3]v
-		 AND aggressive_degradation_btotal.type_detail = '%[4]v'
-   LEFT JOIN balances_%[2]v aggressive_degradation_bt0
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+		 AND aggressive_degradation_btotal.type = %[1]v
+		 AND aggressive_degradation_btotal.type_detail = '%[2]v'
+   LEFT JOIN balances_worker aggressive_degradation_bt0
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt0.worker_index = $1
 		 AND aggressive_degradation_bt0.user_id = u.user_id
 		 AND aggressive_degradation_bt0.negative = FALSE
-		 AND aggressive_degradation_bt0.type = %[3]v
-		 AND aggressive_degradation_bt0.type_detail = '%[5]v_' || u.referred_by || '_'
-   LEFT JOIN balances_%[2]v aggressive_degradation_bt1
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+		 AND aggressive_degradation_bt0.type = %[1]v
+		 AND aggressive_degradation_bt0.type_detail = '%[3]v_' || u.referred_by || '_'
+   LEFT JOIN balances_worker aggressive_degradation_bt1
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt1.worker_index = $1
 		 AND aggressive_degradation_bt1.user_id = u.user_id
 		 AND aggressive_degradation_bt1.negative = FALSE
-		 AND aggressive_degradation_bt1.type = %[3]v
-		 AND aggressive_degradation_bt1.type_detail = '%[6]v'
-   LEFT JOIN balances_%[2]v aggressive_degradation_bt2
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+		 AND aggressive_degradation_bt1.type = %[1]v
+		 AND aggressive_degradation_bt1.type_detail = '%[4]v'
+   LEFT JOIN balances_worker aggressive_degradation_bt2
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt2.worker_index = $1
 		 AND aggressive_degradation_bt2.user_id = u.user_id
 		 AND aggressive_degradation_bt2.negative = FALSE
-		 AND aggressive_degradation_bt2.type = %[3]v
-		 AND aggressive_degradation_bt2.type_detail = '%[7]v'
-   LEFT JOIN balances_%[2]v degradation_btotalt0t1t2
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+		 AND aggressive_degradation_bt2.type = %[1]v
+		 AND aggressive_degradation_bt2.type_detail = '%[5]v'
+   LEFT JOIN balances_worker degradation_btotalt0t1t2
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND degradation_btotalt0t1t2.worker_index = $1
 		 AND degradation_btotalt0t1t2.user_id = u.user_id
 		 AND degradation_btotalt0t1t2.negative = FALSE
-		 AND degradation_btotalt0t1t2.type = %[3]v
-		 AND degradation_btotalt0t1t2.type_detail = '%[8]v'
+		 AND degradation_btotalt0t1t2.type = %[1]v
+		 AND degradation_btotalt0t1t2.type_detail = '%[6]v'
    LEFT JOIN users t0
 	  	  ON t0.user_id = u.referred_by
 	     AND t0.user_id != x.user_id
 	  	 AND t0.last_mining_ended_at IS NOT NULL
-	  	 AND t0.last_mining_ended_at  > :now_nanos`,
-		miningRatesRecalculationBatchSize,
-		workerIndex,
+	  	 AND t0.last_mining_ended_at  > $3`,
 		totalNoPreStakingBonusBalanceType,
 		aggressiveDegradationTotalReferenceBalanceTypeDetail,
 		t0BalanceTypeDetail,
 		aggressiveDegradationT1ReferenceBalanceTypeDetail,
 		aggressiveDegradationT2ReferenceBalanceTypeDetail,
 		degradationT0T1T2TotalReferenceBalanceTypeDetail)
-	params := make(map[string]any, 1)
-	params["now_nanos"] = now
-	res := make([]*latestMiningRateCalculationSQLRow, 0, miningRatesRecalculationBatchSize)
-	if err := s.db.PrepareExecuteTyped(sql, params, &res); err != nil {
-		return nil, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
-	}
+	res, err := storage.Select[latestMiningRateCalculationSQLRow](ctx, s.db, sql, workerIndex, miningRatesRecalculationBatchSize, *now.Time)
 
-	return res, nil
+	return res, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) sendMiningRatesMessage(ctx context.Context, mnrs *MiningRates[coin.ICEFlake]) error {
@@ -243,7 +241,7 @@ func (r *repository) calculateICEFlakeMiningRates(
 	baseMiningRate *coin.ICEFlake, row *latestMiningRateCalculationSQLRow, negativeMiningRate *coin.ICEFlake,
 ) (miningRates *MiningRates[coin.ICEFlake]) {
 	miningRates = new(MiningRates[coin.ICEFlake])
-
+	miningRates.UserID = row.UserID
 	if !negativeMiningRate.IsNil() {
 		miningRates.Type = NegativeMiningRateType
 		if row.PreStakingAllocation != percentage100 {
@@ -273,7 +271,7 @@ func (r *repository) calculateICEFlakeMiningRates(
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) updateLastIterationFinishedAt(
-	ctx context.Context, workerIndex uint64, rows []*MiningRates[coin.ICEFlake], now *time.Time,
+	ctx context.Context, workerIndex int16, rows []*MiningRates[coin.ICEFlake], now *time.Time,
 ) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -282,9 +280,9 @@ func (s *miningRatesRecalculationTriggerStreamSource) updateLastIterationFinishe
 	for i := range rows {
 		userIDs = append(userIDs, rows[i].UserID)
 	}
-	const table = "mining_rates_recalculation_worker_"
+	const table = "mining_rates_recalculation_worker"
 	params := make(map[string]any, 1)
-	params["last_iteration_finished_at"] = now
+	params["last_iteration_finished_at"] = *now.Time
 	err := s.updateWorkerFields(ctx, workerIndex, table, params, userIDs...)
 
 	return errors.Wrapf(err, "failed to updateWorkerTimeField for workerIndex:%v,table:%q,params:%#v,userIDs:%#v", workerIndex, table, params, userIDs)

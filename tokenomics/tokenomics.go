@@ -16,20 +16,19 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func New(ctx context.Context, cancel context.CancelFunc) Repository {
+func New(ctx context.Context, _ context.CancelFunc) Repository {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
-	db := storage.MustConnect(ctx, cancel, getDDL(&cfg), applicationYamlKey)
+	db := storage.MustConnect(ctx, "", applicationYamlKey)
 
 	return &repository{
 		cfg:           &cfg,
@@ -39,23 +38,17 @@ func New(ctx context.Context, cancel context.CancelFunc) Repository {
 	}
 }
 
-func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { //nolint:funlen // A lot of startup & shutdown ceremony.
+func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
-	var mbConsumer messagebroker.Client
 	prc := &processor{repository: &repository{
-		cfg: &cfg,
-		db: storage.MustConnect(context.Background(), func() { //nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-			if mbConsumer != nil {
-				log.Error(errors.Wrap(mbConsumer.Close(), "failed to close mbConsumer due to db premature cancellation"))
-			}
-			cancel()
-		}, getDDL(&cfg), applicationYamlKey),
+		cfg:           &cfg,
+		db:            storage.MustConnect(ctx, getDDL(ddl, &cfg), applicationYamlKey),
 		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
 	//nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
-	mbConsumer = messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
+	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
 		&usersTableSource{processor: prc},
 		&globalTableSource{processor: prc},
 		&miningSessionsTableSource{processor: prc},
@@ -65,7 +58,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	)
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
-	prc.initializeExtraBonusWorkers()
+	prc.initializeExtraBonusWorkers(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
 	go prc.startStreams(ctx)
 	go prc.startCleaners(ctx)
@@ -73,28 +66,33 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor { 
 	return prc
 }
 
-func getDDL(cfg *config) string {
+func getDDL(ddl string, cfg *config) string {
 	extraBonusesValues := make([]string, 0, len(cfg.ExtraBonuses.FlatValues))
 	for ix, value := range cfg.ExtraBonuses.FlatValues {
 		extraBonusesValues = append(extraBonusesValues, fmt.Sprintf("(%v,%v)", ix, value))
 	}
 	now := time.Now()
-	adoptionStart := now.Add(-24 * stdlibtime.Hour).UnixNano()
-	dailyBonusStart := now.Add(-1 * users.NanosSinceMidnight(now)).UnixNano()
-	args := make([]any, 0, len(cfg.AdoptionMilestoneSwitch.ActiveUserMilestones)+1+1+1+1)
-	args = append(args, adoptionStart, cfg.WorkerCount-1, strings.Join(extraBonusesValues, ","), dailyBonusStart)
-	for ix := range cfg.AdoptionMilestoneSwitch.ActiveUserMilestones {
-		args = append(args, cfg.AdoptionMilestoneSwitch.ActiveUserMilestones[ix])
+	adoptionValues := make([]string, 0, len(cfg.AdoptionMilestoneSwitch.ActiveUserMilestones))
+	for ix, milestone := range cfg.AdoptionMilestoneSwitch.ActiveUserMilestones {
+		achievedAtDate := "null"
+		if ix == 0 {
+			achievedAtDate = fmt.Sprintf("'%v'", now.Add(-24*stdlibtime.Hour).UTC().Format("2006-01-02 15:04:05"))
+		}
+		adoptionValues = append(adoptionValues, fmt.Sprintf("(%v,%v,'%v',%v)", ix+1, milestone.Users, milestone.BaseMiningRate, achievedAtDate))
 	}
 
-	return fmt.Sprintf(ddl, args...)
+	return fmt.Sprintf(ddl,
+		cfg.WorkerCount-1,
+		strings.Join(extraBonusesValues, ","),
+		now.Add(-1*users.NanosSinceMidnight(now)).UnixNano(),
+		strings.Join(adoptionValues, ","))
 }
 
 func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer, mbProducer messagebroker.Client, db tarantool.Connector, otherClosers ...func() error) func() error {
+func closeAll(mbConsumer, mbProducer messagebroker.Client, db *storage.DB, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
@@ -129,7 +127,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	log.Info("trying to start streams")
 	const key = "streams-processing-exclusive-lock"
 	tuple := &users.GlobalUnsigned{Key: key, Value: uint64(time.Now().UnixNano())}
-	if err := storage.CheckNoSQLDMLErr(p.db.InsertTyped("GLOBAL", tuple, &[]*users.GlobalUnsigned{})); err != nil {
+	if err := p.insertGlobalUnsignedValue(ctx, tuple, false); err != nil {
 		log.Error(errors.Wrapf(err, "failed to start streams, because failed to insert into global: %#v", tuple))
 		const waitDuration = 5 * stdlibtime.Second
 		stdlibtime.Sleep(waitDuration)
@@ -139,7 +137,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	}
 	log.Info("streams started")
 	defer func() {
-		log.Error(errors.Wrapf(storage.CheckNoSQLDMLErr(p.db.DeleteTyped("GLOBAL", "pk_unnamed_GLOBAL_1", tarantool.StringKey{S: key}, &[]*users.GlobalUnsigned{})), "failed to delete GLOBAL(%v)", key)) //nolint:lll // .
+		log.Error(errors.Wrapf(p.deleteGlobalUnsignedValue(context.Background(), key), "failed to deleteGlobalUnsignedValue(%v)", key))
 	}()
 	streamsCtx, cancelStreams := context.WithCancel(ctx)
 	p.streamsDoneWg = new(sync.WaitGroup)
@@ -186,10 +184,8 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := `DELETE FROM processed_mining_sessions WHERE session_number < :session_number`
-	params := make(map[string]any, 1)
-	params["session_number"] = p.sessionNumber(time.New(time.Now().Add(-24 * stdlibtime.Hour)))
-	if _, err := storage.CheckSQLDMLResponse(p.db.PrepareExecute(sql, params)); err != nil {
+	sql := `DELETE FROM processed_mining_sessions WHERE session_number < $1`
+	if _, err := storage.Exec(ctx, p.db, sql, p.sessionNumber(time.New(time.Now().Add(-24*stdlibtime.Hour)))); err != nil {
 		return errors.Wrap(err, "failed to delete old data from processed_mining_sessions")
 	}
 
@@ -197,7 +193,7 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if _, err := p.db.Ping(); err != nil {
+	if err := p.db.Ping(ctx); err != nil {
 		return errors.Wrap(err, "[health-check] failed to ping DB")
 	}
 	type ts struct {
@@ -252,10 +248,14 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 	return
 }
 
-func (r *repository) workerIndex(ctx context.Context) (workerIndex uint64) {
+func (r *repository) workerIndex(ctx context.Context) (workerIndex int16) {
+	return int16(uint64(r.hashCode(ctx)) % uint64(r.cfg.WorkerCount))
+}
+
+func (*repository) hashCode(ctx context.Context) (hashCode int64) {
 	userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64) //nolint:errcheck // Not needed.
 
-	return userHashCode % r.cfg.WorkerCount
+	return int64(userHashCode)
 }
 
 func executeBatchConcurrently[ARG any](ctx context.Context, process func(context.Context, ARG) error, args []ARG) error {

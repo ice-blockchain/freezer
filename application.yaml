@@ -27,11 +27,11 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 tokenomics: &tokenomics
-  db: &tokenomicsDatabase
-    urls:
-      - localhost:3401
-    user: admin
-    password: pass
+  wintr/connectors/storage/v2:
+    runDDL: true
+    primaryURL: postgresql://root:pass@localhost:5432/ice
+    replicaURLs:
+      - postgresql://root:pass@localhost:5432/ice
   messageBroker: &tokenomicsMessageBroker
     consumerGroup: freezer-local
     createTopics: true
@@ -71,22 +71,6 @@ tokenomics: &tokenomics
         replicationFactor: 1
         retention: 10s
       - name: started-days-off
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: balance-recalculation-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: mining-rates-recalculation-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: blockchain-balance-synchronization-trigger-stream
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: extra-bonus-processing-trigger-stream
         partitions: 10
         replicationFactor: 1
         retention: 10s
@@ -141,11 +125,18 @@ tokenomics: &tokenomics
     duration: 60s
     consecutiveDurationsRequired: 7
     activeUserMilestones:
-      - 2
-      - 4
-      - 6
-      - 8
-      - 10
+      - users: 0
+        baseMiningRate: 320000000000
+      - users: 2
+        baseMiningRate: 160000000000
+      - users: 4
+        baseMiningRate: 80000000000
+      - users: 6
+        baseMiningRate: 40000000000
+      - users: 8
+        baseMiningRate: 20000000000
+      - users: 10
+        baseMiningRate: 10000000000
   extraBonuses:
     duration: 24m
     utcOffsetDuration: 6s
@@ -171,43 +162,9 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
-tokenomics1:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-balance-recalculation-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: balance-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics2:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-mining-rates-recalculation-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: mining-rates-recalculation-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics3:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-blockchain-balance-synchronization-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: blockchain-balance-synchronization-trigger-stream
-        oneGoroutinePerPartition: true
-tokenomics4:
-  messageBroker:
-    consumerGroup: freezer-refrigerant-extra-bonus-processing-trigger-stream
-    urls:
-      - localhost:9092
-    consumingTopics:
-      - name: extra-bonus-processing-trigger-stream
-        oneGoroutinePerPartition: true
 tokenomics_test:
   <<: *tokenomics
   messageBroker:
     <<: *tokenomicsMessageBroker
     consumingTopics: *tokenomicsMessageBrokerTopics
     consumerGroup: freezer-local-test
-  db:
-    <<: *tokenomicsDatabase

@@ -11,17 +11,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/coin"
-	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*RankingSummary, error) { //nolint:funlen // A lot of SQL.
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if true {
-		return &RankingSummary{}, nil
-	}
 	sql := fmt.Sprintf(`
 SELECT count(others.user_id) + 1 AS global_rank
 FROM (SELECT x.amount_w0,
@@ -33,7 +27,7 @@ FROM (SELECT x.amount_w0,
 				   amount_w2,
 				   amount_w3
 			FROM balances
-			WHERE user_id = :user_id
+			WHERE user_id = $1
 			UNION ALL
 			SELECT %[1]v AS amount_w0,
 				   0 AS amount_w1,
@@ -44,13 +38,13 @@ FROM (SELECT x.amount_w0,
 	JOIN balances AS others
 		ON	(
 			 CASE
-			   WHEN others.amount_w3 == this.amount_w3
+			   WHEN others.amount_w3 = this.amount_w3
 				   THEN (
 						 CASE
-							WHEN others.amount_w2 == this.amount_w2
+							WHEN others.amount_w2 = this.amount_w2
 								THEN (
 									  CASE
-										 WHEN others.amount_w1 == this.amount_w1
+										 WHEN others.amount_w1 = this.amount_w1
 											 THEN (others.amount_w0 >= this.amount_w0)
 										 ELSE others.amount_w1 > this.amount_w1
 									  END
@@ -61,15 +55,13 @@ FROM (SELECT x.amount_w0,
 			   ELSE others.amount_w3 > this.amount_w3
 			 END
 			)
-		AND others.user_id != :user_id
+		AND others.user_id != $1
 UNION ALL
-SELECT (CASE WHEN hide_ranking == TRUE THEN 1 ELSE 2 END)
+SELECT (CASE WHEN hide_ranking = TRUE THEN 1 ELSE 2 END)
 FROM users 
-WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
-	params := make(map[string]any, 1)
-	params["user_id"] = userID
-	resp := make([]*RankingSummary, 0, 1+1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+WHERE user_id = $1`, registrationICEFlakeBonusAmount)
+	resp, err := storage.Select[RankingSummary](ctx, r.db, sql, userID)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select miner global rank for userID:%v", userID)
 	}
 	if len(resp) == 1 {
@@ -82,13 +74,12 @@ WHERE user_id = :user_id`, registrationICEFlakeBonusAmount)
 	return resp[0], nil
 }
 
-func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if true {
-		return make([]*Miner, 0), nil
-	}
+func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (res []*Miner, err error) {
+	defer func() {
+		if res == nil && err == nil {
+			res = make([]*Miner, 0)
+		}
+	}()
 	if keyword == "" {
 		return r.getTopMiners(ctx, limit, offset)
 	} else { //nolint:revive // Nope.
@@ -97,63 +88,44 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 }
 
 func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	sql := fmt.Sprintf(`SELECT b.amount,
+	sql := fmt.Sprintf(`SELECT b.amount as balance,
 							   u.user_id,
 							   u.username,
-							   %[2]v AS profile_picture_url
+							   %[1]v AS profile_picture_url
 						FROM users u
 							JOIN balances b
 								ON u.user_id = b.user_id
-						WHERE (
-								( u.username IS NOT NULL AND u.username LIKE :keyword ESCAPE '\' )
-								OR
-								( u.first_name IS NOT NULL AND u.first_name != '' AND LOWER(u.first_name) LIKE :keyword ESCAPE '\' )
-								OR
-								( u.last_name IS NOT NULL AND u.last_name != '' AND LOWER(u.last_name) LIKE :keyword ESCAPE '\' )
-							  )
-							  AND u.hide_ranking = FALSE
+						WHERE u.lookup LIKE $1 ESCAPE '\'
+						  AND u.hide_ranking = FALSE
 						ORDER BY b.amount_w3 DESC,
 								 b.amount_w2 DESC,
 								 b.amount_w1 DESC,
 								 b.amount_w0 DESC
-						LIMIT %[1]v OFFSET :offset`, limit, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	params := make(map[string]any, 1+1)
-	params["offset"] = offset
-	params["keyword"] = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
-	resp := make([]*Miner, 0, limit)
-	err := errors.Wrapf(r.db.PrepareExecuteTyped(sql, params, &resp), "failed to select for top miners for params:%#v", params)
+						LIMIT $2 OFFSET $3`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
+	keywordArg := fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
+	resp, err := storage.Select[Miner](ctx, r.db, sql, keywordArg, limit, offset)
 
-	return resp, err
+	return resp, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keywordArg, offset, offset+limit)
 }
 
-func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]*Miner, error) { //nolint:revive // .
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	sql := fmt.Sprintf(`SELECT b.amount,
+//nolint:revive // Intended.
+func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]*Miner, error) {
+	sql := fmt.Sprintf(`SELECT b.amount as balance,
 							   u.user_id,
 							   u.username,
-							   %[2]v AS profile_picture_url
-							FROM balances b
-								JOIN users u
-								    ON u.user_id = b.user_id
-									AND u.hide_ranking = FALSE
-							ORDER BY b.amount_w3 DESC,
-									 b.amount_w2 DESC,
-									 b.amount_w1 DESC,
-									 b.amount_w0 DESC
-              				LIMIT %[1]v OFFSET :offset`, limit, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	params := make(map[string]any, 1)
-	params["offset"] = offset
-	resp := make([]*Miner, 0, limit)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
-		return nil, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
-	}
+							   %[1]v AS profile_picture_url
+						FROM balances b
+							JOIN users u
+								ON u.user_id = b.user_id
+								AND u.hide_ranking = FALSE
+						ORDER BY b.amount_w3 DESC,
+								 b.amount_w2 DESC,
+								 b.amount_w1 DESC,
+								 b.amount_w0 DESC
+						LIMIT $1 OFFSET $2`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
+	resp, err := storage.Select[Miner](ctx, r.db, sql, limit, offset)
 
-	return resp, nil
+	return resp, errors.Wrapf(err, "failed to select for top miners for limit:%v,offset:%v", limit, offset)
 }
 
 //nolint:funlen,lll // .
@@ -167,115 +139,128 @@ SELECT u.last_natural_mining_started_at,
 	   u.last_mining_started_at,
 	   u.last_mining_ended_at,
 	   current_adoption.base_mining_rate,
-	   btotal.amount AS btotal_amount,
-	   bt0.amount AS bt0_amount,
-	   bt1.amount AS bt1_amount,
-	   bt2.amount AS bt2_amount,
-	   aggressive_degradation_btotal.amount AS aggressive_degradation_btotal_amount,
-	   aggressive_degradation_bt0.amount AS aggressive_degradation_bt0_amount,
-	   aggressive_degradation_bt1.amount AS aggressive_degradation_bt1_amount,
-	   aggressive_degradation_bt2.amount AS aggressive_degradation_bt2_amount,
-	   degradation_btotalt0t1t2.amount AS degradation_btotalt0t1t2_amount,
+	   btotal.amount AS total_amount,
+	   bt0.amount AS t0_amount,
+	   bt1.amount AS t1_amount,
+	   bt2.amount AS t2_amount,
+	   aggressive_degradation_btotal.amount AS aggressive_degradation_reference_total_amount,
+	   aggressive_degradation_bt0.amount AS aggressive_degradation_reference_t0_amount,
+	   aggressive_degradation_bt1.amount AS aggressive_degradation_reference_t1_amount,
+	   aggressive_degradation_bt2.amount AS aggressive_degradation_reference_t2_amount,
+	   degradation_btotalt0t1t2.amount AS degradation_reference_total_t0_t1_t2_amount,
 	   u.user_id,
 	   (CASE WHEN t0.user_id IS NULL THEN 0 ELSE 1 END) AS t0,
-	   ar_worker.t1,
-	   ar_worker.t2,
-	   (CASE WHEN IFNULL(eb_worker.extra_bonus_ended_at, 0) > :now_nanos THEN eb_worker.extra_bonus ELSE 0 END) AS current_extra_bonus,
-	   x.pre_staking_allocation,
-	   st_b.bonus,
-	   eb.bonus AS flat_extra_bonus,
-	   (CASE WHEN (eb_worker.user_id IS NOT NULL AND (:now_nanos - IFNULL(eb_worker.extra_bonus_started_at, 0) > :claim_window) AND ebw.extra_bonus_index IS NOT NULL)
-			 	THEN (100 - (25 *  ((CASE WHEN (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count)) < :first_delayed_claim_penalty_window THEN 0 ELSE (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count)) END)/:delayed_claim_penalty_window)))
+	   COALESCE(ar_worker.t1,0) AS t1,
+	   COALESCE(ar_worker.t2,0) AS t2,
+	   (CASE WHEN coalesce(eb_worker.extra_bonus_ended_at,'1999-01-08 04:05:06'::timestamp) > $3 THEN eb_worker.extra_bonus ELSE 0 END) AS extra_bonus,
+	   COALESCE(x.pre_staking_allocation,0) AS pre_staking_allocation,
+	   COALESCE(st_b.bonus,0) AS pre_staking_bonus,
+	   COALESCE(eb.bonus,0) AS flat_bonus,
+	   (CASE WHEN (eb_worker.user_id IS NOT NULL AND ebw.extra_bonus_index IS NOT NULL AND $13 > coalesce(eb_worker.extra_bonus_started_at,'1999-01-08 04:05:06'::timestamp))
+				THEN (100 - (25 *  ((CASE WHEN ($4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12)) < $10::bigint THEN 0 ELSE ($4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12)) END)/$11::bigint)))
 	   		 ELSE 0
-	    END) AS available_flat_extra_bonus_percentage_remaining,
-	   eb_worker.news_seen
+	    END) AS bonus_percentage_remaining,
+	   COALESCE(eb_worker.news_seen,0) AS news_seen
 FROM (SELECT MAX(st.years) AS pre_staking_years,
 		     MAX(st.allocation) AS pre_staking_allocation,
 			 x.user_id
-			 FROM ( SELECT CAST(:user_id AS STRING) AS user_id ) x
-				 LEFT JOIN pre_stakings_%[1]v st
-						ON st.user_id = x.user_id
+			 FROM ( SELECT CAST($2 AS TEXT) AS user_id ) x
+				 LEFT JOIN pre_stakings st
+					    ON st.worker_index = $1
+					   AND st.user_id = x.user_id
 			 GROUP BY x.user_id 
 	 ) x
-		JOIN (%[2]v) current_adoption
+		JOIN (%[1]v) current_adoption
+		  ON 1=1
 	    JOIN users u
 		  ON u.user_id = x.user_id
    		JOIN extra_bonus_start_date sd 
 		  ON sd.key = 0
-   LEFT	JOIN extra_bonus_processing_worker_%[1]v eb_worker
-		  ON eb_worker.user_id = x.user_id
-   LEFT JOIN active_referrals_%[1]v ar_worker
-		  ON ar_worker.user_id = x.user_id
+   LEFT	JOIN extra_bonus_processing_worker eb_worker
+		  ON eb_worker.worker_index = $1
+		 AND eb_worker.user_id = x.user_id
+   LEFT JOIN active_referrals ar_worker
+		  ON ar_worker.worker_index = $1
+		 AND ar_worker.user_id = x.user_id
    LEFT JOIN extra_bonuses eb 
-          ON eb.ix = (:now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - sd.value) / :duration
-		 AND :now_nanos + (eb_worker.utc_offset * :utc_offset_duration) > sd.value
+		  ON eb.ix = ($4::bigint + (eb_worker.utc_offset * $5::bigint) - sd.value) / $6::bigint
+		 AND $4::bigint + (eb_worker.utc_offset * $5::bigint) > sd.value
 		 AND eb.bonus > 0
-   LEFT JOIN extra_bonuses_%[1]v ebw
-		  ON eb.ix = ebw.extra_bonus_index
-		 AND :now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count) < :claim_window
-		 AND :now_nanos + (eb_worker.utc_offset * :utc_offset_duration) - (sd.value + (ebw.extra_bonus_index * :duration)) - :time_to_availability_window - ((ebw.offset * :availability_window) / :worker_count) > 0
+   LEFT JOIN extra_bonuses_worker ebw
+		  ON ebw.worker_index = $1
+		 AND ebw.extra_bonus_index = eb.ix
+		 AND $4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12) < $8::bigint
+		 AND $4::bigint + (eb_worker.utc_offset * $5::bigint) - (sd.value + (ebw.extra_bonus_index * $6::bigint)) - $7::bigint - ((ebw.offset_value * $9::bigint) / $12) > 0
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years
-   LEFT JOIN balances_%[1]v btotal
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+   LEFT JOIN balances_worker btotal
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND btotal.worker_index = $1
 	     AND btotal.user_id = u.user_id
 	     AND btotal.negative = FALSE
-	     AND btotal.type = %[3]v
+	     AND btotal.type = %[2]v
 	     AND btotal.type_detail = ''
-   LEFT JOIN balances_%[1]v bt0
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+   LEFT JOIN balances_worker bt0
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND bt0.worker_index = $1
 	     AND bt0.user_id = u.user_id
 	     AND bt0.negative = FALSE
-	     AND bt0.type = %[3]v
-	     AND bt0.type_detail = '%[4]v_' || u.referred_by
-   LEFT JOIN balances_%[1]v bt1
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND bt0.type = %[2]v
+	     AND bt0.type_detail = '%[3]v_' || u.referred_by
+   LEFT JOIN balances_worker bt1
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND bt1.worker_index = $1
 	     AND bt1.user_id = u.user_id
 	     AND bt1.negative = FALSE
-	     AND bt1.type = %[3]v
-	     AND bt1.type_detail = '%[5]v'
-   LEFT JOIN balances_%[1]v bt2
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND bt1.type = %[2]v
+	     AND bt1.type_detail = '%[4]v'
+   LEFT JOIN balances_worker bt2
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND bt2.worker_index = $1
 	     AND bt2.user_id = u.user_id
 	     AND bt2.negative = FALSE
-	     AND bt2.type = %[3]v
-	     AND bt2.type_detail = '%[6]v'
-   LEFT JOIN balances_%[1]v aggressive_degradation_btotal
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND bt2.type = %[2]v
+	     AND bt2.type_detail = '%[5]v'
+   LEFT JOIN balances_worker aggressive_degradation_btotal
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_btotal.worker_index = $1
 	     AND aggressive_degradation_btotal.user_id = u.user_id
 	     AND aggressive_degradation_btotal.negative = FALSE
-	     AND aggressive_degradation_btotal.type = %[3]v
-	     AND aggressive_degradation_btotal.type_detail = '%[7]v'
-   LEFT JOIN balances_%[1]v aggressive_degradation_bt0
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND aggressive_degradation_btotal.type = %[2]v
+	     AND aggressive_degradation_btotal.type_detail = '%[6]v'
+   LEFT JOIN balances_worker aggressive_degradation_bt0
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt0.worker_index = $1
 	     AND aggressive_degradation_bt0.user_id = u.user_id
 	     AND aggressive_degradation_bt0.negative = FALSE
-	     AND aggressive_degradation_bt0.type = %[3]v
-	     AND aggressive_degradation_bt0.type_detail = '%[4]v_' || u.referred_by || '_'
-   LEFT JOIN balances_%[1]v aggressive_degradation_bt1
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND aggressive_degradation_bt0.type = %[2]v
+	     AND aggressive_degradation_bt0.type_detail = '%[3]v_' || u.referred_by || '_'
+   LEFT JOIN balances_worker aggressive_degradation_bt1
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt1.worker_index = $1
 	     AND aggressive_degradation_bt1.user_id = u.user_id
 	     AND aggressive_degradation_bt1.negative = FALSE
-	     AND aggressive_degradation_bt1.type = %[3]v
-	     AND aggressive_degradation_bt1.type_detail = '%[8]v'
-   LEFT JOIN balances_%[1]v aggressive_degradation_bt2
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND aggressive_degradation_bt1.type = %[2]v
+	     AND aggressive_degradation_bt1.type_detail = '%[7]v'
+   LEFT JOIN balances_worker aggressive_degradation_bt2
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND aggressive_degradation_bt2.worker_index = $1
 	     AND aggressive_degradation_bt2.user_id = u.user_id
 	     AND aggressive_degradation_bt2.negative = FALSE
-	     AND aggressive_degradation_bt2.type = %[3]v
-	     AND aggressive_degradation_bt2.type_detail = '%[9]v'
-   LEFT JOIN balances_%[1]v degradation_btotalt0t1t2
-		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < :now_nanos )
+	     AND aggressive_degradation_bt2.type = %[2]v
+	     AND aggressive_degradation_bt2.type_detail = '%[8]v'
+   LEFT JOIN balances_worker degradation_btotalt0t1t2
+		  ON (u.last_mining_ended_at IS NOT NULL AND u.last_mining_ended_at < $3 )
+		 AND degradation_btotalt0t1t2.worker_index = $1
 	     AND degradation_btotalt0t1t2.user_id = u.user_id
 	     AND degradation_btotalt0t1t2.negative = FALSE
-	     AND degradation_btotalt0t1t2.type = %[3]v
-	     AND degradation_btotalt0t1t2.type_detail = '%[10]v'
+	     AND degradation_btotalt0t1t2.type = %[2]v
+	     AND degradation_btotalt0t1t2.type_detail = '%[9]v'
    LEFT JOIN users t0
 	  	  ON t0.user_id = u.referred_by
 	     AND t0.user_id != x.user_id
 	  	 AND t0.last_mining_ended_at IS NOT NULL
-	  	 AND t0.last_mining_ended_at  > :now_nanos`,
-		r.workerIndex(ctx),
+	  	 AND t0.last_mining_ended_at  > $3`,
 		currentAdoptionSQL(),
 		totalNoPreStakingBonusBalanceType,
 		t0BalanceTypeDetail,
@@ -287,19 +272,22 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		degradationT0T1T2TotalReferenceBalanceTypeDetail,
 	)
 	const networkLagDelta = 1.3
-	params := make(map[string]any, 10) //nolint:gomnd // .
-	params["user_id"] = userID
-	params["now_nanos"] = now
-	params["duration"] = r.cfg.ExtraBonuses.Duration
-	params["utc_offset_duration"] = r.cfg.ExtraBonuses.UTCOffsetDuration
-	params["availability_window"] = r.cfg.ExtraBonuses.AvailabilityWindow
-	params["delayed_claim_penalty_window"] = r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow
-	params["first_delayed_claim_penalty_window"] = stdlibtime.Duration(float64(r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkLagDelta)
-	params["time_to_availability_window"] = r.cfg.ExtraBonuses.TimeToAvailabilityWindow
-	params["claim_window"] = r.cfg.ExtraBonuses.ClaimWindow
-	params["worker_count"] = r.cfg.WorkerCount
-	resp := make([]*struct {
-		_msgpack                                  struct{} `msgpack:",asArray"` //nolint:tagliatelle,revive,nosnakecase // To insert we need asArray
+	args := []any{
+		r.workerIndex(ctx),
+		userID,
+		*now.Time,
+		now.UnixNano(),
+		r.cfg.ExtraBonuses.UTCOffsetDuration,
+		r.cfg.ExtraBonuses.Duration,
+		r.cfg.ExtraBonuses.TimeToAvailabilityWindow,
+		r.cfg.ExtraBonuses.ClaimWindow,
+		r.cfg.ExtraBonuses.AvailabilityWindow,
+		stdlibtime.Duration(float64(r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkLagDelta),
+		r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow,
+		r.cfg.WorkerCount,
+		now.Add(-r.cfg.ExtraBonuses.ClaimWindow),
+	}
+	resp, err := storage.Get[struct {
 		LastNaturalMiningStartedAt                *time.Time
 		LastMiningStartedAt                       *time.Time
 		LastMiningEndedAt                         *time.Time
@@ -317,42 +305,43 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		FlatBonus                uint64
 		BonusPercentageRemaining uint64
 		NewsSeen                 uint64
-	}, 0, 1)
-	if err := r.db.PrepareExecuteTyped(sql, params, &resp); err != nil {
+	}](ctx, r.db, sql, args...)
+	if err != nil {
+		if storage.IsErr(err, storage.ErrNotFound) {
+			return nil, errors.Wrapf(storage.ErrRelationNotFound, "failed to select for mining summary for userID:%v", userID)
+		}
+
 		return nil, errors.Wrapf(err, "failed to select for mining summary for userID:%v", userID)
-	}
-	if len(resp) == 0 {
-		return nil, storage.ErrRelationNotFound
 	}
 	var mrt MiningRateType
 	var negativeMiningRate *coin.ICEFlake
-	if resp[0].LastMiningEndedAt == nil { //nolint:gocritic,nestif // Wrong.
+	if resp.LastMiningEndedAt == nil { //nolint:gocritic,nestif // Wrong.
 		mrt = NoneMiningRateType
-	} else if resp[0].LastMiningEndedAt.After(*now.Time) {
+	} else if resp.LastMiningEndedAt.After(*now.Time) {
 		mrt = PositiveMiningRateType
-	} else if resp[0].TotalAmount.Add(resp[0].T0Amount).Add(resp[0].T1Amount).Add(resp[0].T2Amount).IsZero() {
+	} else if resp.TotalAmount.Add(resp.T0Amount).Add(resp.T1Amount).Add(resp.T2Amount).IsZero() {
 		mrt = NoneMiningRateType
 	} else {
 		mrt = NegativeMiningRateType
-		if aggressive := resp[0].LastMiningEndedAt.Add(r.cfg.RollbackNegativeMining.AggressiveDegradationStartsAfter).Before(*now.Time); aggressive {
-			referenceAmount := resp[0].AggressiveDegradationReferenceTotalAmount.
-				Add(resp[0].AggressiveDegradationReferenceT0Amount).
-				Add(resp[0].AggressiveDegradationReferenceT1Amount).
-				Add(resp[0].AggressiveDegradationReferenceT2Amount)
+		if aggressive := resp.LastMiningEndedAt.Add(r.cfg.RollbackNegativeMining.AggressiveDegradationStartsAfter).Before(*now.Time); aggressive {
+			referenceAmount := resp.AggressiveDegradationReferenceTotalAmount.
+				Add(resp.AggressiveDegradationReferenceT0Amount).
+				Add(resp.AggressiveDegradationReferenceT1Amount).
+				Add(resp.AggressiveDegradationReferenceT2Amount)
 			negativeMiningRate = r.calculateDegradation(r.cfg.GlobalAggregationInterval.Child, referenceAmount, true)
 		} else {
-			negativeMiningRate = r.calculateDegradation(r.cfg.GlobalAggregationInterval.Child, resp[0].DegradationReferenceTotalT0T1T2Amount, false)
+			negativeMiningRate = r.calculateDegradation(r.cfg.GlobalAggregationInterval.Child, resp.DegradationReferenceTotalT0T1T2Amount, false)
 		}
 	}
-	miningStreak := r.calculateMiningStreak(now, resp[0].LastMiningStartedAt, resp[0].LastMiningEndedAt)
+	miningStreak := r.calculateMiningStreak(now, resp.LastMiningStartedAt, resp.LastMiningEndedAt)
 
 	return &MiningSummary{
 		MiningStreak:                miningStreak,
-		MiningSession:               r.calculateMiningSession(now, resp[0].LastNaturalMiningStartedAt, resp[0].LastMiningEndedAt),
-		RemainingFreeMiningSessions: r.calculateRemainingFreeMiningSessions(now, resp[0].LastMiningEndedAt),
-		MiningRates:                 r.calculateMiningRateSummaries(resp[0].BaseMiningRate, &resp[0].userMiningRateRecalculationParameters, negativeMiningRate, mrt), //nolint:lll // .
+		MiningSession:               r.calculateMiningSession(now, resp.LastNaturalMiningStartedAt, resp.LastMiningEndedAt),
+		RemainingFreeMiningSessions: r.calculateRemainingFreeMiningSessions(now, resp.LastMiningEndedAt),
+		MiningRates:                 r.calculateMiningRateSummaries(resp.BaseMiningRate, &resp.userMiningRateRecalculationParameters, negativeMiningRate, mrt), //nolint:lll // .
 		ExtraBonusSummary: ExtraBonusSummary{
-			AvailableExtraBonus: r.calculateExtraBonus(resp[0].FlatBonus, resp[0].BonusPercentageRemaining, resp[0].NewsSeen, miningStreak),
+			AvailableExtraBonus: r.calculateExtraBonus(resp.FlatBonus, resp.BonusPercentageRemaining, resp.NewsSeen, miningStreak),
 		},
 	}, nil
 }

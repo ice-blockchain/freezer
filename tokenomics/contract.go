@@ -12,10 +12,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/go-tarantool-client"
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage"
+	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -50,7 +49,6 @@ type (
 		EventID  string `json:"eventId,omitempty" example:"some unique id"`
 	}
 	Miner struct {
-		_msgpack          struct{}  `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		Balance           *coin.ICE `json:"balance,omitempty" example:"12345.6334"`
 		UserID            string    `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		Username          string    `json:"username,omitempty" example:"jdoe"`
@@ -91,7 +89,6 @@ type (
 		Before *Adoption[coin.ICEFlake] `json:"before,omitempty"`
 	}
 	Adoption[DENOM coin.ICEFlake | coin.ICE] struct {
-		_msgpack         struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		AchievedAt       *time.Time `json:"achievedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		BaseMiningRate   *DENOM     `json:"baseMiningRate,omitempty" swaggertype:"string" example:"1,243.02"`
 		Milestone        uint64     `json:"milestone,omitempty" example:"1"`
@@ -106,11 +103,12 @@ type (
 		Before *PreStakingSummary `json:"before,omitempty"`
 	}
 	PreStaking struct {
-		_msgpack   struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		CreatedAt  *time.Time `json:"createdAt,omitempty" swaggerignore:"true" example:"2022-01-03T16:20:52.156534Z"`
-		UserID     string     `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Years      uint64     `json:"years,omitempty" example:"1"`
-		Allocation uint64     `json:"allocation,omitempty" example:"100"`
+		CreatedAt   *time.Time `json:"createdAt,omitempty" swaggerignore:"true" example:"2022-01-03T16:20:52.156534Z"`
+		UserID      string     `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Years       uint64     `json:"years,omitempty" example:"1"`
+		Allocation  uint64     `json:"allocation,omitempty" example:"100"`
+		HashCode    int64      `json:"-" example:"11"`
+		WorkerIndex int16      `json:"-" example:"11"`
 	}
 	MiningRateBonuses struct {
 		T1         uint64 `json:"t1,omitempty" example:"100"`
@@ -124,7 +122,6 @@ type (
 		Bonuses *MiningRateBonuses `json:"bonuses,omitempty"`
 	}
 	MiningRates[T coin.ICEFlake | MiningRateSummary[coin.ICE]] struct {
-		_msgpack                       struct{}       `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		Total                          *T             `json:"total,omitempty"`
 		TotalNoPreStakingBonus         *T             `json:"totalNoPreStakingBonus,omitempty"`
 		PositiveTotalNoPreStakingBonus *T             `json:"positiveTotalNoPreStakingBonus,omitempty"`
@@ -142,7 +139,6 @@ type (
 		RemainingFreeMiningSessions uint64 `json:"remainingFreeMiningSessions,omitempty" example:"1"`
 	}
 	MiningSession struct {
-		_msgpack                      struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
 		LastNaturalMiningStartedAt    *time.Time `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z" swaggerignore:"true"`
 		StartedAt                     *time.Time `json:"startedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		EndedAt                       *time.Time `json:"endedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
@@ -202,13 +198,13 @@ const (
 	totalActiveUsersGlobalKey                                  = "TOTAL_ACTIVE_USERS"
 	requestingUserIDCtxValueKey                                = "requestingUserIDCtxValueKey"
 	userHashCodeCtxValueKey                                    = "userHashCodeCtxValueKey"
+	registrationICEBonusEventID                                = "registration_ice_bonus"
 	percentage100                                              = uint64(100)
 	registrationICEFlakeBonusAmount                            = 10 * uint64(coin.Denomination)
-	lastAdoptionMilestone                                      = 6
-	miningRatesRecalculationBatchSize                          = 10
-	balanceRecalculationBatchSize                              = 10
-	extraBonusProcessingBatchSize                              = 100
-	maxICEBlockchainConcurrentOperations                       = 10000
+	miningRatesRecalculationBatchSize                          = 100
+	balanceRecalculationBatchSize                              = 100
+	extraBonusProcessingBatchSize                              = 500
+	maxICEBlockchainConcurrentOperations                       = 100000
 	balanceCalculationProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
 	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
 	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 0 * stdlibtime.Second
@@ -217,6 +213,7 @@ const (
 )
 
 const (
+	rootBalanceTypeDetail                                = "."
 	t0BalanceTypeDetail                                  = "t0"
 	t1BalanceTypeDetail                                  = "t1"
 	t2BalanceTypeDetail                                  = "t2"
@@ -235,48 +232,25 @@ const (
 
 // .
 var (
-	//go:embed DDL.lua
+	//go:embed DDL.sql
 	ddl string
 )
 
 type (
 	balanceType                           int8
 	userMiningRateRecalculationParameters struct {
-		_msgpack                                                      struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // .
 		UserID                                                        users.UserID
 		T0, T1, T2, ExtraBonus, PreStakingAllocation, PreStakingBonus uint64
 	}
-	user struct {
-		_msgpack                       struct{}   `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		CreatedAt                      *time.Time `json:"createdAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		UpdatedAt                      *time.Time `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		RollbackUsedAt                 *time.Time `json:"rollbackUsedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		LastNaturalMiningStartedAt     *time.Time `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		LastMiningStartedAt            *time.Time `json:"lastMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		LastMiningEndedAt              *time.Time `json:"lastMiningEndedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		PreviousMiningStartedAt        *time.Time `json:"previousMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		PreviousMiningEndedAt          *time.Time `json:"previousMiningEndedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		LastFreeMiningSessionAwardedAt *time.Time `json:"lastFreeMiningSessionAwardedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		UserID                         string     `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		ReferredBy                     string     `json:"referredBy,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Username                       string     `json:"username,omitempty" example:"jdoe"`
-		FirstName                      string     `json:"firstName,omitempty" example:"John"`
-		LastName                       string     `json:"lastName,omitempty" example:"Doe"`
-		ProfilePictureURL              string     `json:"profilePictureUrl,omitempty" example:"https://somecdn.com/p1.jpg"`
-		MiningBlockchainAccountAddress string     `json:"miningBlockchainAccountAddress,omitempty" example:"0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		BlockchainAccountAddress       string     `json:"blockchainAccountAddress,omitempty" example:"0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		HashCode                       uint64     `json:"hashCode,omitempty" example:"1234567890"`
-		HideRanking                    bool       `json:"hideRanking,omitempty" example:"false"`
-		Verified                       bool       `json:"verified,omitempty" example:"false"`
-	}
 	balance struct {
-		_msgpack   struct{}       `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		UpdatedAt  *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		Amount     *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`
-		UserID     string         `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		TypeDetail string         `json:"typeDetail,omitempty" example:"/2022-01-03"`
-		Type       balanceType    `json:"type,omitempty" example:"1"`
-		Negative   bool           `json:"negative,omitempty" example:"false"`
+		UpdatedAt   *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
+		Amount      *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`
+		UserID      string         `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		TypeDetail  string         `json:"typeDetail,omitempty" example:"/2022-01-03"`
+		HashCode    int64          `json:"hashCode,omitempty" example:"11"`
+		WorkerIndex int16          `json:"workerIndex,omitempty" example:"11"`
+		Type        balanceType    `json:"type,omitempty" example:"1"`
+		Negative    bool           `json:"negative,omitempty" example:"false"`
 	}
 	miningSummary struct {
 		LastNaturalMiningStartedAt                    *time.Time     `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
@@ -295,15 +269,13 @@ type (
 		PreStakingBonus                               uint64         `json:"preStakingBonus,omitempty" example:"11"`
 	}
 	deviceMetadata struct {
-		_msgpack struct{}        `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		Before   *deviceMetadata `json:"before,omitempty"`
-		UserID   string          `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		TZ       string          `json:"tz,omitempty" example:"+03:00"`
+		Before *deviceMetadata `json:"before,omitempty"`
+		UserID string          `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		TZ     string          `json:"tz,omitempty" example:"+03:00"`
 	}
 	viewedNews struct {
-		_msgpack struct{} `msgpack:",asArray"` //nolint:unused,tagliatelle,revive,nosnakecase // To insert we need asArray
-		UserID   string   `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		NewsID   string   `json:"newsId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		UserID string `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		NewsID string `json:"newsId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 	}
 
 	usersTableSource struct {
@@ -349,7 +321,7 @@ type (
 	repository struct {
 		cfg           *config
 		shutdown      func() error
-		db            tarantool.Connector
+		db            *storage.DB
 		mb            messagebroker.Client
 		pictureClient picture.Client
 	}
@@ -363,7 +335,10 @@ type (
 	config struct {
 		messagebroker.Config    `mapstructure:",squash"` //nolint:tagliatelle // Nope.
 		AdoptionMilestoneSwitch struct {
-			ActiveUserMilestones         []uint64            `yaml:"activeUserMilestones"`
+			ActiveUserMilestones []struct {
+				Users          uint64 `yaml:"users"`
+				BaseMiningRate uint64 `yaml:"baseMiningRate"`
+			} `yaml:"activeUserMilestones"`
 			ConsecutiveDurationsRequired uint64              `yaml:"consecutiveDurationsRequired"`
 			Duration                     stdlibtime.Duration `yaml:"duration"`
 		} `yaml:"adoptionMilestoneSwitch"`
@@ -404,6 +379,6 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
-		WorkerCount uint64 `yaml:"workerCount"`
+		WorkerCount int16 `yaml:"workerCount"`
 	}
 )
