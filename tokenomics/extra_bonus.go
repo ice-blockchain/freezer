@@ -213,7 +213,7 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 			ON CONFLICT (worker_index, user_id) 
 					DO UPDATE 
 						  SET utc_offset = EXCLUDED.utc_offset
-					WHERE utc_offset != EXCLUDED.utc_offset`
+					WHERE extra_bonus_processing_worker.utc_offset != EXCLUDED.utc_offset`
 	_, err = storage.Exec(ctx, s.db, sql, workerIndex, dm.UserID, hashCode, int16(duration/stdlibtime.Minute))
 
 	return errors.Wrapf(err, "failed to update users' timezone for %#v", &dm)
@@ -251,7 +251,7 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 											   VALUES ($1		   , $2		, $3	   , 1)
 			ON CONFLICT (worker_index, user_id) 
 					DO UPDATE 
-						  SET news_seen = news_seen + 1`
+						  SET news_seen = extra_bonus_processing_worker.news_seen + 1`
 	_, err = storage.Exec(ctx, s.db, sql, workerIndex, vn.UserID, hashCode)
 
 	return errors.Wrapf(err, "failed to update users' newsSeen count for %#v", &vn)

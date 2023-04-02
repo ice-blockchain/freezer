@@ -402,7 +402,7 @@ type (
 	}
 )
 
-//nolint:funlen,gocognit,revive,gomnd // .
+//nolint:funlen,gocognit,revive,gomnd,gocyclo,cyclop // .
 func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Context, usersThatStoppedMining ...*userThatStoppedMining) error {
 	if ctx.Err() != nil || len(usersThatStoppedMining) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
@@ -452,6 +452,12 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 		} else {
 			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs) //nolint:asasalint // Intended.
 		}
+	}
+	if len(t0Conditions) == 0 {
+		t0Conditions = append(t0Conditions, `WHEN 1 = 0 THEN t1`)
+	}
+	if len(tMinus1Conditions) == 0 {
+		tMinus1Conditions = append(tMinus1Conditions, `WHEN 1 = 0 THEN t2`)
 	}
 	if err := storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
 		sql := fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) 
