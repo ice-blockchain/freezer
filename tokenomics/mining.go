@@ -74,7 +74,12 @@ WHERE user_id = $1`, registrationICEFlakeBonusAmount)
 	return resp[0], nil
 }
 
-func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error) {
+func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (res []*Miner, err error) {
+	defer func() {
+		if res == nil && err == nil {
+			res = make([]*Miner, 0)
+		}
+	}()
 	if keyword == "" {
 		return r.getTopMiners(ctx, limit, offset)
 	} else { //nolint:revive // Nope.

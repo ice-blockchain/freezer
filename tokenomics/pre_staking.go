@@ -14,10 +14,11 @@ import (
 )
 
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (resp *PreStakingSummary, err error) {
-	sql := `SELECT st.created_at,
+	sql := `SELECT DISTINCT ON (st.user_id)
+				   st.created_at,
 				   st.user_id,
-				   MAX(st.years) AS years,
-				   MAX(st.allocation) AS allocation,
+				   st.years AS years,
+				   st.allocation AS allocation,
 				   st.hash_code,	
 				   st.worker_index,	
 				   coalesce(st_b.bonus,0) AS bonus
@@ -27,7 +28,7 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (r
 					  AND st.years = st_b.years
 			WHERE st.worker_index = $1 
 			  AND st.user_id = $2
-			GROUP BY st.worker_index,st.user_id,st.hash_code,st.created_at,st_b.bonus`
+			ORDER BY st.user_id, st.allocation DESC nulls last, st.years DESC nulls last`
 	resp, err = storage.Get[PreStakingSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
 
 	return resp, errors.Wrapf(err, "failed to select for pre-staking summary for userID:%v", userID)

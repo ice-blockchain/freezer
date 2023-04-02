@@ -58,7 +58,8 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 }
 
 func (r *repository) getInternalMiningSummary(ctx context.Context, userID string) (*miningSummary, error) { //nolint:funlen // Big SQL.
-	sql := fmt.Sprintf(`SELECT u.last_natural_mining_started_at,
+	sql := fmt.Sprintf(`SELECT DISTINCT ON (u.user_id) 
+						       u.last_natural_mining_started_at,
 							   u.last_mining_started_at,
 							   u.last_mining_ended_at,
 							   u.previous_mining_started_at,
@@ -69,9 +70,9 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 							   negative_t1_balance.amount as negative_total_t1_no_pre_staking_bonus_balance_amount,
 							   negative_t2_balance.amount as negative_total_t2_no_pre_staking_bonus_balance_amount,
 							   0 AS mining_streak,
-							   COALESCE(MAX(st.years),0) AS pre_staking_years,
-							   COALESCE(MAX(st.allocation),0) AS pre_staking_allocation,
-							   COALESCE(MAX(st_b.bonus),0) as pre_staking_bonus
+							   COALESCE(st.years,0) AS pre_staking_years,
+							   COALESCE(st.allocation,0) AS pre_staking_allocation,
+							   COALESCE(st_b.bonus,0) as pre_staking_bonus
 						FROM users u 
 							LEFT JOIN pre_stakings st
 								   ON st.worker_index = $1
@@ -108,7 +109,7 @@ func (r *repository) getInternalMiningSummary(ctx context.Context, userID string
 								  AND negative_t2_balance.type = %[1]v
 								  AND negative_t2_balance.type_detail = '%[4]v'
 						WHERE u.user_id = $2
-						GROUP BY u.user_id,negative_balance.amount,negative_t0_balance.amount,negative_t1_balance.amount,negative_t2_balance.amount`,
+						ORDER BY u.user_id, st.allocation DESC nulls last, st.years DESC nulls last`,
 		totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
 	resp, err := storage.Get[miningSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
 	if err != nil && storage.IsErr(err, storage.ErrNotFound) {

@@ -137,7 +137,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
 	}
 	log.Info("streams started")
 	defer func() {
-		log.Error(errors.Wrapf(p.deleteGlobalUnsignedValue(ctx, key), "failed to deleteGlobalUnsignedValue(%v)", key))
+		log.Error(errors.Wrapf(p.deleteGlobalUnsignedValue(context.Background(), key), "failed to deleteGlobalUnsignedValue(%v)", key))
 	}()
 	streamsCtx, cancelStreams := context.WithCancel(ctx)
 	p.streamsDoneWg = new(sync.WaitGroup)

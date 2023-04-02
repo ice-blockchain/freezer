@@ -138,9 +138,10 @@ SELECT coalesce(coalesce(x.amount,b.amount),'0') AS total_no_pre_staking_bonus_b
 	   x.user_id,
 	   coalesce(x.pre_staking_allocation,0) AS pre_staking_allocation,
 	   coalesce(st_b.bonus,0) AS pre_staking_bonus
-FROM (SELECT MAX(st.years) AS pre_staking_years,
-		     MAX(st.allocation) AS pre_staking_allocation,
-		     MAX(b.updated_at),
+FROM (SELECT DISTINCT ON (x.user_id) 
+			 st.years AS pre_staking_years,
+		     st.allocation AS pre_staking_allocation,
+		     b.updated_at,
 		     b.amount AS amount,
 			 x.mining_blockchain_account_address,
 			 x.user_id
@@ -159,7 +160,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 			   AND b.negative = FALSE
 			   AND b.type = %[1]v
 			   AND b.type_detail = ANY($3)
-	  GROUP BY x.user_id, x.mining_blockchain_account_address, b.amount
+	  ORDER BY x.user_id, st.allocation DESC nulls last, st.years DESC nulls last, b.updated_at DESC nulls last
 	 ) x
    LEFT JOIN pre_staking_bonuses st_b
 		  ON st_b.years = x.pre_staking_years

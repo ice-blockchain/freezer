@@ -100,7 +100,14 @@ func (s *balanceRecalculationTriggerStreamSource) getLatestBalancesNewBatch( //n
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
 	sql := fmt.Sprintf(`
-SELECT b.*,
+SELECT  b.updated_at,
+    	b.amount,
+    	coalesce(b.user_id,'') AS user_id,
+    	coalesce(b.type_detail,'') AS type_detail,
+    	coalesce(b.hash_code,0) AS hash_code,
+    	coalesce(b.worker_index,0) AS worker_index ,
+    	coalesce(b.type,0) AS type,
+    	coalesce(b.negative,false) AS negative,
 	   u.last_natural_mining_started_at,
 	   u.last_mining_started_at,
 	   t0.last_mining_started_at AS t0_last_mining_started_at,

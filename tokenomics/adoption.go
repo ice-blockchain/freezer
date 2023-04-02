@@ -112,11 +112,12 @@ func (r *repository) getCurrentAdoption(ctx context.Context) (*Adoption[coin.ICE
 func currentAdoptionSQL() string {
 	return `SELECT achieved_at,
 			       base_mining_rate,
-				   MAX(milestone) AS milestone,
+				   milestone,
 				   total_active_users
 		    FROM adoption
 		    WHERE achieved_at IS NOT NULL
-		    GROUP BY achieved_at, base_mining_rate, total_active_users`
+		    ORDER BY achieved_at DESC
+			LIMIT 1`
 }
 
 func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[coin.ICEFlake], error) { //nolint:funlen // Alot of SQL & mappings.
