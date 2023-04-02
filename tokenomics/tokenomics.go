@@ -58,7 +58,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	)
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
-	prc.initializeExtraBonusWorkers()
+	prc.initializeExtraBonusWorkers(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
 	go prc.startStreams(ctx)
 	go prc.startCleaners(ctx)
@@ -66,7 +66,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	return prc
 }
 
-func getDDL(ddl string, cfg *config) string { //nolint:revive // We need it cuz of different types.
+func getDDL(ddl string, cfg *config) string {
 	extraBonusesValues := make([]string, 0, len(cfg.ExtraBonuses.FlatValues))
 	for ix, value := range cfg.ExtraBonuses.FlatValues {
 		extraBonusesValues = append(extraBonusesValues, fmt.Sprintf("(%v,%v)", ix, value))
@@ -252,7 +252,7 @@ func (r *repository) workerIndex(ctx context.Context) (workerIndex int16) {
 	return int16(uint64(r.hashCode(ctx)) % uint64(r.cfg.WorkerCount))
 }
 
-func (r *repository) hashCode(ctx context.Context) (hashCode int64) {
+func (*repository) hashCode(ctx context.Context) (hashCode int64) {
 	userHashCode, _ := ctx.Value(userHashCodeCtxValueKey).(uint64) //nolint:errcheck // Not needed.
 
 	return int64(userHashCode)

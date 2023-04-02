@@ -28,7 +28,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
 	}
 	now := time.Now()
-	nowValue := *(*now).Time
+	nowValue := now.Time
 	if old.LastMiningEndedAt != nil &&
 		old.LastNaturalMiningStartedAt != nil &&
 		old.LastMiningEndedAt.After(*now.Time) &&
@@ -205,7 +205,7 @@ func (r *repository) newMiningSummary(old *miningSummary, now *time.Time) *minin
 	return resp
 }
 
-func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
+func (r *repository) insertNewMiningSession( //nolint:funlen,gocognit,revive // Big script.
 	ctx context.Context, userID string, old, ms *miningSummary, rollbackNegativeMiningSession *bool,
 ) error {
 	var rollbackUsedAt, rollbackUsedAtCondition string
@@ -222,7 +222,7 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 		lastFreeMiningSessionAwardedAtVal = ms.LastFreeMiningSessionAwardedAt.Time
 	}
 
-	return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
+	return errors.Wrap(storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
 		sql := fmt.Sprintf(`UPDATE users
 							   SET updated_at = $1,
 								   last_natural_mining_started_at = $1,
@@ -291,7 +291,7 @@ func (r *repository) insertNewMiningSession( //nolint:funlen // Big script.
 		}
 
 		return errors.Wrapf(r.sendMiningSessionMessage(ctx, sess), "failed to sendMiningSessionMessage:%#v", sess)
-	})
+	}), "insertNewMiningSession transaction failed")
 }
 
 func (r *repository) sendMiningSessionMessage(ctx context.Context, ms *MiningSession) error {
@@ -334,7 +334,8 @@ func (s *miningSessionsTableSource) Process(ctx context.Context, msg *messagebro
 	).ErrorOrNil()
 }
 
-func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(ctx context.Context, ms *MiningSession) error { //nolint:funlen // .
+//nolint:funlen,revive,gocognit // .
+func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(ctx context.Context, ms *MiningSession) error {
 	if ctx.Err() != nil || !ms.LastNaturalMiningStartedAt.Equal(*ms.StartedAt.Time) {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
@@ -351,7 +352,6 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 						  AND tMinus1.user_id != t0.user_id
 						  AND tMinus1.user_id != u.user_id
 			  WHERE u.user_id = $1`
-	//nolint:revive // Nope.
 	referees, err := storage.Get[struct {
 		T0UserID, TMinus1UserID     string
 		T0HashCode, TMinus1HashCode int64
@@ -449,14 +449,14 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 		if _, err := storage.Exec(ctx, r.db, sql, processedMiningSessionArgs...); err == nil || storage.IsErr(err, storage.ErrDuplicate, "pk") {
 			return nil
 		} else {
-			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs)
+			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs) //nolint:asasalint // Intended.
 		}
 	}
 	if err := storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
 		sql := fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) 
 																  VALUES %[1]v`, strings.Join(processedMiningSessionValues, ","))
 		if _, err := conn.Exec(ctx, sql, processedMiningSessionArgs...); err != nil {
-			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs)
+			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs) //nolint:asasalint // Intended.
 		}
 		sql = fmt.Sprintf(`UPDATE active_referrals
 						   SET t1 = (CASE %[2]v ELSE t1 END),
@@ -467,7 +467,7 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 			strings.Join(tMinus1Conditions, ","))
 		_, err := conn.Exec(ctx, sql, referralsArgs...)
 
-		return errors.Wrapf(err, "failed to decrement t1 and t2 active_referrals for args:%#v", referralsArgs)
+		return errors.Wrapf(err, "failed to decrement t1 and t2 active_referrals for args:%#v", referralsArgs) //nolint:asasalint // Intended.
 	}); err != nil {
 		if storage.IsErr(err, storage.ErrDuplicate, "pk") {
 			return nil

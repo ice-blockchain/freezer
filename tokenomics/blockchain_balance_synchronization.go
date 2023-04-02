@@ -217,7 +217,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateBalances( //
 		log.Panic(err) //nolint:revive // Intended.
 		args = append(args, string(totalAmount), total.AmountWord0, total.AmountWord1, total.AmountWord2, total.AmountWord3, bal.UserID)
 		values = append(values, fmt.Sprintf("($%[1]v,$%[2]v,$%[3]v,$%[4]v,$%[5]v,$%[6]v)",
-			ix*columnNumber+1, ix*columnNumber+2, ix*columnNumber+3, ix*columnNumber+4, ix*columnNumber+5, ix*columnNumber+columnNumber))
+			ix*columnNumber+1, ix*columnNumber+2, ix*columnNumber+3, ix*columnNumber+4, ix*columnNumber+5, ix*columnNumber+columnNumber)) //nolint:gomnd // .
 		if bal.miningBlockchainAccountAddress != "" {
 			blockchainMessages = append(blockchainMessages, &blockchainMessage{
 				AccountAddress:     bal.miningBlockchainAccountAddress,
@@ -284,7 +284,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) updateLastIteratio
 }
 
 func (r *repository) updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil || usr.MiningBlockchainAccountAddress == "" {
+	if usr.MiningBlockchainAccountAddress == "" || ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	const table = "blockchain_balance_synchronization_worker"

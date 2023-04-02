@@ -242,6 +242,7 @@ type (
 		UserID                                                        users.UserID
 		T0, T1, T2, ExtraBonus, PreStakingAllocation, PreStakingBonus uint64
 	}
+	//nolint:govet // If we change the order it will mess up something unexpected. Will fix later.
 	balance struct {
 		UpdatedAt   *time.Time     `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
 		Amount      *coin.ICEFlake `json:"amount,omitempty" example:"1,235.777777777"`

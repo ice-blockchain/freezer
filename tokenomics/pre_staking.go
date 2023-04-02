@@ -79,7 +79,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 		ss := &PreStakingSnapshot{PreStakingSummary: st, Before: existing}
 
 		return errors.Wrapf(r.sendPreStakingSnapshotMessage(ctx, ss), "failed to send pre-staking snapshot message:%#v", ss)
-	}), "DoInTransaction failed")
+	}), "doInTransaction failed")
 }
 
 func (r *repository) sendPreStakingSnapshotMessage(ctx context.Context, st *PreStakingSnapshot) error {

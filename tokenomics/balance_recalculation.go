@@ -524,14 +524,15 @@ func (s *balanceRecalculationTriggerStreamSource) stopWorkerForUsers(
 	if ctx.Err() != nil || len(lastMiningEndedAtPerUserID) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
+	const fieldCount = 2
 	ix := 1
-	args := make([]any, 0, 1+len(lastMiningEndedAtPerUserID)*2)
+	args := make([]any, 0, 1+len(lastMiningEndedAtPerUserID)*fieldCount)
 	args = append(args, workerIndex)
 	conditions := make([]string, 0, len(lastMiningEndedAtPerUserID))
 	for userID, lastMiningEndedAt := range lastMiningEndedAtPerUserID {
 		args = append(args, userID, *lastMiningEndedAt.Time)
-		conditions = append(conditions, fmt.Sprintf("(user_id = $%[1]v AND last_mining_ended_at = $%[2]v)", ix+1, ix+2))
-		ix += 2
+		conditions = append(conditions, fmt.Sprintf("(user_id = $%[1]v AND last_mining_ended_at = $%[2]v)", ix+1, ix+1+1))
+		ix += fieldCount
 	}
 	sql := fmt.Sprintf(`UPDATE balance_recalculation_worker
 					    SET enabled = FALSE

@@ -156,7 +156,8 @@ func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, us
 	return errors.Wrapf(executeBatchConcurrently(ctx, s.sendAddBalanceCommandMessage, cmds), "failed to sendAddBalanceCommandMessages for %#v", cmds)
 }
 
-func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .
+//nolint:funlen,lll // .
+func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error {
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}

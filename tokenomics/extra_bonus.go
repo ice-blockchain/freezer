@@ -19,7 +19,7 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary) error {
+func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary) error { //nolint:funlen // .
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
@@ -35,7 +35,8 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
           	WHERE worker_index = $1
               AND user_id = $2
               AND $5 > coalesce(extra_bonus_started_at,'1999-01-08 04:05:06'::timestamp)`
-	args := append(make([]any, 0, 6),
+	const argCount = 6
+	args := append(make([]any, 0, argCount),
 		r.workerIndex(ctx),
 		ebs.UserID,
 		*now.Time,
@@ -44,7 +45,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		bonus.AvailableExtraBonus)
 	affectedRows, err := storage.Exec(ctx, r.db, sql, args...)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update extra_bonus_processing_worker to claim bonus for args:%#v", args)
+		return errors.Wrapf(err, "failed to update extra_bonus_processing_worker to claim bonus for args:%#v", args) //nolint:asasalint // Intended.
 	}
 	if affectedRows == 0 {
 		return ErrDuplicate
@@ -131,7 +132,7 @@ func (r *repository) calculateExtraBonus(flatBonus, bonusPercentageRemaining, ne
 	return ((extraBonus + flatBonus) * bonusPercentageRemaining) / percentage100
 }
 
-func (r *repository) initializeExtraBonusWorkers() {
+func (r *repository) initializeExtraBonusWorkers(ctx context.Context) {
 	allWorkers := make(map[int16]map[uint64]uint64, r.cfg.WorkerCount)
 	for extraBonusIndex := 0; extraBonusIndex < len(r.cfg.ExtraBonuses.FlatValues); extraBonusIndex++ {
 		offsets := make([]uint64, r.cfg.WorkerCount, r.cfg.WorkerCount) //nolint:gosimple // Prefer to be more descriptive.
@@ -153,25 +154,28 @@ func (r *repository) initializeExtraBonusWorkers() {
 	for key, val := range allWorkers {
 		go func(workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
 			defer wg.Done()
-			r.mustPopulateExtraBonusWorker(workerIndex, extraBonusesWorkerValues)
+			r.mustPopulateExtraBonusWorker(ctx, workerIndex, extraBonusesWorkerValues)
 		}(key, val)
 	}
 	wg.Wait()
 }
 
-func (r *repository) mustPopulateExtraBonusWorker(workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
-	ix := 0
+func (r *repository) mustPopulateExtraBonusWorker(ctx context.Context, workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
+	const argOffset = 2
+	ix := uint64(0)
 	values := make([]string, 0, r.cfg.WorkerCount)
 	args := append(make([]any, 0), workerIndex)
 	for extraBonusIndex, offset := range extraBonusesWorkerValues {
-		values = append(values, fmt.Sprintf("($1,$%v,$%v)", ix+2, ix+3))
+		values = append(values, fmt.Sprintf("($1,$%v,$%v)", ix+argOffset, ix+argOffset+1))
 		args = append(args, extraBonusIndex, offset)
-		ix += 2
+		ix += argOffset
 	}
+	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+	defer cancel()
 	sql := fmt.Sprintf(`INSERT INTO extra_bonuses_worker (worker_index,extra_bonus_index,offset_value) 
 													     VALUES %[1]v
 							   ON CONFLICT (worker_index, extra_bonus_index) DO NOTHING`, strings.Join(values, ","))
-	_, err := storage.Exec(context.Background(), r.db, sql, args...)
+	_, err := storage.Exec(reqCtx, r.db, sql, args...)
 	log.Panic(errors.Wrapf(err, "failed to initialize extra_bonuses_%[1]v", workerIndex))
 }
 

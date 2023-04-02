@@ -97,12 +97,13 @@ func (r *repository) getTopMinersByKeyword(ctx context.Context, keyword string, 
 								 b.amount_w1 DESC,
 								 b.amount_w0 DESC
 						LIMIT $2 OFFSET $3`, r.pictureClient.SQLAliasDownloadURL("u.profile_picture_name"))
-	keyword = fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
-	resp, err := storage.Select[Miner](ctx, r.db, sql, keyword, limit, offset)
+	keywordArg := fmt.Sprintf("%v%%", strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(keyword), "_", "\\_"), "%", "\\%"))
+	resp, err := storage.Select[Miner](ctx, r.db, sql, keywordArg, limit, offset)
 
-	return resp, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keyword, offset, offset+limit)
+	return resp, errors.Wrapf(err, "failed to select for top miners for keyword:%v (%v, %v)", keywordArg, offset, offset+limit)
 }
 
+//nolint:revive // Intended.
 func (r *repository) getTopMiners(ctx context.Context, limit, offset uint64) ([]*Miner, error) {
 	sql := fmt.Sprintf(`SELECT b.amount as balance,
 							   u.user_id,

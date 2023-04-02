@@ -19,7 +19,7 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) GetBalanceSummary( //nolint:funlen,gocognit // Better to be grouped together.
+func (r *repository) GetBalanceSummary( //nolint:funlen // Better to be grouped together.
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {
 	sql := fmt.Sprintf(`
@@ -402,7 +402,7 @@ func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate *coin.ICEFlake)
 	}
 }
 
-func (r *repository) replaceBalances(
+func (r *repository) replaceBalances( //nolint:funlen // .
 	ctx context.Context, db storage.QueryExecer, workerIndex int16, updatedAt *time.Time, balances ...*balance,
 ) error {
 	if len(balances) == 0 {
@@ -429,7 +429,7 @@ func (r *repository) replaceBalances(
 									amount          = EXCLUDED.amount
 							WHERE COALESCE(balances_worker.amount,'') != coalesce(EXCLUDED.amount,'')`, strings.Join(values, ","))
 	if db == nil {
-		db = r.db
+		db = r.db //nolint:revive // Not an issue here.
 	}
 	_, err := storage.Exec(ctx, db, sql, args...)
 
@@ -448,12 +448,12 @@ func (r *repository) deleteBalances(ctx context.Context, workerIndex int16, bala
 			fieldCount*ix+2, fieldCount*ix+3, fieldCount*ix+4, fieldCount*ix+5)) //nolint:gomnd // .
 		args = append(args, bal.UserID, bal.Negative, bal.Type, bal.TypeDetail)
 	}
-	sql := fmt.Sprintf(`DELETE FROM balances 
+	sql := fmt.Sprintf(`DELETE FROM balances_worker 
 					    WHERE worker_index = $1
 					      AND (%v)`, strings.Join(values, " OR "))
 	_, err := storage.Exec(ctx, r.db, sql, args...)
 
-	return errors.Wrapf(err, "failed to DELETE from balances for args:%#v", args)
+	return errors.Wrapf(err, "failed to DELETE from balances for args:%#v", args) //nolint:asasalint // Intended.
 }
 
 func (r *repository) sendAddBalanceCommandMessage(ctx context.Context, cmd *AddBalanceCommand) error {
@@ -506,9 +506,6 @@ func (s *addBalanceCommandsSource) Process(ctx context.Context, message *message
 }
 
 func (s *addBalanceCommandsSource) balance(ctx context.Context, cmd *AddBalanceCommand) (*balance, error) {
-	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
 	bal := &balance{
 		UserID:     cmd.UserID,
 		Type:       pendingXBalanceType,
