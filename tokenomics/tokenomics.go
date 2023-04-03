@@ -58,7 +58,6 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	)
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
-	prc.initializeExtraBonusWorkers(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
 	go prc.startStreams(ctx)
 	go prc.startCleaners(ctx)
@@ -199,6 +198,7 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen,gocognit
 	}()
 	go func() {
 		defer p.streamsDoneWg.Done()
+		p.initializeExtraBonusWorkers(ctx)
 		(&extraBonusProcessingTriggerStreamSource{processor: p}).start(streamsCtx)
 	}()
 	p.streamsDoneWg.Wait()
