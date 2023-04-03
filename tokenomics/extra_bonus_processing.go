@@ -48,7 +48,7 @@ func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
 		stdlibtime.Sleep(s.cfg.Workers.ExtraBonusProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
-		log.Info(fmt.Sprintf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(fmt.Errorf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 

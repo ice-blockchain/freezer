@@ -48,7 +48,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context)
 		stdlibtime.Sleep(s.cfg.Workers.RefreshMiningRatesProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[miningRatesRecalculationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Info(fmt.Sprintf("miningRatesRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(fmt.Errorf("miningRatesRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 

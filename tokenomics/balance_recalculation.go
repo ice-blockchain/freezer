@@ -50,7 +50,7 @@ func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 		stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(fmt.Errorf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 
@@ -62,9 +62,7 @@ func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Con
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	now := time.Now()
-	before := time.Now()
 	batch, err := s.getLatestBalancesNewBatch(ctx, now, workerIndex) //nolint:contextcheck // Intended.
-	log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.getLatestBalancesNewBatch[%v] took: %v", workerIndex, stdlibtime.Since(*before.Time)))
 	if err != nil || len(batch) == 0 {
 		return errors.Wrapf(err, "failed to getLatestBalancesNewBatch for workerIndex:%v,time:%v", workerIndex, now)
 	}
