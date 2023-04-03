@@ -50,7 +50,7 @@ func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 		stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(fmt.Errorf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 

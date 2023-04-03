@@ -50,7 +50,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.
 		stdlibtime.Sleep(s.cfg.Workers.BlockchainBalanceSynchronizationSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[blockchainBalanceSynchronizationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(fmt.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 

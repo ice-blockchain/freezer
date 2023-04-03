@@ -4,7 +4,6 @@ package tokenomics
 
 import (
 	"context"
-	"fmt"
 	stdlibtime "time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -48,7 +47,7 @@ func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
 		stdlibtime.Sleep(s.cfg.Workers.ExtraBonusProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(fmt.Errorf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		log.Error(errors.Errorf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
 	}
 }
 
