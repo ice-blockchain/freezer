@@ -139,7 +139,7 @@ SELECT  b.updated_at,
 FROM ( SELECT user_id
 	   FROM balance_recalculation_worker
 	   WHERE worker_index = $3 AND enabled = TRUE
-	   ORDER BY last_iteration_finished_at
+	   ORDER BY last_iteration_finished_at ASC NULLS first
 	   LIMIT $2 ) x
 		JOIN (%[1]v) current_adoption 
 		  ON 1=1

@@ -149,7 +149,7 @@ FROM (SELECT DISTINCT ON (x.user_id)
 					mining_blockchain_account_address
 			 FROM blockchain_balance_synchronization_worker
 			 WHERE worker_index = $1
-			 ORDER BY last_iteration_finished_at
+			 ORDER BY last_iteration_finished_at ASC NULLS first
 			 LIMIT $2 ) x
 		 LEFT JOIN pre_stakings st
 			    ON st.worker_index = $1

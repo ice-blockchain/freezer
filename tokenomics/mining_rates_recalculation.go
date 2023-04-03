@@ -150,7 +150,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 	  FROM ( SELECT user_id
 		     FROM mining_rates_recalculation_worker
 			 WHERE worker_index = $1
-		     ORDER BY last_iteration_finished_at
+		     ORDER BY last_iteration_finished_at ASC NULLS first
 		     LIMIT $2 ) x
 			 LEFT JOIN pre_stakings st
 					ON st.worker_index = $1

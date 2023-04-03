@@ -215,7 +215,7 @@ create table if not exists balance_recalculation_worker
     primary key (worker_index, user_id)
 ) partition by list (worker_index);
 ----
-create index if not exists balance_recalculation_worker_iterator_ix ON balance_recalculation_worker(worker_index,enabled,last_iteration_finished_at);
+create index if not exists balance_recalculation_worker_iterator_ix ON balance_recalculation_worker(worker_index,enabled,last_iteration_finished_at ASC NULLS first);
 ----
 select createListWorkerPartition('balance_recalculation_worker'::text,%[1]v::smallint);
 ----
@@ -230,7 +230,7 @@ create table if not exists mining_rates_recalculation_worker
     primary key (worker_index, user_id)
 ) partition by list (worker_index);
 ----
-create index if not exists mining_rates_recalculation_worker_last_iteration_finished_at_ix ON mining_rates_recalculation_worker(worker_index,last_iteration_finished_at);
+create index if not exists mining_rates_recalculation_worker_last_iteration_finished_at_ix ON mining_rates_recalculation_worker(worker_index,last_iteration_finished_at ASC NULLS first);
 ----
 select createListWorkerPartition('mining_rates_recalculation_worker'::text,%[1]v::smallint);
 ----
@@ -246,7 +246,7 @@ create table if not exists blockchain_balance_synchronization_worker
     primary key (worker_index, user_id)
 ) partition by list (worker_index);
 ----
-create index if not exists blockchain_balance_synchronization_worker_last_iteration_finished_at_ix ON blockchain_balance_synchronization_worker(worker_index,last_iteration_finished_at);
+create index if not exists blockchain_balance_synchronization_worker_last_iteration_finished_at_ix ON blockchain_balance_synchronization_worker(worker_index,last_iteration_finished_at ASC NULLS first);
 ----
 select createListWorkerPartition('blockchain_balance_synchronization_worker'::text,%[1]v::smallint);
 ----
