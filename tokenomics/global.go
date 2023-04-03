@@ -22,12 +22,6 @@ func (r *repository) getGlobalUnsignedValue(ctx context.Context, key string) (ui
 	return val.Value, nil
 }
 
-func (r *repository) deleteGlobalUnsignedValue(ctx context.Context, key string) error {
-	_, err := storage.Exec(ctx, r.db, `DELETE FROM global WHERE key = $1`, key)
-
-	return errors.Wrapf(err, "failed to get global value for key:%v ", key)
-}
-
 //nolint:revive // Not an issue atm.
 func (r *repository) insertGlobalUnsignedValue(ctx context.Context, val *users.GlobalUnsigned, replace bool) error {
 	var sql string

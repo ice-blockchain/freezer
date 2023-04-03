@@ -120,24 +120,66 @@ func (p *processor) Close() error {
 	return errors.Wrap(p.repository.Close(), "closing repository failed")
 }
 
-func (p *processor) startStreams(ctx context.Context) { //nolint:funlen // .
+func (p *processor) startStreams(ctx context.Context) { //nolint:funlen,gocognit // .
 	if ctx.Err() != nil {
 		return
 	}
 	log.Info("trying to start streams")
 	const key = "streams-processing-exclusive-lock"
-	tuple := &users.GlobalUnsigned{Key: key, Value: uint64(time.Now().UnixNano())}
-	if err := p.insertGlobalUnsignedValue(ctx, tuple, false); err != nil {
-		log.Error(errors.Wrapf(err, "failed to start streams, because failed to insert into global: %#v", tuple))
-		const waitDuration = 5 * stdlibtime.Second
+	value, err := p.getGlobalUnsignedValue(ctx, key)
+	if err != nil || time.Now().Sub(*time.New(stdlibtime.Unix(0, int64(value))).Time) < stdlibtime.Minute {
+		log.Error(errors.Wrapf(err, "failed to getGlobalUnsignedValue: %v", key))
+		const waitDuration = 30 * stdlibtime.Second
+		stdlibtime.Sleep(waitDuration)
+		p.startStreams(ctx)
+
+		return
+	}
+	sql := `UPDATE global SET value = $2 WHERE key = $1 AND value = $3 RETURNING *`
+	if err = storage.DoInTransaction(ctx, p.db, func(conn storage.QueryExecer) error {
+		val, gErr := storage.Get[users.GlobalUnsigned](ctx, conn, `SELECT * FROM global WHERE key = $1 FOR UPDATE`, key)
+		if gErr != nil {
+			return gErr
+		}
+		if val.Value != value {
+			return errors.New("race condition")
+		}
+		newValue := time.Now().UnixNano()
+		updatedValue, eErr := storage.ExecOne[users.GlobalUnsigned](ctx, conn, sql, key, newValue, value)
+		if eErr != nil {
+			return eErr
+		}
+		if uint64(newValue) != updatedValue.Value {
+			return errors.New("race condition 2")
+		}
+		value = updatedValue.Value
+
+		return nil
+	}); err != nil {
+		log.Error(errors.Wrapf(err, "failed to update global value: %v", key))
+		const waitDuration = 30 * stdlibtime.Second
 		stdlibtime.Sleep(waitDuration)
 		p.startStreams(ctx)
 
 		return
 	}
 	log.Info("streams started")
-	defer func() {
-		log.Error(errors.Wrapf(p.deleteGlobalUnsignedValue(context.Background(), key), "failed to deleteGlobalUnsignedValue(%v)", key))
+	go func() {
+		for ctx.Err() == nil {
+			const waitDuration = 5 * stdlibtime.Second
+			stdlibtime.Sleep(waitDuration)
+			newValue := time.Now().UnixNano()
+			updatedValue, eErr := storage.ExecOne[users.GlobalUnsigned](ctx, p.db, sql, key, newValue, value)
+			if eErr != nil {
+				log.Error(errors.Wrapf(eErr, "failed to update global %v, for locking, so we're closing the runtime to avoid leaks", key))
+				log.Error(p.Close())
+			}
+			if uint64(newValue) != updatedValue.Value {
+				log.Error(errors.New("race condition 3"))
+				log.Error(p.Close())
+			}
+			value = updatedValue.Value
+		}
 	}()
 	streamsCtx, cancelStreams := context.WithCancel(ctx)
 	p.streamsDoneWg = new(sync.WaitGroup)

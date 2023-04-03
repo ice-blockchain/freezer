@@ -45,7 +45,7 @@ func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
 		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(extraBonusProcessingSeedingStreamEmitFrequency)
+		stdlibtime.Sleep(s.cfg.Workers.ExtraBonusProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
 		log.Info(fmt.Sprintf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
@@ -116,7 +116,7 @@ func (s *extraBonusProcessingTriggerStreamSource) getAvailableExtraBonuses(
 	const networkLagDelta, argCount = 1.3, 12
 	args := append(make([]any, 0, argCount),
 		workerIndex,
-		extraBonusProcessingBatchSize,
+		s.cfg.Workers.ExtraBonusProcessingBatchSize,
 		now.UnixNano(),
 		s.cfg.ExtraBonuses.UTCOffsetDuration,
 		s.cfg.ExtraBonuses.Duration,

@@ -47,7 +47,7 @@ func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(balanceCalculationProcessingSeedingStreamEmitFrequency)
+		stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
 		log.Info(fmt.Sprintf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
@@ -170,7 +170,7 @@ FROM ( SELECT user_id
               END)`, currentAdoptionSQL())
 	args := append(make([]any, 0, 4), //nolint:gomnd // There are 4 elements.
 		*now.Time,
-		balanceRecalculationBatchSize,
+		s.cfg.Workers.BalanceRecalculationBatchSize,
 		workerIndex,
 		[]string{
 			fmt.Sprintf("/%v", now.Add(-1*s.cfg.GlobalAggregationInterval.Child).Format(s.cfg.globalAggregationIntervalChildDateFormat())),
@@ -224,11 +224,11 @@ func (s *balanceRecalculationTriggerStreamSource) recalculateBalances(
 	var (
 		thisDurationTypeDetail                = fmt.Sprintf("/%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat()))
 		untilThisDurationTypeDetail           = fmt.Sprintf("@%v", now.Format(s.cfg.globalAggregationIntervalChildDateFormat()))
-		balancesPerUser                       = make(map[string]map[string]*balance, balanceRecalculationBatchSize)
-		aggregatedPendingTotalBalancesPerUser = make(map[string]map[bool]*balance, balanceRecalculationBatchSize)
-		aggregatedPendingT1BalancesPerUser    = make(map[string]map[bool]*balance, balanceRecalculationBatchSize)
-		aggregatedPendingT2BalancesPerUser    = make(map[string]map[bool]*balance, balanceRecalculationBatchSize)
-		balanceRecalculationDetailsPerUser    = make(map[string]*BalanceRecalculationDetails, balanceRecalculationBatchSize)
+		balancesPerUser                       = make(map[string]map[string]*balance, s.cfg.Workers.BalanceRecalculationBatchSize)
+		aggregatedPendingTotalBalancesPerUser = make(map[string]map[bool]*balance, s.cfg.Workers.BalanceRecalculationBatchSize)
+		aggregatedPendingT1BalancesPerUser    = make(map[string]map[bool]*balance, s.cfg.Workers.BalanceRecalculationBatchSize)
+		aggregatedPendingT2BalancesPerUser    = make(map[string]map[bool]*balance, s.cfg.Workers.BalanceRecalculationBatchSize)
+		balanceRecalculationDetailsPerUser    = make(map[string]*BalanceRecalculationDetails, s.cfg.Workers.BalanceRecalculationBatchSize)
 	)
 	for _, row := range rows {
 		userID := row.BalanceRecalculationDetails.UUserID

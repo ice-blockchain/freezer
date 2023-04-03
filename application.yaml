@@ -27,6 +27,15 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 tokenomics: &tokenomics
+  workers:
+    miningRatesRecalculationBatchSize: 100
+    balanceRecalculationBatchSize: 100
+    extraBonusProcessingBatchSize: 500
+    maxICEBlockchainConcurrentOperations: 100000
+    balanceCalculationProcessingSeedingStreamEmitFrequency: 10s
+    refreshMiningRatesProcessingSeedingStreamEmitFrequency: 10s
+    blockchainBalanceSynchronizationSeedingStreamEmitFrequency: 10s
+    extraBonusProcessingSeedingStreamEmitFrequency: 10s
   wintr/connectors/storage/v2:
     runDDL: true
     primaryURL: postgresql://root:pass@localhost:5432/ice

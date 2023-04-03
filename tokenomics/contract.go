@@ -193,23 +193,15 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey                                         = "tokenomics"
-	dayFormat, hourFormat, minuteFormat                        = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
-	totalActiveUsersGlobalKey                                  = "TOTAL_ACTIVE_USERS"
-	requestingUserIDCtxValueKey                                = "requestingUserIDCtxValueKey"
-	userHashCodeCtxValueKey                                    = "userHashCodeCtxValueKey"
-	registrationICEBonusEventID                                = "registration_ice_bonus"
-	percentage100                                              = uint64(100)
-	registrationICEFlakeBonusAmount                            = 10 * uint64(coin.Denomination)
-	miningRatesRecalculationBatchSize                          = 100
-	balanceRecalculationBatchSize                              = 100
-	extraBonusProcessingBatchSize                              = 500
-	maxICEBlockchainConcurrentOperations                       = 100000
-	balanceCalculationProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
-	refreshMiningRatesProcessingSeedingStreamEmitFrequency     = 0 * stdlibtime.Second
-	blockchainBalanceSynchronizationSeedingStreamEmitFrequency = 0 * stdlibtime.Second
-	extraBonusProcessingSeedingStreamEmitFrequency             = 0 * stdlibtime.Second
-	requestDeadline                                            = 25 * stdlibtime.Second
+	applicationYamlKey                  = "tokenomics"
+	dayFormat, hourFormat, minuteFormat = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
+	totalActiveUsersGlobalKey           = "TOTAL_ACTIVE_USERS"
+	requestingUserIDCtxValueKey         = "requestingUserIDCtxValueKey"
+	userHashCodeCtxValueKey             = "userHashCodeCtxValueKey"
+	registrationICEBonusEventID         = "registration_ice_bonus"
+	percentage100                       = uint64(100)
+	registrationICEFlakeBonusAmount     = 10 * uint64(coin.Denomination)
+	requestDeadline                     = 25 * stdlibtime.Second
 )
 
 const (
@@ -379,6 +371,17 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
+		//nolint:tagliatelle // .
+		Workers struct {
+			MiningRatesRecalculationBatchSize                          uint64              `mapstructure:"miningRatesRecalculationBatchSize"`
+			BalanceRecalculationBatchSize                              uint64              `mapstructure:"balanceRecalculationBatchSize"`
+			ExtraBonusProcessingBatchSize                              uint64              `mapstructure:"extraBonusProcessingBatchSize"`
+			MaxICEBlockchainConcurrentOperations                       uint64              `mapstructure:"maxICEBlockchainConcurrentOperations"`
+			BalanceCalculationProcessingSeedingStreamEmitFrequency     stdlibtime.Duration `mapstructure:"balanceCalculationProcessingSeedingStreamEmitFrequency"`
+			RefreshMiningRatesProcessingSeedingStreamEmitFrequency     stdlibtime.Duration `mapstructure:"refreshMiningRatesProcessingSeedingStreamEmitFrequency"`
+			BlockchainBalanceSynchronizationSeedingStreamEmitFrequency stdlibtime.Duration `mapstructure:"blockchainBalanceSynchronizationSeedingStreamEmitFrequency"`
+			ExtraBonusProcessingSeedingStreamEmitFrequency             stdlibtime.Duration `mapstructure:"extraBonusProcessingSeedingStreamEmitFrequency"`
+		} `yaml:"workers"`
 		WorkerCount int16 `yaml:"workerCount"`
 	}
 )

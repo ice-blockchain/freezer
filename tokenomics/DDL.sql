@@ -35,6 +35,8 @@ create table if not exists global
     value bigint not null
 );
 ----
+insert into global (key, value) values ('streams-processing-exclusive-lock', 1680531126600000000::bigint) on conflict(key) do nothing;
+----
 --************************************************************************************************************************************
 -- extra_bonus_start_date
 create table if not exists extra_bonus_start_date

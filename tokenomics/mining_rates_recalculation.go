@@ -45,7 +45,7 @@ func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context)
 		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(refreshMiningRatesProcessingSeedingStreamEmitFrequency)
+		stdlibtime.Sleep(s.cfg.Workers.RefreshMiningRatesProcessingSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[miningRatesRecalculationTriggerStreamSource.process]")) //nolint:lll // .
 		log.Info(fmt.Sprintf("miningRatesRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
@@ -212,7 +212,7 @@ FROM (SELECT MAX(st.years) AS pre_staking_years,
 		aggressiveDegradationT1ReferenceBalanceTypeDetail,
 		aggressiveDegradationT2ReferenceBalanceTypeDetail,
 		degradationT0T1T2TotalReferenceBalanceTypeDetail)
-	res, err := storage.Select[latestMiningRateCalculationSQLRow](ctx, s.db, sql, workerIndex, miningRatesRecalculationBatchSize, *now.Time)
+	res, err := storage.Select[latestMiningRateCalculationSQLRow](ctx, s.db, sql, workerIndex, s.cfg.Workers.MiningRatesRecalculationBatchSize, *now.Time)
 
 	return res, errors.Wrapf(err, "failed to select a batch of latest user mining rate calculation parameters for workerIndex:%v", workerIndex)
 }

@@ -47,7 +47,7 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.
 		workerIndexes[i] = int16(i)
 	}
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(blockchainBalanceSynchronizationSeedingStreamEmitFrequency)
+		stdlibtime.Sleep(s.cfg.Workers.BlockchainBalanceSynchronizationSeedingStreamEmitFrequency)
 		before := time.Now()
 		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[blockchainBalanceSynchronizationTriggerStreamSource.process]")) //nolint:lll // .
 		log.Info(fmt.Sprintf("blockchainBalanceSynchronizationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
@@ -176,7 +176,7 @@ FROM (SELECT DISTINCT ON (x.user_id)
 	     AND b.type_detail = '%[3]v_%[4]v'`, totalNoPreStakingBonusBalanceType, pendingXBalanceType, rootBalanceTypeDetail, registrationICEBonusEventID)
 	var (
 		now         = *time.Now().Time
-		limit       = maxICEBlockchainConcurrentOperations / int(s.cfg.WorkerCount)
+		limit       = s.cfg.Workers.MaxICEBlockchainConcurrentOperations / uint64(s.cfg.WorkerCount)
 		typeDetails = make([]string, 0, 1+1)
 	)
 	for i := stdlibtime.Duration(0); i <= 1; i++ {
