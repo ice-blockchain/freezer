@@ -470,8 +470,8 @@ func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Con
 							   t2 = (CASE %[3]v ELSE t2 END)
 						   WHERE (worker_index, user_id) in (%[1]v)`,
 			strings.Join(referralsValues, ","),
-			strings.Join(t0Conditions, ","),
-			strings.Join(tMinus1Conditions, ","))
+			strings.Join(t0Conditions, " "),
+			strings.Join(tMinus1Conditions, " "))
 		_, err := conn.Exec(ctx, sql, referralsArgs...)
 
 		return errors.Wrapf(err, "failed to decrement t1 and t2 active_referrals for args:%#v", referralsArgs) //nolint:asasalint // Intended.
