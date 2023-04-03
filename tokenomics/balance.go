@@ -156,6 +156,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to getAllPreStakingSummaries for userID:%v", userID)
 	}
+	location := stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
 	filteredChildrenByParents := make(map[string]map[string]any, 1+1)
 	childDateLayout, parentDateLayout := r.cfg.globalAggregationIntervalChildDateFormat(), r.cfg.globalAggregationIntervalParentDateFormat()
 	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
@@ -166,7 +167,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 		if factor == 1 && date.After(*end.Time) {
 			continue
 		}
-		date = date.Add(utcOffset)
+		date = date.In(location)
 		childDateFormat, parentDateFormat := date.Format(childDateLayout), date.Format(parentDateLayout)
 		if _, found := filteredChildrenByParents[parentDateFormat]; !found {
 			filteredChildrenByParents[parentDateFormat] = make(map[string]any, mappedLimit)
@@ -214,7 +215,6 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 	for _, bal := range res {
 		child, err := stdlibtime.Parse(childDateLayout, strings.Replace(bal.TypeDetail, "/", "", 1))
 		log.Panic(err) //nolint:revive // Intended.
-		child = child.In(location)
 		childFormat, parentFormat := child.Format(childDateLayout), child.Format(parentDateLayout)
 		if _, found := parents[parentFormat]; !found {
 			parent, pErr := stdlibtime.Parse(parentDateLayout, parentFormat)
@@ -232,7 +232,7 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		}
 		if _, found := parents[parentFormat].children[childFormat]; !found {
 			parents[parentFormat].children[childFormat] = &BalanceHistoryEntry{
-				Time:    child,
+				Time:    child.In(location),
 				Balance: &BalanceHistoryBalanceDiff{amount: coin.ZeroICEFlakes()},
 			}
 		}
