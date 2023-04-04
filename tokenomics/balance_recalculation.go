@@ -63,7 +63,9 @@ func (s *balanceRecalculationTriggerStreamSource) process(ignoredCtx context.Con
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	now := time.Now()
+	before := time.Now()
 	batch, err := s.getLatestBalancesNewBatch(ctx, now, workerIndex) //nolint:contextcheck // Intended.
+	log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource.getLatestBalancesNewBatch([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
 	if err != nil || len(batch) == 0 {
 		return errors.Wrapf(err, "failed to getLatestBalancesNewBatch for workerIndex:%v,time:%v", workerIndex, now)
 	}
@@ -98,7 +100,7 @@ func (s *balanceRecalculationTriggerStreamSource) getLatestBalancesNewBatch( //n
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
-	sql := fmt.Sprintf(`
+	sql := fmt.Sprintf(`WITH current_adoption AS (%[1]v) 
 SELECT  b.updated_at,
     	b.amount,
     	coalesce(b.user_id,'') AS user_id,
@@ -142,7 +144,7 @@ FROM ( SELECT user_id
 	   WHERE worker_index = $3 AND enabled = TRUE
 	   ORDER BY last_iteration_finished_at ASC NULLS first
 	   LIMIT $2 ) x
-		JOIN (%[1]v) current_adoption 
+		JOIN current_adoption 
 		  ON 1=1
 	    JOIN users u
 		  ON u.user_id = x.user_id
@@ -181,7 +183,7 @@ FROM ( SELECT user_id
 	return resp, errors.Wrapf(err, "failed to select new balance recalculation batch for workerIndex:%v,now:%#v", workerIndex, now)
 }
 
-func (s *balanceRecalculationTriggerStreamSource) updateBalances(
+func (s *balanceRecalculationTriggerStreamSource) updateBalances( //nolint:funlen // .
 	ctx context.Context, now *time.Time, workerIndex int16, batch []*balanceRecalculationRow,
 ) error {
 	if ctx.Err() != nil {
@@ -194,14 +196,20 @@ func (s *balanceRecalculationTriggerStreamSource) updateBalances(
 	if err := executeBatchConcurrently(ctx, s.sendFreeMiningSessionStartedMessage, dayOffStartedEvents); err != nil {
 		return errors.Wrapf(err, "failed to executeBatchConcurrently[sendFreeMiningSessionStartedMessage] for dayOffStartedEvents:%#v", dayOffStartedEvents)
 	}
-	if err := s.replaceBalances(ctx, nil, workerIndex, now, balancesForReplace...); err != nil {
-		return errors.Wrapf(err, "failed to replaceBalances: %#v", balancesForReplace)
+	before := time.Now()
+	rErr := s.replaceBalances(ctx, nil, workerIndex, now, balancesForReplace...)
+	log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource.replaceBalances([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if rErr != nil {
+		return errors.Wrapf(rErr, "failed to replaceBalances: %#v", balancesForReplace)
 	}
 	if err := s.deleteBalances(ctx, workerIndex, balancesForDelete...); err != nil {
 		return errors.Wrapf(err, "failed to deleteBalances: %#v", balancesForDelete)
 	}
-	if err := s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs); err != nil {
-		return errors.Wrapf(err, "failed to updateLastIterationFinishedAt, workerIndex:%v,userIDs:%#v", workerIndex, userIDs)
+	before = time.Now()
+	uErr := s.updateLastIterationFinishedAt(ctx, workerIndex, userIDs)
+	log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource.updateLastIterationFinishedAt([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if uErr != nil {
+		return errors.Wrapf(uErr, "failed to updateLastIterationFinishedAt, workerIndex:%v,userIDs:%#v", workerIndex, userIDs)
 	}
 	if err := s.stopWorkerForUsers(ctx, workerIndex, processingStoppedForUserIDs); err != nil {
 		return errors.Wrapf(err, "failed to stopWorkerForUsers, workerIndex:%v,userIDs:%#v", workerIndex, processingStoppedForUserIDs)

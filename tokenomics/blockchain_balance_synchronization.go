@@ -62,14 +62,22 @@ func (s *blockchainBalanceSynchronizationTriggerStreamSource) process(ignoredCtx
 	const deadline = 5 * stdlibtime.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
+	before := time.Now()
 	rows, err := s.getLatestBalances(ctx, workerIndex) //nolint:contextcheck // We use context with longer deadline.
+	log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.getLatestBalances([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
 	if err != nil || len(rows) == 0 {
 		return errors.Wrapf(err, "failed to getLatestBalances for workerIndex:%v", workerIndex)
 	}
-	if err = s.updateBalances(ctx, rows); err != nil { //nolint:contextcheck // Intended.
+	before = time.Now()
+	err = s.updateBalances(ctx, rows) //nolint:contextcheck // Intended.
+	log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.updateBalances([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if err != nil {
 		return errors.Wrapf(err, "failed to updateBalances:%#v", rows)
 	}
-	if err = executeBatchConcurrently(ctx, s.sendBalancesMessage, rows); err != nil { //nolint:contextcheck // We use context with longer deadline.
+	before = time.Now()
+	err = executeBatchConcurrently(ctx, s.sendBalancesMessage, rows) //nolint:contextcheck // We use context with longer deadline.
+	log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.sendBalancesMessage([%v]) took: %v", workerIndex, stdlibtime.Since(*before.Time)))
+	if err != nil {
 		return errors.Wrapf(err, "failed to sendBalancesMessages for:%#v", rows)
 	}
 

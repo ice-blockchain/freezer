@@ -116,7 +116,7 @@ func currentAdoptionSQL() string {
 				   total_active_users
 		    FROM adoption
 		    WHERE achieved_at IS NOT NULL
-		    ORDER BY achieved_at DESC
+		    ORDER BY milestone DESC
 			LIMIT 1`
 }
 
