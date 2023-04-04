@@ -35,7 +35,7 @@ tokenomics: &tokenomics
     miningRatesRecalculationBatchSize: 100
     balanceRecalculationBatchSize: 100
     extraBonusProcessingBatchSize: 500
-    maxICEBlockchainConcurrentOperations: 100000
+    blockchainBalanceSynchronizationSize: 100
     balanceCalculationBeforeSingleIterationProcessingDelay: 10s
     balanceCalculationBeforeGroupIterationProcessingDelay: 10s
     blockchainBalanceSynchronizationBeforeSingleIterationProcessingDelay: 10s

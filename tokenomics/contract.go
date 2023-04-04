@@ -371,7 +371,7 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
-		//nolint:tagliatelle,lll // .
+		//nolint:lll // MaxICEBlockchainConcurrentOperations should be ~ 100.000, across all workers.
 		Workers struct {
 			BalanceRecalculationConcurrency                                      uint64              `mapstructure:"balanceRecalculationConcurrency"`
 			BlockchainBalanceSynchronizationConcurrency                          uint64              `mapstructure:"blockchainBalanceSynchronizationConcurrency"`
@@ -380,7 +380,7 @@ type (
 			MiningRatesRecalculationBatchSize                                    uint64              `mapstructure:"miningRatesRecalculationBatchSize"`
 			BalanceRecalculationBatchSize                                        uint64              `mapstructure:"balanceRecalculationBatchSize"`
 			ExtraBonusProcessingBatchSize                                        uint64              `mapstructure:"extraBonusProcessingBatchSize"`
-			MaxICEBlockchainConcurrentOperations                                 uint64              `mapstructure:"maxICEBlockchainConcurrentOperations"`
+			BlockchainBalanceSynchronizationSize                                 uint64              `mapstructure:"blockchainBalanceSynchronizationSize"`
 			BalanceCalculationBeforeSingleIterationProcessingDelay               stdlibtime.Duration `mapstructure:"balanceCalculationBeforeSingleIterationProcessingDelay"`
 			BalanceCalculationBeforeGroupIterationProcessingDelay                stdlibtime.Duration `mapstructure:"balanceCalculationBeforeGroupIterationProcessingDelay"`
 			RefreshMiningRatesProcessingSeedingStreamEmitFrequency               stdlibtime.Duration `mapstructure:"refreshMiningRatesProcessingSeedingStreamEmitFrequency"`

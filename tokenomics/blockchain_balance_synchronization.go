@@ -177,7 +177,7 @@ FROM (SELECT DISTINCT ON (x.user_id)
 	     AND b.type_detail = '%[3]v_%[4]v'`, totalNoPreStakingBonusBalanceType, pendingXBalanceType, rootBalanceTypeDetail, registrationICEBonusEventID)
 	var (
 		now         = *time.Now().Time
-		limit       = s.cfg.Workers.MaxICEBlockchainConcurrentOperations / uint64(s.cfg.WorkerCount)
+		limit       = s.cfg.Workers.BlockchainBalanceSynchronizationSize
 		typeDetails = make([]string, 0, 1+1)
 	)
 	for i := stdlibtime.Duration(0); i <= 1; i++ {
