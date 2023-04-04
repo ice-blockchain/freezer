@@ -42,15 +42,16 @@ func (r *repository) initializeBalanceRecalculationWorker(ctx context.Context, u
 func (s *balanceRecalculationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("balanceRecalculationTriggerStreamSource started")
 	defer log.Info("balanceRecalculationTriggerStreamSource stopped")
-	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
-	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = int16(i)
-	}
+	distributedWorkerIndices := s.distributedWorkerIndices(int(s.cfg.Workers.BalanceRecalculationConcurrency))
+
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationProcessingSeedingStreamEmitFrequency)
-		before := time.Now()
-		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationBeforeGroupIterationProcessingDelay)
+		for ix, workerIndices := range distributedWorkerIndices {
+			stdlibtime.Sleep(s.cfg.Workers.BalanceCalculationBeforeSingleIterationProcessingDelay)
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndices), "failed to executeBatchConcurrently[balanceRecalculationTriggerStreamSource.process]")) //nolint:lll // .
+			log.Error(errors.Errorf("balanceRecalculationTriggerStreamSource[%v].process took: %v", ix, stdlibtime.Since(*before.Time)))
+		}
 	}
 }
 

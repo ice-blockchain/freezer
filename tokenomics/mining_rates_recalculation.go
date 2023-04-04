@@ -38,6 +38,11 @@ func (r *repository) initializeMiningRatesRecalculationWorker(ctx context.Contex
 }
 
 func (s *miningRatesRecalculationTriggerStreamSource) start(ctx context.Context) {
+	if true {
+		log.Info("miningRatesRecalculationTriggerStreamSource disabled")
+
+		return
+	}
 	log.Info("miningRatesRecalculationTriggerStreamSource started")
 	defer log.Info("miningRatesRecalculationTriggerStreamSource stopped")
 	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.

@@ -39,15 +39,16 @@ func (r *repository) initializeExtraBonusProcessingWorker(ctx context.Context, u
 func (s *extraBonusProcessingTriggerStreamSource) start(ctx context.Context) {
 	log.Info("extraBonusProcessingTriggerStreamSource started")
 	defer log.Info("extraBonusProcessingTriggerStreamSource stopped")
-	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
-	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = int16(i)
-	}
+	distributedWorkerIndices := s.distributedWorkerIndices(int(s.cfg.Workers.ExtraBonusProcessingConcurrency))
+
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(s.cfg.Workers.ExtraBonusProcessingSeedingStreamEmitFrequency)
-		before := time.Now()
-		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(errors.Errorf("extraBonusProcessingTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		stdlibtime.Sleep(s.cfg.Workers.ExtraBonusBeforeGroupIterationProcessingDelay)
+		for ix, workerIndices := range distributedWorkerIndices {
+			stdlibtime.Sleep(s.cfg.Workers.ExtraBonusBeforeSingleIterationProcessingDelay)
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndices), "failed to executeBatchConcurrently[extraBonusProcessingTriggerStreamSource.process]")) //nolint:lll // .
+			log.Error(errors.Errorf("extraBonusProcessingTriggerStreamSource[%v].process took: %v", ix, stdlibtime.Since(*before.Time)))
+		}
 	}
 }
 

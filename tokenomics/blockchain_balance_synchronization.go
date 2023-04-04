@@ -42,15 +42,16 @@ func (r *repository) initializeBlockchainBalanceSynchronizationWorker(ctx contex
 func (s *blockchainBalanceSynchronizationTriggerStreamSource) start(ctx context.Context) {
 	log.Info("blockchainBalanceSynchronizationTriggerStreamSource started")
 	defer log.Info("blockchainBalanceSynchronizationTriggerStreamSource stopped")
-	workerIndexes := make([]int16, s.cfg.WorkerCount) //nolint:makezero // Intended.
-	for i := 0; i < int(s.cfg.WorkerCount); i++ {
-		workerIndexes[i] = int16(i)
-	}
+	distributedWorkerIndices := s.distributedWorkerIndices(int(s.cfg.Workers.BlockchainBalanceSynchronizationConcurrency))
+
 	for ctx.Err() == nil {
-		stdlibtime.Sleep(s.cfg.Workers.BlockchainBalanceSynchronizationSeedingStreamEmitFrequency)
-		before := time.Now()
-		log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndexes), "failed to executeBatchConcurrently[blockchainBalanceSynchronizationTriggerStreamSource.process]")) //nolint:lll // .
-		log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource.process took: %v", stdlibtime.Since(*before.Time)))
+		stdlibtime.Sleep(s.cfg.Workers.BlockchainBalanceSynchronizationBeforeGroupIterationProcessingDelay)
+		for ix, workerIndices := range distributedWorkerIndices {
+			stdlibtime.Sleep(s.cfg.Workers.BlockchainBalanceSynchronizationBeforeSingleIterationProcessingDelay)
+			before := time.Now()
+			log.Error(errors.Wrap(executeBatchConcurrently(ctx, s.process, workerIndices), "failed to executeBatchConcurrently[blockchainBalanceSynchronizationTriggerStreamSource.process]")) //nolint:lll // .
+			log.Error(errors.Errorf("blockchainBalanceSynchronizationTriggerStreamSource[%v].process took: %v", ix, stdlibtime.Since(*before.Time)))
+		}
 	}
 }
 

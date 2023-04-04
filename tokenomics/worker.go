@@ -50,3 +50,16 @@ func (r *repository) getWorker(ctx context.Context, userID string) (workerIndex 
 
 	return int16(uint64(resp.HashCode) % uint64(r.cfg.WorkerCount)), resp.HashCode, nil
 }
+
+func (r *repository) distributedWorkerIndices(concurrency int) map[int][]int16 {
+	workerCount := int(r.cfg.WorkerCount)
+	workerIndices := make(map[int][]int16, workerCount/concurrency)
+	for ix := 0; ix < workerCount; ix++ {
+		if _, found := workerIndices[ix%(workerCount/concurrency)]; !found {
+			workerIndices[ix%(workerCount/concurrency)] = make([]int16, 0, concurrency)
+		}
+		workerIndices[ix%(workerCount/concurrency)] = append(workerIndices[ix%(workerCount/concurrency)], int16(ix))
+	}
+
+	return workerIndices
+}

@@ -371,16 +371,23 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
-		//nolint:tagliatelle // .
+		//nolint:tagliatelle,lll // .
 		Workers struct {
-			MiningRatesRecalculationBatchSize                          uint64              `mapstructure:"miningRatesRecalculationBatchSize"`
-			BalanceRecalculationBatchSize                              uint64              `mapstructure:"balanceRecalculationBatchSize"`
-			ExtraBonusProcessingBatchSize                              uint64              `mapstructure:"extraBonusProcessingBatchSize"`
-			MaxICEBlockchainConcurrentOperations                       uint64              `mapstructure:"maxICEBlockchainConcurrentOperations"`
-			BalanceCalculationProcessingSeedingStreamEmitFrequency     stdlibtime.Duration `mapstructure:"balanceCalculationProcessingSeedingStreamEmitFrequency"`
-			RefreshMiningRatesProcessingSeedingStreamEmitFrequency     stdlibtime.Duration `mapstructure:"refreshMiningRatesProcessingSeedingStreamEmitFrequency"`
-			BlockchainBalanceSynchronizationSeedingStreamEmitFrequency stdlibtime.Duration `mapstructure:"blockchainBalanceSynchronizationSeedingStreamEmitFrequency"`
-			ExtraBonusProcessingSeedingStreamEmitFrequency             stdlibtime.Duration `mapstructure:"extraBonusProcessingSeedingStreamEmitFrequency"`
+			BalanceRecalculationConcurrency                                      uint64              `mapstructure:"balanceRecalculationConcurrency"`
+			BlockchainBalanceSynchronizationConcurrency                          uint64              `mapstructure:"blockchainBalanceSynchronizationConcurrency"`
+			ExtraBonusProcessingConcurrency                                      uint64              `mapstructure:"extraBonusProcessingConcurrency"`
+			InitializeExtraBonusWorkers                                          bool                `mapstructure:"initializeExtraBonusWorkers"`
+			MiningRatesRecalculationBatchSize                                    uint64              `mapstructure:"miningRatesRecalculationBatchSize"`
+			BalanceRecalculationBatchSize                                        uint64              `mapstructure:"balanceRecalculationBatchSize"`
+			ExtraBonusProcessingBatchSize                                        uint64              `mapstructure:"extraBonusProcessingBatchSize"`
+			MaxICEBlockchainConcurrentOperations                                 uint64              `mapstructure:"maxICEBlockchainConcurrentOperations"`
+			BalanceCalculationBeforeSingleIterationProcessingDelay               stdlibtime.Duration `mapstructure:"balanceCalculationBeforeSingleIterationProcessingDelay"`
+			BalanceCalculationBeforeGroupIterationProcessingDelay                stdlibtime.Duration `mapstructure:"balanceCalculationBeforeGroupIterationProcessingDelay"`
+			RefreshMiningRatesProcessingSeedingStreamEmitFrequency               stdlibtime.Duration `mapstructure:"refreshMiningRatesProcessingSeedingStreamEmitFrequency"`
+			BlockchainBalanceSynchronizationBeforeSingleIterationProcessingDelay stdlibtime.Duration `mapstructure:"blockchainBalanceSynchronizationBeforeSingleIterationProcessingDelay"`
+			BlockchainBalanceSynchronizationBeforeGroupIterationProcessingDelay  stdlibtime.Duration `mapstructure:"blockchainBalanceSynchronizationBeforeGroupIterationProcessingDelay"`
+			ExtraBonusBeforeSingleIterationProcessingDelay                       stdlibtime.Duration `mapstructure:"extraBonusBeforeSingleIterationProcessingDelay"`
+			ExtraBonusBeforeGroupIterationProcessingDelay                        stdlibtime.Duration `mapstructure:"extraBonusBeforeGroupIterationProcessingDelay"`
 		} `yaml:"workers"`
 		WorkerCount int16 `yaml:"workerCount"`
 	}

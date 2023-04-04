@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"sync"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
@@ -133,6 +132,9 @@ func (r *repository) calculateExtraBonus(flatBonus, bonusPercentageRemaining, ne
 }
 
 func (r *repository) initializeExtraBonusWorkers(ctx context.Context) {
+	if !r.cfg.Workers.InitializeExtraBonusWorkers {
+		return
+	}
 	allWorkers := make(map[int16]map[uint64]uint64, r.cfg.WorkerCount)
 	for extraBonusIndex := 0; extraBonusIndex < len(r.cfg.ExtraBonuses.FlatValues); extraBonusIndex++ {
 		offsets := make([]uint64, r.cfg.WorkerCount, r.cfg.WorkerCount) //nolint:gosimple // Prefer to be more descriptive.
@@ -149,15 +151,9 @@ func (r *repository) initializeExtraBonusWorkers(ctx context.Context) {
 			allWorkers[workerIndex][uint64(extraBonusIndex)] = offsets[workerIndex]
 		}
 	}
-	wg := new(sync.WaitGroup)
-	wg.Add(int(r.cfg.WorkerCount))
-	for key, val := range allWorkers {
-		go func(workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
-			defer wg.Done()
-			r.mustPopulateExtraBonusWorker(ctx, workerIndex, extraBonusesWorkerValues)
-		}(key, val)
+	for workerIndex, extraBonusesWorkerValues := range allWorkers {
+		r.mustPopulateExtraBonusWorker(ctx, workerIndex, extraBonusesWorkerValues)
 	}
-	wg.Wait()
 }
 
 func (r *repository) mustPopulateExtraBonusWorker(ctx context.Context, workerIndex int16, extraBonusesWorkerValues map[uint64]uint64) {
