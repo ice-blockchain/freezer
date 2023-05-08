@@ -18,7 +18,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
 	"github.com/ice-blockchain/wintr/time"
@@ -28,7 +28,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
-	db := storage.MustConnect(ctx, "", applicationYamlKey)
+	db := storage.MustConnect(ctx, applicationYamlKey)
 
 	return &repository{
 		cfg:           &cfg,
@@ -43,8 +43,8 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	prc := &processor{repository: &repository{
 		cfg:           &cfg,
-		db:            storage.MustConnect(ctx, getDDL(ddl, &cfg), applicationYamlKey),
-		mb:            messagebroker.MustConnect(ctx, applicationYamlKey),
+		db:            storage.MustConnect(context.Background(), applicationYamlKey),
+		mb:            messagebroker.MustConnect(context.Background(), applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
 	//nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
@@ -77,7 +77,7 @@ func getDDL(ddl string, cfg *config) string {
 		if ix == 0 {
 			achievedAtDate = fmt.Sprintf("'%v'", now.Add(-24*stdlibtime.Hour).UTC().Format("2006-01-02 15:04:05"))
 		}
-		adoptionValues = append(adoptionValues, fmt.Sprintf("(%v,%v,'%v',%v)", ix+1, milestone.Users, milestone.BaseMiningRate, achievedAtDate))
+		adoptionValues = append(adoptionValues, fmt.Sprintf("(%v,%v,%v,%v)", int16(ix+1), milestone.Users, milestone.BaseMiningRate, achievedAtDate))
 	}
 
 	return fmt.Sprintf(ddl,
@@ -91,7 +91,7 @@ func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
-func closeAll(mbConsumer, mbProducer messagebroker.Client, db *storage.DB, otherClosers ...func() error) func() error {
+func closeAll(mbConsumer, mbProducer messagebroker.Client, db storage.DB, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
 		err2 := errors.Wrap(db.Close(), "closing db connection failed")
@@ -180,28 +180,8 @@ func (p *processor) startStreams(ctx context.Context) { //nolint:funlen,gocognit
 			value = updatedValue.Value
 		}
 	}()
-	streamsCtx, cancelStreams := context.WithCancel(ctx)
-	p.streamsDoneWg = new(sync.WaitGroup)
-	p.streamsDoneWg.Add(1 + 1 + 1 + 1)
-	p.cancelStreams = cancelStreams
-	go func() {
-		defer p.streamsDoneWg.Done()
-		(&balanceRecalculationTriggerStreamSource{processor: p}).start(streamsCtx)
-	}()
-	go func() {
-		defer p.streamsDoneWg.Done()
-		(&miningRatesRecalculationTriggerStreamSource{processor: p}).start(streamsCtx)
-	}()
-	go func() {
-		defer p.streamsDoneWg.Done()
-		(&blockchainBalanceSynchronizationTriggerStreamSource{processor: p}).start(streamsCtx)
-	}()
-	go func() {
-		defer p.streamsDoneWg.Done()
-		p.initializeExtraBonusWorkers(ctx)
-		(&extraBonusProcessingTriggerStreamSource{processor: p}).start(streamsCtx)
-	}()
-	p.streamsDoneWg.Wait()
+	p.initializeExtraBonusWorkers(ctx)
+	p.startStreamProcessors(ctx, (&balanceRecalculationStreamProcessor{processor: p}).updateBalances)
 	log.Info("streams stopped")
 }
 
@@ -235,8 +215,12 @@ func (p *processor) deleteOldProcessedMiningSessions(ctx context.Context) error 
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if err := p.db.Ping(ctx); err != nil {
-		return errors.Wrap(err, "[health-check] failed to ping DB")
+	if resp := p.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
+		if resp.Err() == nil {
+			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
+		}
+
+		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
 	}
 	type ts struct {
 		TS *time.Time `json:"ts"`
@@ -326,6 +310,45 @@ func executeBatchConcurrently[ARG any](ctx context.Context, process func(context
 	return errors.Wrap(multierror.Append(nil, errs...).ErrorOrNil(), "at least one arg processing failed")
 }
 
+func processArgsConcurrently[ARG any](ctx context.Context, args []*ARG, processes ...func(context.Context, []*ARG) error) error {
+	if len(processes) == 0 || len(args) == 0 || ctx.Err() != nil {
+		return errors.Wrap(ctx.Err(), "unexpected deadline")
+	}
+	wg := new(sync.WaitGroup)
+	wg.Add(len(processes))
+	errChan := make(chan error, len(processes))
+	for i := range processes {
+		go func(ix int) {
+			defer wg.Done()
+			errChan <- errors.Wrapf(processes[ix](ctx, args), "failed to process[%v](%#v)", ix, args)
+		}(i)
+	}
+	wg.Wait()
+	close(errChan)
+	errs := make([]error, 0, len(processes))
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	return errors.Wrap(multierror.Append(nil, errs...).ErrorOrNil(), "at least one processing failed")
+}
+
+func (c *config) totalActiveUsersAggregationIntervalDateFormat() string {
+	const hoursInADay = 24
+	switch c.AdoptionMilestoneSwitch.Duration { //nolint:exhaustive // We don't care about the others.
+	case stdlibtime.Minute:
+		return minuteFormat
+	case stdlibtime.Hour:
+		return hourFormat
+	case hoursInADay * stdlibtime.Hour:
+		return dayFormat
+	default:
+		log.Panic(fmt.Sprintf("invalid interval: %v", c.AdoptionMilestoneSwitch.Duration))
+
+		return ""
+	}
+}
+
 func (c *config) globalAggregationIntervalChildDateFormat() string {
 	const hoursInADay = 24
 	switch c.GlobalAggregationInterval.Child { //nolint:exhaustive // We don't care about the others.
@@ -376,4 +399,16 @@ func (c *config) lastXMiningSessionsCollectingIntervalDateFormat() string {
 
 func (r *repository) lastXMiningSessionsCollectingIntervalDateFormat(now *time.Time) string {
 	return now.Format(r.cfg.lastXMiningSessionsCollectingIntervalDateFormat())
+}
+
+func (u *user) String() string {
+	if rawValue, err := json.MarshalContext(context.Background(), u); err != nil {
+		return string(rawValue)
+	} else {
+		return errors.Wrapf(err, "failed to json marshal %T", u).Error()
+	}
+}
+
+func pointer[T any](tt T) *T {
+	return &tt
 }

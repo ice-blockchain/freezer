@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -113,7 +113,7 @@ func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time,
 	}, nil
 }
 
-func (r *repository) calculateExtraBonus(flatBonus, bonusPercentageRemaining, newsSeen, miningStreak uint64) (extraBonus uint64) {
+func (r *repository) calculateExtraBonus(newsSeen uint16, now, miningSessionSoloStartedAt, miningSessionSoloEndedAt *time.Time) (extraBonus uint64) {
 	if flatBonus == 0 {
 		return 0
 	}

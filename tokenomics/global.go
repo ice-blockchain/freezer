@@ -10,7 +10,7 @@ import (
 
 	"github.com/ice-blockchain/eskimo/users"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 )
 
 func (r *repository) getGlobalUnsignedValue(ctx context.Context, key string) (uint64, error) {

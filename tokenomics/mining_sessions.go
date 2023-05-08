@@ -5,7 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"strings"
+	"github.com/redis/go-redis/v9"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
@@ -14,7 +14,7 @@ import (
 
 	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/terror"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -180,15 +180,18 @@ func (r *repository) newMiningSummary(old *miningSummary, now *time.Time) *minin
 		LastMiningStartedAt:        now,
 		LastNaturalMiningStartedAt: now,
 		LastMiningEndedAt:          time.New(now.Add(r.cfg.MiningSessionDuration.Max)),
+		PreviousMiningEndedAt:      old.LastMiningEndedAt,
+		Extension:                  r.cfg.MiningSessionDuration.Max,
 	}
-	if old.LastMiningEndedAt == nil || old.LastMiningStartedAt == nil || old.LastMiningEndedAt.Before(*now.Time) {
+	if old.LastMiningEndedAt.IsNil() || old.LastMiningStartedAt.IsNil() || old.LastMiningEndedAt.Before(*now.Time) {
 		return resp
 	}
+	resp.PreviousMiningEndedAt = old.PreviousMiningEndedAt
 	resp.LastMiningStartedAt = old.LastMiningStartedAt
 	resp.LastFreeMiningSessionAwardedAt = old.LastFreeMiningSessionAwardedAt
 	resp.MiningStreak = r.calculateMiningStreak(now, resp.LastMiningStartedAt, resp.LastMiningEndedAt)
 	var durationSinceLastFreeMiningSessionAwarded stdlibtime.Duration
-	if resp.LastFreeMiningSessionAwardedAt == nil {
+	if resp.LastFreeMiningSessionAwardedAt.IsNil() {
 		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.LastMiningStartedAt.Time)
 	} else {
 		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.LastFreeMiningSessionAwardedAt.Time)
@@ -202,6 +205,7 @@ func (r *repository) newMiningSummary(old *miningSummary, now *time.Time) *minin
 	if freeSessions := stdlibtime.Duration(r.calculateRemainingFreeMiningSessions(now, old.LastMiningEndedAt) + freeMiningSession); freeSessions > 0 {
 		resp.LastMiningEndedAt = time.New(resp.LastMiningEndedAt.Add(freeSessions * r.cfg.MiningSessionDuration.Max))
 	}
+	resp.Extension = resp.LastMiningEndedAt.Sub(*old.LastMiningEndedAt.Time)
 
 	return resp
 }
@@ -287,6 +291,8 @@ func (r *repository) insertNewMiningSession( //nolint:funlen,gocognit,revive // 
 			LastNaturalMiningStartedAt: ms.LastNaturalMiningStartedAt,
 			StartedAt:                  ms.LastMiningStartedAt,
 			EndedAt:                    ms.LastMiningEndedAt,
+			PreviouslyEndedAt:          ms.PreviousMiningEndedAt,
+			Extension:                  ms.Extension,
 			MiningStreak:               ms.MiningStreak,
 			UserID:                     &userID,
 		}
@@ -301,7 +307,7 @@ func (r *repository) sendMiningSessionMessage(ctx context.Context, ms *MiningSes
 		return errors.Wrapf(err, "failed to marshal %#v", ms)
 	}
 	msg := &messagebroker.Message{
-		Timestamp: *ms.LastNaturalMiningStartedAt.Time,
+		Timestamp: *ms.LastNaturalMiningStartedAt.Time, //TODO why?
 		Headers:   map[string]string{"producer": "freezer"},
 		Key:       *ms.UserID,
 		Topic:     r.cfg.MessageBroker.Topics[2].Name,
@@ -315,177 +321,87 @@ func (r *repository) sendMiningSessionMessage(ctx context.Context, ms *MiningSes
 }
 
 func (s *miningSessionsTableSource) Process(ctx context.Context, msg *messagebroker.Message) error {
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || len(msg.Value) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
-	if len(msg.Value) == 0 {
-		return nil
-	}
-	var ms MiningSession
-	if err := json.UnmarshalContext(ctx, msg.Value, &ms); err != nil {
-		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), &ms)
-	}
-	if ms.UserID == nil {
-		return nil
+	ms := new(MiningSession)
+	if err := json.UnmarshalContext(ctx, msg.Value, ms); err != nil || ms.UserID == nil {
+		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), ms)
 	}
 
 	return multierror.Append( //nolint:wrapcheck // Not needed.
+		errors.Wrapf(s.incrementTotalActiveUsers(ctx, ms), "failed to incrementTotalActiveUsers for %#v", ms),
+		errors.Wrapf(s.incrementActiveReferralCountForT0AndTMinus1(ctx, ms), "failed to incrementActiveReferralCountForT0AndTMinus1 for %#v", ms),
 		errors.Wrapf(s.trySwitchToNextAdoption(ctx), "failed to trySwitchToNextAdoption"),
-		errors.Wrapf(s.incrementActiveReferralCountForT0AndTMinus1(ctx, &ms), "failed to incrementActiveReferralCountForT0AndTMinus1 for %#v", ms),
 	).ErrorOrNil()
 }
 
 //nolint:funlen,revive,gocognit // .
-func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(ctx context.Context, ms *MiningSession) error {
+func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(ctx context.Context, ms *MiningSession) (err error) {
 	if ctx.Err() != nil || !ms.LastNaturalMiningStartedAt.Equal(*ms.StartedAt.Time) {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	sql := `SELECT COALESCE(t0.user_id,'') AS t0_user_id,
-				   COALESCE(tMinus1.user_id, '') AS t_Minus1_user_id,
-				   COALESCE(t0.hash_code,0) AS t0_Hash_Code,
-				   COALESCE(tMinus1.hash_code,0) AS t_Minus1_Hash_Code
-			  FROM users u
-			  		LEFT JOIN users t0
-			  			   ON t0.user_id = u.referred_by
-						  AND t0.user_id != u.user_id
-			  		LEFT JOIN users tMinus1
-			  			   ON tMinus1.user_id = t0.referred_by
-						  AND tMinus1.user_id != t0.user_id
-						  AND tMinus1.user_id != u.user_id
-			  WHERE u.user_id = $1`
+	duplGuardKey := ms.duplGuardKey(s.repository, "incr_active_ref")
+	if set, dErr := s.db.SetNX(ctx, duplGuardKey, "", s.cfg.MiningSessionDuration.Min).Result(); dErr != nil || !set {
+		if dErr == nil {
+			dErr = ErrDuplicate
+		}
+
+		return errors.Wrapf(dErr, "SetNX failed for mining_session_dupl_guard, miningSession: %#v", ms)
+	}
+	defer func() {
+		if err != nil {
+			undoCtx, cancelUndo := context.WithTimeout(context.Background(), requestDeadline)
+			defer cancelUndo()
+			err = multierror.Append( //nolint:wrapcheck // .
+				err,
+				errors.Wrapf(s.db.Del(undoCtx, duplGuardKey).Err(), "failed to del mining_session_dupl_guard key"),
+			).ErrorOrNil()
+		}
+	}()
+	id, err := s.getOrInitInternalID(ctx, *ms.UserID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
+	}
 	referees, err := storage.Get[struct {
-		T0UserID, TMinus1UserID     string
-		T0HashCode, TMinus1HashCode int64
-	}](ctx, s.db, sql, *ms.UserID)
-	if err != nil || (referees.T0UserID == "" && referees.TMinus1UserID == "") {
-		return errors.Wrapf(err, "failed to select for t0/t-1 information for userID:%v", *ms.UserID)
+		deserializedUsersKey
+		IDT0      int64 `redis:"id_t0"`
+		IDTMinus1 int64 `redis:"id_tminus1"`
+	}](ctx, s.db, serializedUsersKey(id))
+	if err != nil || len(referees) == 0 || (referees[0].IDT0 < 1 && referees[0].IDTMinus1 < 1) {
+		return errors.Wrapf(err, "failed to get referees for id:%v, userID:%v", id, *ms.UserID)
 	}
-
-	return errors.Wrapf(storage.DoInTransaction(ctx, s.db, func(conn storage.QueryExecer) error {
-		sessionNumber := s.sessionNumber(ms.LastNaturalMiningStartedAt)
-		sql = `INSERT INTO processed_mining_sessions(session_number, user_id) VALUES ($1, $2);`
-		if _, err = conn.Exec(ctx, sql, sessionNumber, *ms.UserID); err != nil {
-			return errors.Wrapf(err, "failed to insert processed_mining_sessions for userId:%v, sessionNumber:%v", *ms.UserID, sessionNumber)
+	if referees[0].IDT0 < 1 || referees[0].IDTMinus1 < 1 {
+		if referees[0].IDT0 >= 1 {
+			err = s.db.HIncrBy(ctx, serializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
 		}
-		if referees.T0UserID != "" {
-			sql = `INSERT INTO active_referrals (t1, user_id, hash_code, worker_index) 
-									     VALUES (1 , $1     , $2       , $3)
-				   ON CONFLICT (worker_index, user_id)
-							DO UPDATE
-								  SET t1 = active_referrals.t1 + EXCLUDED.t1`
-			t0WorkerIndex := int16(uint64(referees.T0HashCode) % uint64(s.cfg.WorkerCount))
-			if _, err = conn.Exec(ctx, sql, referees.T0UserID, referees.T0HashCode, t0WorkerIndex); err != nil {
-				return errors.Wrapf(err, "failed to increment t1 active_referrals for userId:%v", referees.T0UserID)
+		if referees[0].IDTMinus1 >= 1 {
+			err = s.db.HIncrBy(ctx, serializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
+		}
+	} else {
+		responses, txErr := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+			return multierror.Append( //nolint:wrapcheck // .
+				pipeliner.HIncrBy(ctx, serializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err(),
+				pipeliner.HIncrBy(ctx, serializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err(),
+			).ErrorOrNil()
+		})
+		if txErr == nil {
+			errs := make([]error, 0, len(responses))
+			for _, response := range responses {
+				errs = append(errs, errors.Wrapf(response.Err(), "failed to `%v`", response.FullName()))
 			}
+			txErr = multierror.Append(nil, errs...).ErrorOrNil()
 		}
-		if referees.TMinus1UserID != "" {
-			sql = `INSERT INTO active_referrals (t2, user_id, hash_code, worker_index) 
-									     VALUES (1 , $1     , $2       , $3)
-				   ON CONFLICT (worker_index, user_id)
-							DO UPDATE
-								  SET t2 = active_referrals.t2 + EXCLUDED.t2`
-			tMinus1WorkerIndex := int16(uint64(referees.TMinus1HashCode) % uint64(s.cfg.WorkerCount))
-			if _, err = conn.Exec(ctx, sql, referees.TMinus1UserID, referees.TMinus1HashCode, tMinus1WorkerIndex); err != nil {
-				return errors.Wrapf(err, "failed to increment t2 active_referrals for userId:%v", referees.TMinus1UserID)
-			}
-		}
-
-		return nil
-	}), "failed to execute transaction to increment active_referrals for t0&t-1, for %#v", ms)
-}
-
-type (
-	userThatStoppedMining struct {
-		LastMiningEndedAt               *time.Time
-		UserID, T0UserID, TMinus1UserID string
-		T0HashCode, TMinus1HashCode     int64
-	}
-)
-
-//nolint:funlen,gocognit,revive,gomnd,gocyclo,cyclop // .
-func (r *repository) decrementActiveReferralCountForT0AndTMinus1(ctx context.Context, usersThatStoppedMining ...*userThatStoppedMining) error {
-	if ctx.Err() != nil || len(usersThatStoppedMining) == 0 {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	t0Referrals := make(map[string]int, len(usersThatStoppedMining))
-	tMinus1Referrals := make(map[string]int, len(usersThatStoppedMining))
-	t0WorkerIndexes := make(map[string]int16, len(usersThatStoppedMining))
-	tMinus1WorkerIndexes := make(map[string]int16, len(usersThatStoppedMining))
-	processedMiningSessionValues := make([]string, 0, len(usersThatStoppedMining))
-	processedMiningSessionArgs := make([]any, 0, 2*len(usersThatStoppedMining))
-	for ix, usr := range usersThatStoppedMining {
-		processedMiningSessionValues = append(processedMiningSessionValues, fmt.Sprintf(`($%v,true,$%v)`, 2*ix+1, 2*ix+2))
-		processedMiningSessionArgs = append(processedMiningSessionArgs, r.sessionNumber(usr.LastMiningEndedAt), usr.UserID)
-		if usr.TMinus1UserID != "" {
-			tMinus1Referrals[usr.TMinus1UserID]++
-			tMinus1WorkerIndexes[usr.TMinus1UserID] = int16(uint64(usr.TMinus1HashCode) % uint64(r.cfg.WorkerCount))
-		}
-		if usr.T0UserID != "" {
-			t0Referrals[usr.T0UserID]++
-			t0WorkerIndexes[usr.T0UserID] = int16(uint64(usr.T0HashCode) % uint64(r.cfg.WorkerCount))
-		}
-	}
-	ix := 0
-	referralsValues := make([]string, 0, len(t0Referrals)+len(tMinus1Referrals))
-	referralsArgs := make([]any, 0, 3*(len(t0Referrals)+len(tMinus1Referrals)))
-	t0Conditions := make([]string, 0, len(t0Referrals))
-	tMinus1Conditions := make([]string, 0, len(tMinus1Referrals))
-	for userID, referralCount := range t0Referrals {
-		pk := fmt.Sprintf(`($%v, $%v)`, 3*ix+1, 3*ix+2)
-		referralsValues = append(referralsValues, pk)
-		referralsArgs = append(referralsArgs, t0WorkerIndexes[userID], userID, referralCount)
-		t0Conditions = append(t0Conditions, fmt.Sprintf(`WHEN (worker_index, user_id) = %v THEN GREATEST(t1 - $%v, 0)`, pk, 3*ix+3))
-		ix++
-	}
-	for userID, referralCount := range tMinus1Referrals {
-		pk := fmt.Sprintf(`($%v, $%v)`, 3*ix+1, 3*ix+2)
-		referralsValues = append(referralsValues, pk)
-		referralsArgs = append(referralsArgs, tMinus1WorkerIndexes[userID], userID, referralCount)
-		tMinus1Conditions = append(tMinus1Conditions, fmt.Sprintf(`WHEN (worker_index, user_id) = %v THEN GREATEST(t2 - $%v, 0)`, pk, 3*ix+3))
-		ix++
-	}
-	if len(referralsValues) == 0 {
-		sql := fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) 
-																  VALUES %[1]v`, strings.Join(processedMiningSessionValues, ","))
-		if _, err := storage.Exec(ctx, r.db, sql, processedMiningSessionArgs...); err == nil || storage.IsErr(err, storage.ErrDuplicate, "pk") {
-			return nil
-		} else {
-			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs) //nolint:asasalint // Intended.
-		}
-	}
-	if len(t0Conditions) == 0 {
-		t0Conditions = append(t0Conditions, `WHEN 1 = 0 THEN t1`)
-	}
-	if len(tMinus1Conditions) == 0 {
-		tMinus1Conditions = append(tMinus1Conditions, `WHEN 1 = 0 THEN t2`)
-	}
-	if err := storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
-		sql := fmt.Sprintf(`INSERT INTO processed_mining_sessions(session_number, negative, user_id) 
-																  VALUES %[1]v`, strings.Join(processedMiningSessionValues, ","))
-		if _, err := conn.Exec(ctx, sql, processedMiningSessionArgs...); err != nil {
-			return errors.Wrapf(err, "failed to insert processed_mining_sessions for args:%#v", processedMiningSessionArgs) //nolint:asasalint // Intended.
-		}
-		sql = fmt.Sprintf(`UPDATE active_referrals
-						   SET t1 = (CASE %[2]v ELSE t1 END),
-							   t2 = (CASE %[3]v ELSE t2 END)
-						   WHERE (worker_index, user_id) in (%[1]v)`,
-			strings.Join(referralsValues, ","),
-			strings.Join(t0Conditions, " "),
-			strings.Join(tMinus1Conditions, " "))
-		_, err := conn.Exec(ctx, sql, referralsArgs...)
-
-		return errors.Wrapf(err, "failed to decrement t1 and t2 active_referrals for args:%#v", referralsArgs) //nolint:asasalint // Intended.
-	}); err != nil {
-		if storage.IsErr(err, storage.ErrDuplicate, "pk") {
-			return nil
-		}
-
-		return errors.Wrapf(err, "failed to run transaction to decrement active_referrals for t0&t-1, for %#v", usersThatStoppedMining)
+		err = txErr
 	}
 
-	return nil
+	return errors.Wrapf(err, "failed to increment active referrals for t0&t-1, id:%v, userID:%v, ref:%#v", id, *ms.UserID, referees[0])
 }
 
 func (r *repository) sessionNumber(date *time.Time) uint64 {
-	return uint64(date.Unix()) / uint64(r.cfg.MiningSessionDuration.Max/stdlibtime.Second)
+	return uint64(date.Unix()) / uint64(r.cfg.MiningSessionDuration.Min/stdlibtime.Second)
+}
+
+func (ms *MiningSession) duplGuardKey(repo *repository, guardType string) string {
+	return fmt.Sprintf("mining_session_dupl_guards:%v~%v~%v", guardType, ms.UserID, repo.sessionNumber(ms.StartedAt))
 }
