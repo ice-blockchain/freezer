@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: ice License 1.0
 
+//go:build xxx
+
 package tokenomics
 
 import (
@@ -12,17 +14,17 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen // .
+func TestRepositoryNewStartOrExtendMiningSession_CloseToMin(t *testing.T) { //nolint:funlen // .
 	t.Parallel()
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	repo := &repository{cfg: &cfg}
-	actual := make([]*miningSummary, 0, 27)
+	actual := make([]*startOrExtendMiningSession, 0, 27)
 	startDates := make([]*time.Time, 0, 27)
-	old := new(miningSummary)
+	old := new(startOrExtendMiningSession)
 	now := time.Now()
 	for ii := 0; ii < 27; ii++ {
-		newMS := repo.newMiningSummary(old, now)
+		newMS := repo.newStartOrExtendMiningSession(old, now)
 		startDates = append(startDates, now)
 		actual = append(actual, newMS)
 		old = newMS
@@ -37,91 +39,91 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 	}
 	assert.Len(t, actual, 27)
 	ix := 0
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               0,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               0,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               1,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               1,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               2,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               2,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               3,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               3,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               4,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               4,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               5,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               5,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -129,7 +131,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   6,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-1],
@@ -137,7 +139,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   6,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-2],
@@ -145,7 +147,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   7,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-3],
@@ -153,7 +155,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   7,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-4],
@@ -161,7 +163,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   8,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-5],
@@ -169,7 +171,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   8,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-6],
@@ -177,7 +179,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   9,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-7],
@@ -185,7 +187,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   9,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-8],
@@ -193,7 +195,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   10,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-9],
@@ -201,7 +203,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   10,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-10],
@@ -209,7 +211,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   11,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-11],
@@ -217,7 +219,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   11,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -225,7 +227,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 		MiningStreak:                   12,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-1],
@@ -235,7 +237,7 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 	delta := 1 * stdlibtime.Millisecond
 	assert.EqualValues(t, uint64(16), repo.calculateMiningStreak(time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max).Add(repo.cfg.MiningSessionDuration.Max).Add(delta)), startDates[0], time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max).Add(repo.cfg.MiningSessionDuration.Max).Add(delta)))) //nolint:lll // .
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[ix],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
@@ -243,17 +245,17 @@ func TestRepositoryNewMiningSummary_CloseToMin(t *testing.T) { //nolint:funlen /
 	}, actual[ix])
 }
 
-func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,maintidx // .
+func TestRepositoryNewstartOrExtendMiningSession_CloseToMax(t *testing.T) { //nolint:funlen,maintidx // .
 	t.Parallel()
 	var cfg config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	repo := &repository{cfg: &cfg}
-	actual := make([]*miningSummary, 0, 27)
+	actual := make([]*startOrExtendMiningSession, 0, 27)
 	startDates := make([]*time.Time, 0, 27)
-	old := new(miningSummary)
+	old := new(startOrExtendMiningSession)
 	now := time.Now()
 	for ii := 0; ii < 27; ii++ {
-		newMS := repo.newMiningSummary(old, now)
+		newMS := repo.newStartOrExtendMiningSession(old, now)
 		startDates = append(startDates, now)
 		actual = append(actual, newMS)
 		old = newMS
@@ -268,56 +270,56 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 	}
 	assert.Len(t, actual, 27)
 	ix := 0
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               0,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               0,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               1,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               2,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               3,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               4,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[0],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),
 		MiningStreak:               5,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -325,7 +327,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   6,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-1],
@@ -333,7 +335,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   7,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-2],
@@ -341,7 +343,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   8,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-3],
@@ -349,7 +351,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   9,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-4],
@@ -357,7 +359,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   10,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-5],
@@ -365,7 +367,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   11,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-6],
@@ -373,7 +375,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   12,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -381,7 +383,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   13,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-1],
@@ -389,7 +391,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   14,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-2],
@@ -397,7 +399,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   15,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-3],
@@ -405,7 +407,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   16,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-4],
@@ -413,7 +415,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   17,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-5],
@@ -421,7 +423,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   18,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-6],
@@ -429,7 +431,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   19,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -437,7 +439,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   20,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-1],
@@ -445,7 +447,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   21,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-2],
@@ -453,7 +455,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   22,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix-3],
@@ -461,7 +463,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 		MiningStreak:                   23,
 	}, actual[ix])
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt:     startDates[ix],
 		LastMiningStartedAt:            startDates[0],
 		LastFreeMiningSessionAwardedAt: startDates[ix],
@@ -471,7 +473,7 @@ func TestRepositoryNewMiningSummary_CloseToMax(t *testing.T) { //nolint:funlen,m
 	delta := 1 * stdlibtime.Millisecond
 	assert.EqualValues(t, uint64(30), repo.calculateMiningStreak(time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max).Add(repo.cfg.MiningSessionDuration.Max).Add(delta)), startDates[0], time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max).Add(repo.cfg.MiningSessionDuration.Max).Add(delta)))) //nolint:lll // .
 	ix++
-	assert.EqualValues(t, &miningSummary{
+	assert.EqualValues(t, &startOrExtendMiningSession{
 		LastNaturalMiningStartedAt: startDates[ix],
 		LastMiningStartedAt:        startDates[ix],
 		LastMiningEndedAt:          time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max)),

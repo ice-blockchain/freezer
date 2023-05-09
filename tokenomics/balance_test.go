@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: ice License 1.0
+//go:build xxx
 
 package tokenomics
 

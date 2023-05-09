@@ -5,16 +5,18 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
-
 	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/time"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
+	"strconv"
+	"strings"
+	stdlibtime "time"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
@@ -43,179 +45,312 @@ func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Messa
 	return nil
 }
 
-func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	if err := s.removeBalanceFromT0AndTMinus1(ctx, usr); err != nil {
-		return errors.Wrapf(err, "failed to removeBalanceFromT0AndTMinus1 for user:%#v", usr)
-	}
-	_, err := storage.Exec(ctx, s.db, `DELETE FROM users WHERE user_id = $1`, usr.ID)
-
-	return errors.Wrapf(err, "failed to delete userID:%v", usr.ID)
-}
-
-func (s *usersTableSource) removeBalanceFromT0AndTMinus1(ctx context.Context, usr *users.User) error { //nolint:funlen // .
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
-	}
-	sql := fmt.Sprintf(`SELECT reverse_t0_balance.amount AS total_reverse_t0_amount,
-								reverse_tminus1_balance.amount AS total_reverse_t_minus1_amount,
-								negative_t0_balance.amount AS negative_reverse_t0_amount,
-								negative_tminus1_balance.amount AS negative_reverse_t_minus1_amount,
-				   			    t0.user_id AS t0_user_id,
-								coalesce(tminus1.user_id,'') AS t_minus1_user_id
-						FROM users u
-							 JOIN users t0
-							   ON t0.user_id = u.referred_by
-							  AND t0.user_id != u.user_id
-						LEFT JOIN users tminus1
-							   ON tminus1.user_id = t0.referred_by
-							  AND tminus1.user_id != t0.user_id
-						LEFT JOIN balances_worker reverse_t0_balance
-							   ON reverse_t0_balance.worker_index = $1
-							  AND reverse_t0_balance.user_id = u.user_id
-							  AND reverse_t0_balance.negative = FALSE
-							  AND reverse_t0_balance.type = %[1]v
-							  AND reverse_t0_balance.type_detail =  '%[2]v_' || t0.user_id
-						LEFT JOIN balances_worker reverse_tminus1_balance
-							   ON reverse_tminus1_balance.worker_index = $1
-							  AND reverse_tminus1_balance.user_id = u.user_id
-							  AND reverse_tminus1_balance.negative = FALSE
-							  AND reverse_tminus1_balance.type = %[1]v
-							  AND tminus1.user_id IS NOT NULL
-							  AND reverse_tminus1_balance.type_detail =  '%[3]v_' || tminus1.user_id
-						LEFT JOIN balances_worker negative_t0_balance
-							   ON negative_t0_balance.worker_index = $1
-							  AND negative_t0_balance.user_id = u.user_id
-							  AND negative_t0_balance.negative = TRUE
-							  AND negative_t0_balance.type = %[1]v
-							  AND negative_t0_balance.type_detail =  '%[2]v_' || t0.user_id
-						LEFT JOIN balances_worker negative_tminus1_balance
-							   ON negative_tminus1_balance.worker_index = $1
-							  AND negative_tminus1_balance.user_id = u.user_id
-							  AND negative_tminus1_balance.negative = TRUE
-							  AND negative_tminus1_balance.type = %[1]v
-							  AND tminus1.user_id IS NOT NULL
-							  AND negative_tminus1_balance.type_detail =  '%[3]v_' || tminus1.user_id
-					    WHERE u.user_id = $2`, totalNoPreStakingBonusBalanceType, reverseT0BalanceTypeDetail, reverseTMinus1BalanceTypeDetail)
-	res, err := storage.Get[struct {
-		TotalReverseT0Amount, TotalReverseTMinus1Amount,
-		NegativeReverseT0Amount, NegativeReverseTMinus1Amount *coin.ICEFlake
-		T0UserID, TMinus1UserID string
-	}](ctx, s.db, sql, int16(usr.HashCode%uint64(s.cfg.WorkerCount)), usr.ID)
+func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .
+	id, err := s.getInternalID(ctx, usr.ID)
 	if err != nil {
-		if storage.IsErr(err, storage.ErrNotFound) {
-			return nil
+		return errors.Wrapf(err, "failed to getInternalID for user:%#v", usr)
+	}
+	dbUserBeforeMiningStopped, err := storage.Get[struct {
+		MiningSessionSoloEndedAt *time.Time `redis:"mining_session_solo_ended_at"`
+		UserID                   string     `redis:"user_id"`
+	}](ctx, s.db, serializedUsersKey(id))
+	if err != nil || len(dbUserBeforeMiningStopped) == 0 {
+		if err == nil && len(dbUserBeforeMiningStopped) == 0 {
+			err = ErrNotFound
 		}
 
-		return errors.Wrapf(err, "failed to get reverse t0 and t-1 balance information for userID:%v", usr.ID)
+		return errors.Wrapf(err, "failed to get current state for user:%#v", usr)
 	}
-	cmds := make([]*AddBalanceCommand, 0, 1+1+1+1)
-	if !res.TotalReverseT0Amount.IsZero() {
-		cmds = append(cmds, &AddBalanceCommand{
-			Balances: &Balances[coin.ICEFlake]{
-				T1:     res.TotalReverseT0Amount,
-				UserID: res.T0UserID,
-			},
-			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
-		})
+	if err = storage.Set(ctx, s.db, &struct {
+		MiningSessionSoloStartedAt       *time.Time `redis:"mining_session_solo_started_at"`
+		MiningSessionSoloEndedAt         *time.Time `redis:"mining_session_solo_ended_at"`
+		PreviousMiningSessionSoloEndedAt *time.Time `redis:"previous_mining_session_solo_ended_at"`
+		deserializedUsersKey
+	}{
+		deserializedUsersKey:             deserializedUsersKey{ID: id},
+		PreviousMiningSessionSoloEndedAt: time.Now(),
+	}); err != nil {
+		return errors.Wrapf(err, "failed to manually stop mining due to user deletion message for user:%#v", usr)
 	}
-	if !res.NegativeReverseT0Amount.IsZero() {
-		negative := true
-		cmds = append(cmds, &AddBalanceCommand{
-			Balances: &Balances[coin.ICEFlake]{
-				T1:     res.NegativeReverseT0Amount,
-				UserID: res.T0UserID,
-			},
-			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
-			Negative: &negative,
-		})
+	stdlibtime.Sleep(stdlibtime.Second)
+	dbUserAfterMiningStopped, err := storage.Get[struct {
+		UserID            string  `redis:"user_id"`
+		IDT0              int64   `redis:"id_t0"`
+		IDTMinus1         int64   `redis:"id_tminus1"`
+		BalanceForT0      float64 `redis:"balance_for_t0"`
+		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
+	}](ctx, s.db, serializedUsersKey(id))
+	if err != nil || len(dbUserAfterMiningStopped) == 0 {
+		if err == nil && len(dbUserAfterMiningStopped) == 0 {
+			err = ErrNotFound
+		}
+
+		return errors.Wrapf(err, "failed to get current state for user:%#v", usr)
 	}
-	if !res.TotalReverseTMinus1Amount.IsZero() {
-		cmds = append(cmds, &AddBalanceCommand{
-			Balances: &Balances[coin.ICEFlake]{
-				T2:     res.TotalReverseTMinus1Amount,
-				UserID: res.TMinus1UserID,
-			},
-			EventID: fmt.Sprintf("referral_account_deletion_positive_balance_%v", usr.ID),
-		})
+	results, err := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		if idT0Key := serializedUsersKey(dbUserAfterMiningStopped[0].IDT0); idT0Key != "" {
+			if dbUserAfterMiningStopped[0].BalanceForT0 > 0.0 {
+				if err = pipeliner.HIncrByFloat(ctx, idT0Key, "balance_t1", -dbUserAfterMiningStopped[0].BalanceForT0).Err(); err != nil {
+					return err
+				}
+			}
+			if !dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.IsNil() &&
+				dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
+				if err = pipeliner.HIncrBy(ctx, idT0Key, "active_t1_referrals", -1).Err(); err != nil {
+					return err
+				}
+			}
+		}
+		if idTMinus1Key := serializedUsersKey(dbUserAfterMiningStopped[0].IDTMinus1); idTMinus1Key != "" {
+			if dbUserAfterMiningStopped[0].BalanceForTMinus1 > 0.0 {
+				if err = pipeliner.HIncrByFloat(ctx, idTMinus1Key, "balance_t2", -dbUserAfterMiningStopped[0].BalanceForTMinus1).Err(); err != nil {
+					return err
+				}
+			}
+			if !dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.IsNil() &&
+				dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
+				if err = pipeliner.HIncrBy(ctx, idTMinus1Key, "active_t2_referrals", -1).Err(); err != nil {
+					return err
+				}
+			}
+		}
+		_, toAdd := s.usernameKeywords(usr.Username, "")
+		for _, usernameKeyword := range toAdd {
+			if err = pipeliner.SRem(ctx, usernameKeyword, id).Err(); err != nil {
+				return err
+			}
+		}
+		if err = pipeliner.ZRem(ctx, "top_miners", id).Err(); err != nil {
+			return err
+		}
+		if err = pipeliner.Del(ctx, serializedUsersKey(id), serializedUsersKey(usr.ID)).Err(); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete userID:%v,id:%v", usr.ID, id)
 	}
-	if !res.NegativeReverseTMinus1Amount.IsZero() {
-		negative := true
-		cmds = append(cmds, &AddBalanceCommand{
-			Balances: &Balances[coin.ICEFlake]{
-				T2:     res.NegativeReverseTMinus1Amount,
-				UserID: res.TMinus1UserID,
-			},
-			EventID:  fmt.Sprintf("referral_account_deletion_negative_balance_%v", usr.ID),
-			Negative: &negative,
-		})
+	errs := make([]error, 0, len(results))
+	for _, result := range results {
+		if err = result.Err(); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to run `%#v`", result.FullName()))
+		}
 	}
 
-	return errors.Wrapf(executeBatchConcurrently(ctx, s.sendAddBalanceCommandMessage, cmds), "failed to sendAddBalanceCommandMessages for %#v", cmds)
+	return errors.Wrapf(multierror.Append(nil, errs...).ErrorOrNil(), "failed to delete userID:%v,id:%v", usr.ID, id)
 }
 
-//nolint:funlen,lll // .
-func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error {
-	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
+func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .
+	internalID, err := s.getOrInitInternalID(ctx, usr.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to getOrInitInternalID for user:%#v", usr)
 	}
-	sql := `INSERT INTO users (created_at, updated_at, user_id, referred_by, username, first_name, last_name, lookup, profile_picture_name, mining_blockchain_account_address, blockchain_account_address, hash_code  , hide_ranking, verified)
-					   VALUES ($1		 , $2		 , $3	  , $4		   , $5	     , $6		 , $7	    , $8    , $9			      , $10								 , $11					     , $12::bigint, $13			, $14)
-		    ON CONFLICT (user_id)
-		    	DO UPDATE
-		    		  SET updated_at 						= EXCLUDED.updated_at,
-		    		  	  referred_by 						= EXCLUDED.referred_by,
-		    		  	  username 							= EXCLUDED.username,
-		    		  	  first_name 						= EXCLUDED.first_name,
-		    		  	  last_name 						= EXCLUDED.last_name,
-		    		  	  lookup 						    = EXCLUDED.lookup,
-		    		  	  profile_picture_name 				= EXCLUDED.profile_picture_name,
-		    		  	  mining_blockchain_account_address = EXCLUDED.mining_blockchain_account_address,
-		    		  	  blockchain_account_address 		= EXCLUDED.blockchain_account_address,
-		    		  	  hide_ranking 						= EXCLUDED.hide_ranking
-			  		WHERE coalesce(users.referred_by,'') 						!= coalesce(EXCLUDED.referred_by,'')
-			  		   OR coalesce(users.username,'') 							!= coalesce(EXCLUDED.username,'')
-			  		   OR coalesce(users.first_name,'') 						!= coalesce(EXCLUDED.first_name,'')
-			  		   OR coalesce(users.last_name,'') 							!= coalesce(EXCLUDED.last_name,'')
-			  		   OR coalesce(users.lookup,'') 							!= coalesce(EXCLUDED.lookup,'')
-			  		   OR coalesce(users.profile_picture_name,'') 				!= coalesce(EXCLUDED.profile_picture_name,'')
-			  		   OR coalesce(users.mining_blockchain_account_address,'') 	!= coalesce(EXCLUDED.mining_blockchain_account_address,'')
-			  		   OR coalesce(users.blockchain_account_address,'') 		!= coalesce(EXCLUDED.blockchain_account_address,'')
-			  		   OR coalesce(users.hide_ranking,false) 					!= coalesce(EXCLUDED.hide_ranking,false)
-			  		   OR coalesce(users.verified,false) 						!= coalesce(EXCLUDED.verified,false)`
-	verified := false
-	if usr.Verified != nil && *usr.Verified {
-		verified = true
+	type (
+		userPartialState struct {
+			UserID                         string `redis:"user_id"`
+			ProfilePictureName             string `redis:"profile_picture_name"`
+			Username                       string `redis:"username"`
+			MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address"`
+			BlockchainAccountAddress       string `redis:"blockchain_account_address"`
+			deserializedUsersKey
+			IDT0        int64 `redis:"id_t0"`
+			HideRanking bool  `redis:"hide_ranking"`
+		}
+	)
+	dbUser, err := storage.Get[userPartialState](ctx, s.db, serializedUsersKey(internalID))
+	if err != nil || len(dbUser) == 0 {
+		if err == nil && len(dbUser) == 0 {
+			err = errors.Errorf("missing state for user:%#v", usr)
+		}
+
+		return errors.Wrapf(err, "failed to get current user for internalID:%v", internalID)
 	}
-	args := append(make([]any, 0, 13), //nolint:gomnd // .
-		*usr.CreatedAt.Time,
-		*usr.UpdatedAt.Time,
-		usr.ID,
-		usr.ReferredBy,
-		usr.Username,
-		usr.FirstName,
-		usr.LastName,
-		strings.ToLower(fmt.Sprintf("%v%v%v", usr.Username, usr.FirstName, usr.LastName)),
-		s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
-		usr.MiningBlockchainAccountAddress,
-		usr.BlockchainAccountAddress,
-		int64(usr.HashCode),
-		s.hideRanking(usr),
-		verified)
-	if _, err := storage.Exec(ctx, s.db, sql, args...); err != nil {
-		return errors.Wrapf(err, "failed to replace user:%#v", usr)
+	newPartialState := &userPartialState{
+		deserializedUsersKey:           deserializedUsersKey{ID: internalID},
+		IDT0:                           dbUser[0].IDT0,
+		UserID:                         usr.ID,
+		ProfilePictureName:             s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
+		Username:                       usr.Username,
+		MiningBlockchainAccountAddress: usr.MiningBlockchainAccountAddress,
+		BlockchainAccountAddress:       usr.BlockchainAccountAddress,
+		HideRanking:                    s.hideRanking(usr),
 	}
 
-	return multierror.Append( //nolint:wrapcheck // Not needed.
-		errors.Wrapf(s.updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress(ctx, usr), "failed to updateBlockchainBalanceSynchronizationWorkerBlockchainAccountAddress for usr:%#v", usr), //nolint:lll // .
-		errors.Wrapf(s.initializeBalanceRecalculationWorker(ctx, usr), "failed to initializeBalanceRecalculationWorker for %#v", usr),
-		errors.Wrapf(s.initializeMiningRatesRecalculationWorker(ctx, usr), "failed to initializeMiningRatesRecalculationWorker for %#v", usr),
-		errors.Wrapf(s.initializeBlockchainBalanceSynchronizationWorker(ctx, usr), "failed to initializeBlockchainBalanceSynchronizationWorker for %#v", usr),
-		errors.Wrapf(s.initializeExtraBonusProcessingWorker(ctx, usr), "failed to initializeExtraBonusProcessingWorker for %#v", usr),
-		errors.Wrapf(s.awardRegistrationICECoinsBonus(ctx, usr), "failed to awardRegistrationICECoinsBonus for %#v", usr),
+	return multierror.Append( //nolint:wrapcheck // Not Needed.
+		errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed to replace user:%#v", usr),
+		errors.Wrapf(s.updateReferredBy(ctx, dbUser[0].ID, dbUser[0].IDT0, usr.ID, usr.ReferredBy), "failed to updateReferredBy for user:%#v", usr),
+		errors.Wrapf(s.updateUsernameKeywords(ctx, dbUser[0].ID, dbUser[0].Username, usr.Username), "failed to updateUsernameKeywords for oldUser:%#v, user:%#v", dbUser, usr), //nolint:lll // .
 	).ErrorOrNil()
+}
+
+func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int64, userID, referredBy string) error {
+	if referredBy == userID ||
+		referredBy == "" ||
+		referredBy == "bogus" ||
+		referredBy == "icenetwork" {
+		return nil
+	}
+	idT0, err := s.getOrInitInternalID(ctx, referredBy)
+	if err != nil {
+		return errors.Wrapf(err, "failed to getOrInitInternalID for referredBy:%v", referredBy)
+	} else if oldIDT0 == idT0 {
+		return nil
+	}
+	type (
+		t0Changed struct {
+			MiningSessionT0StartedAt            *time.Time `redis:"mining_session_t0_started_at"`
+			MiningSessionTMinus1StartedAt       *time.Time `redis:"mining_session_tminus1_started_at"`
+			MiningSessionT0EndedAt              *time.Time `redis:"mining_session_t0_ended_at"`
+			MiningSessionTMinus1EndedAt         *time.Time `redis:"mining_session_tminus1_ended_at"`
+			PreviousMiningSessionT0EndedAt      *time.Time `redis:"previous_mining_session_t0_ended_at"`
+			PreviousMiningSessionTMinus1EndedAt *time.Time `redis:"previous_mining_session_tminus1_ended_at"`
+			ResurrectT0UsedAt                   *time.Time `redis:"resurrect_t0_used_at"`
+			ResurrectTMinus1UsedAt              *time.Time `redis:"resurrect_tminus1_used_at"`
+			deserializedUsersKey
+			IDT0                   int64   `redis:"id_t0"`
+			IDTMinus1              int64   `redis:"id_tminus1"`
+			BalanceT0              int64   `redis:"balance_t0"`
+			BalanceForT0           float64 `redis:"balance_for_t0"`
+			BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+			SlashingRateT0         float64 `redis:"slashing_rate_t0"`
+			SlashingRateForT0      float64 `redis:"slashing_rate_for_t0"`
+			SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+		}
+		referral struct {
+			MiningSessionSoloStartedAt       *time.Time `redis:"mining_session_solo_started_at"`
+			MiningSessionSoloEndedAt         *time.Time `redis:"mining_session_solo_ended_at"`
+			PreviousMiningSessionSoloEndedAt *time.Time `redis:"previous_mining_session_solo_ended_at"`
+			ResurrectSoloUsedAt              *time.Time `redis:"resurrect_solo_used_at"`
+			deserializedUsersKey
+			IDT0 int64 `redis:"id_t0"`
+		}
+	)
+	newPartialState := &t0Changed{deserializedUsersKey: deserializedUsersKey{ID: id}}
+	if t0Referral, err2 := storage.Get[referral](ctx, s.db, serializedUsersKey(idT0)); err2 != nil {
+		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", idT0)
+	} else if len(t0Referral) == 1 {
+		newPartialState.IDT0 = t0Referral[0].ID
+		newPartialState.ResurrectT0UsedAt = t0Referral[0].ResurrectSoloUsedAt
+		newPartialState.MiningSessionT0StartedAt = t0Referral[0].MiningSessionSoloStartedAt
+		newPartialState.MiningSessionT0EndedAt = t0Referral[0].MiningSessionSoloEndedAt
+		newPartialState.PreviousMiningSessionT0EndedAt = t0Referral[0].PreviousMiningSessionSoloEndedAt
+		if t0Referral[0].IDT0 > 0 {
+			if tMinus1Referral, err3 := storage.Get[referral](ctx, s.db, serializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
+				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
+			} else if len(tMinus1Referral) == 1 {
+				newPartialState.IDTMinus1 = tMinus1Referral[0].ID
+				newPartialState.ResurrectTMinus1UsedAt = tMinus1Referral[0].ResurrectSoloUsedAt
+				newPartialState.MiningSessionTMinus1StartedAt = tMinus1Referral[0].MiningSessionSoloStartedAt
+				newPartialState.MiningSessionTMinus1EndedAt = tMinus1Referral[0].MiningSessionSoloEndedAt
+				newPartialState.PreviousMiningSessionTMinus1EndedAt = tMinus1Referral[0].PreviousMiningSessionSoloEndedAt
+			}
+		}
+	}
+	if err = storage.Set(ctx, s.db, newPartialState); err != nil {
+		return errors.Wrapf(err, "failed to replace newPartialState:%#v", newPartialState)
+	}
+	if oldIDT0 > 0 {
+		stdlibtime.Sleep(stdlibtime.Second)
+	}
+	dbUserAfterT0Changed, err := storage.Get[struct {
+		IDT0                   int64   `redis:"id_t0"`
+		IDTMinus1              int64   `redis:"id_tminus1"`
+		BalanceT0              int64   `redis:"balance_t0"`
+		BalanceForT0           float64 `redis:"balance_for_t0"`
+		BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+		SlashingRateT0         float64 `redis:"slashing_rate_t0"`
+		SlashingRateForT0      float64 `redis:"slashing_rate_for_t0"`
+		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+	}](ctx, s.db, serializedUsersKey(id))
+	if err != nil || len(dbUserAfterT0Changed) == 0 {
+		if err == nil && len(dbUserAfterT0Changed) == 0 {
+			err = errors.Errorf("missing state for userID:%v", id)
+		}
+
+		return errors.Wrapf(err, "failed to get[2] current user for internalID:%v", id)
+	}
+	if dbUserAfterT0Changed[0].IDT0 != newPartialState.IDT0 ||
+		dbUserAfterT0Changed[0].IDTMinus1 != newPartialState.IDTMinus1 ||
+		dbUserAfterT0Changed[0].BalanceT0 != 0.0 ||
+		dbUserAfterT0Changed[0].BalanceForT0 != 0.0 ||
+		dbUserAfterT0Changed[0].BalanceForTMinus1 != 0.0 ||
+		dbUserAfterT0Changed[0].SlashingRateForT0 != 0.0 ||
+		dbUserAfterT0Changed[0].SlashingRateT0 != 0.0 ||
+		dbUserAfterT0Changed[0].SlashingRateForTMinus1 != 0.0 {
+		return errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed[2] to replace newPartialState:%#v", newPartialState)
+	}
+
+	return nil
+}
+
+func (s *usersTableSource) updateUsernameKeywords(
+	ctx context.Context, id int64, oldUsername, newUsername string,
+) error {
+	if oldUsername == newUsername {
+		return nil
+	}
+	toRemove, toAdd := s.usernameKeywords(oldUsername, newUsername)
+	if len(toRemove)+len(toAdd) == 0 {
+		return nil
+	}
+	results, err := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		for _, keyword := range toAdd {
+			if cmdErr := pipeliner.SAdd(ctx, keyword, id).Err(); cmdErr != nil {
+				return cmdErr
+			}
+		}
+		for _, keyword := range toRemove {
+			if cmdErr := pipeliner.SRem(ctx, keyword, id).Err(); cmdErr != nil {
+				return cmdErr
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to move username keywords for internalUserID:%#v", id)
+	}
+	errs := make([]error, 0, len(results))
+	for _, result := range results {
+		if err = result.Err(); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to `%#v` for username keyword", result.FullName()))
+		}
+	}
+
+	return multierror.Append(nil, errs...).ErrorOrNil()
+}
+
+func (*usersTableSource) usernameKeywords(before, after string) (toRemove, toAdd []string) {
+	beforeKeywords, afterKeywords := generateUsernameKeywords(before), generateUsernameKeywords(after)
+	for beforeKeyword := range beforeKeywords {
+		if _, found := afterKeywords[beforeKeyword]; !found {
+			toRemove = append(toRemove, beforeKeyword)
+		}
+	}
+	for afterKeyword := range afterKeywords {
+		if _, found := beforeKeywords[afterKeyword]; !found {
+			toAdd = append(toAdd, afterKeyword)
+		}
+	}
+
+	return toRemove, toAdd
+}
+
+func generateUsernameKeywords(username string) map[string]struct{} {
+	if username == "" {
+		return nil
+	}
+	keywords := make(map[string]struct{})
+	for _, part := range append(strings.Split(username, "."), username) {
+		for i := 0; i < len(part); i++ {
+			keywords[part[:i+1]] = struct{}{}
+			keywords[part[len(part)-1-i:]] = struct{}{}
+		}
+	}
+
+	return keywords
 }
 
 func (*usersTableSource) hideRanking(usr *users.User) (hideRanking bool) {
@@ -232,17 +367,121 @@ func (*usersTableSource) hideRanking(usr *users.User) (hideRanking bool) {
 	return hideRanking
 }
 
-func (s *usersTableSource) awardRegistrationICECoinsBonus(ctx context.Context, usr *users.User) error {
+var (
+	initInternalIDScript = redis.NewScript(`
+local new_id = redis.call('INCR', KEYS[1])
+local set_nx_reply = redis.pcall('SETNX', KEYS[2], tostring(new_id))
+if type(set_nx_reply) == "table" and set_nx_reply['err'] ~= nil then
+	redis.call('DECR', KEYS[1])
+	return set_nx_reply
+elseif set_nx_reply == 0 then
+	redis.call('DECR', KEYS[1])
+	return redis.error_reply('race condition')
+end
+return new_id
+`)
+	initUserScript = redis.NewScript(`
+local hlen_reply = redis.call('HLEN', KEYS[1])
+if hlen_reply ~= 0 then
+	return redis.error_reply('race condition')
+end
+redis.call('HSETNX', KEYS[1], 'balance_total', 10.0)
+redis.call('HSETNX', KEYS[1], 'balance_total_minted', 10.0)
+redis.call('HSETNX', KEYS[1], 'balance_solo', 10.0)
+redis.call('HSETNX', KEYS[1], 'user_id', ARGV[1])
+redis.call('ZADD', 'top_miners', 'NX', 10.0, KEYS[1])
+`)
+)
+
+func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (int64, error) {
 	if ctx.Err() != nil {
-		return errors.Wrap(ctx.Err(), "unexpected deadline")
+		return 0, errors.Wrapf(ctx.Err(), "context expired")
 	}
-	cmd := &AddBalanceCommand{
-		Balances: &Balances[coin.ICEFlake]{
-			Total:  coin.NewAmountUint64(registrationICEFlakeBonusAmount),
-			UserID: usr.ID,
-		},
-		EventID: registrationICEBonusEventID,
+	id, err := r.getInternalID(ctx, userID)
+	if err != nil && errors.Is(err, ErrNotFound) {
+		accessibleKeys := append(make([]string, 0, 1+1), "users_serial", serializedUsersKey(userID))
+		id, err = initInternalIDScript.EvalSha(ctx, r.db, accessibleKeys).Int64()
+		if err != nil && redis.HasErrorPrefix(err, "NOSCRIPT") {
+			log.Error(errors.Wrap(initInternalIDScript.Load(ctx, r.db).Err(), "failed to load initInternalIDScript"))
+
+			return r.getOrInitInternalID(ctx, userID)
+		}
+		if err == nil {
+			accessibleKeys = append(make([]string, 0, 1), serializedUsersKey(id))
+			for ctx.Err() == nil {
+				if err = initUserScript.EvalSha(ctx, r.db, accessibleKeys, userID).Err(); err == nil || errors.Is(err, redis.Nil) || strings.Contains(err.Error(), "race condition") {
+					if err != nil && strings.Contains(err.Error(), "race condition") {
+						log.Error(errors.Wrapf(err, "race condition while evaling initUserScript for userID:%v", userID))
+					}
+					err = nil
+					break
+				} else if err != nil && redis.HasErrorPrefix(err, "NOSCRIPT") {
+					log.Error(errors.Wrap(initUserScript.Load(ctx, r.db).Err(), "failed to load initUserScript"))
+				}
+			}
+		}
+		err = errors.Wrapf(err, "failed to generate internalID for userID:%#v", userID)
+	}
+	if err != nil {
+		log.Error(err)
+
+		return r.getOrInitInternalID(ctx, userID)
 	}
 
-	return errors.Wrapf(s.sendAddBalanceCommandMessage(ctx, cmd), "failed to sendAddBalanceCommandMessage for %#v", cmd)
+	return id, errors.Wrapf(err, "failed to getInternalID for userID:%#v", userID)
+}
+
+func (r *repository) getInternalID(ctx context.Context, userID string) (int64, error) {
+	idAsString, err := r.db.Get(ctx, serializedUsersKey(userID)).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return 0, errors.Wrapf(err, "failed to get internal id for external userID:%v", userID)
+	}
+	if idAsString == "" {
+		return 0, ErrNotFound
+	}
+	id, err := strconv.ParseInt(idAsString, 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "internalID:%v is not numeric", idAsString)
+	}
+
+	return id, nil
+}
+
+func (k *deserializedUsersKey) Key() string {
+	if k == nil || k.ID == 0 {
+		return ""
+	}
+
+	return serializedUsersKey(k.ID)
+}
+
+func (k *deserializedUsersKey) SetKey(val string) {
+	if val == "" || val == "users:" {
+		return
+	}
+	if val[0] == 'u' {
+		val = val[6:]
+	}
+	var err error
+	k.ID, err = strconv.ParseInt(val, 10, 64)
+	log.Panic(err)
+}
+
+func serializedUsersKey(val any) string {
+	switch typedVal := val.(type) {
+	case string:
+		if typedVal == "" {
+			return ""
+		}
+
+		return "users:" + typedVal
+	case int64:
+		if typedVal == 0 {
+			return ""
+		}
+
+		return "users:" + strconv.FormatInt(typedVal, 10)
+	default:
+		panic(fmt.Sprintf("%#v cannot be used as users key", val))
+	}
 }

@@ -202,7 +202,6 @@ func (s *service) GetBalanceHistory( //nolint:gocritic,funlen // False negative.
 //	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
 //	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
 //	@Failure		403				{object}	server.ErrorResponse	"if hidden by the user"
-//	@Failure		404				{object}	server.ErrorResponse	"if not found"
 //	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
 //	@Failure		500				{object}	server.ErrorResponse
 //	@Failure		504				{object}	server.ErrorResponse	"if request times out"
@@ -214,9 +213,6 @@ func (s *service) GetRankingSummary( //nolint:gocritic // False negative.
 	ranking, err := s.tokenomicsRepository.GetRankingSummary(contextWithHashCode(ctx, req), req.Data.UserID)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to get user's ranking summary for userID:%v", req.Data.UserID)
-		if errors.Is(err, tokenomics.ErrRelationNotFound) {
-			return nil, server.NotFound(err, userNotFoundErrorCode)
-		}
 		if errors.Is(err, tokenomics.ErrGlobalRankHidden) {
 			return nil, server.ForbiddenWithCode(err, globalRankHiddenErrorCode)
 		}
