@@ -12,41 +12,104 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
-	"github.com/ice-blockchain/wintr/coin"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/terror"
 	"github.com/ice-blockchain/wintr/time"
 )
 
+type (
+	startOrExtendMiningSession struct {
+		ResurrectSoloUsedAt                  *time.Time `redis:"resurrect_solo_used_at"`
+		MiningSessionSoloLastStartedAt       *time.Time `redis:"mining_session_solo_last_started_at"`
+		MiningSessionSoloStartedAt           *time.Time `redis:"mining_session_solo_started_at"`
+		MiningSessionSoloEndedAt             *time.Time `redis:"mining_session_solo_ended_at"`
+		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at"`
+		MiningSessionSoloPreviouslyEndedAt   *time.Time `redis:"mining_session_solo_previously_ended_at"`
+		deserializedUsersKey
+	}
+	getCurrentMiningSession struct {
+		ResurrectSoloUsedAt                  *time.Time `redis:"resurrect_solo_used_at"`
+		MiningSessionSoloLastStartedAt       *time.Time `redis:"mining_session_solo_last_started_at"`
+		MiningSessionSoloStartedAt           *time.Time `redis:"mining_session_solo_started_at"`
+		MiningSessionSoloEndedAt             *time.Time `redis:"mining_session_solo_ended_at"`
+		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at"`
+		MiningSessionSoloPreviouslyEndedAt   *time.Time `redis:"mining_session_solo_previously_ended_at"`
+		PreStakingAllocation                 uint16     `redis:"pre_staking_allocation"`
+		PreStakingBonus                      uint16     `redis:"pre_staking_bonus"`
+		BalanceTotal                         float64    `redis:"balance_total"`
+		SlashingRateSolo                     float64    `redis:"slashing_rate_solo"`
+		SlashingRateT0                       float64    `redis:"slashing_rate_t0"`
+		SlashingRateT1                       float64    `redis:"slashing_rate_t1"`
+		SlashingRateT2                       float64    `redis:"slashing_rate_t2"`
+		IDT0                                 int64      `redis:"id_t0"`
+		IDTMinus1                            int64      `redis:"id_tminus1"`
+	}
+)
+
 func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of handling.
 	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool,
 ) error {
 	userID := *ms.MiningSession.UserID
-	old, err := r.getInternalMiningSummary(ctx, userID)
+	id, err := r.getOrInitInternalID(ctx, userID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to getMiningSummary for userID:%v", userID)
+		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	now := time.Now()
-	if old.LastMiningEndedAt != nil &&
-		old.LastNaturalMiningStartedAt != nil &&
-		old.LastMiningEndedAt.After(*now.Time) &&
-		(now.Sub(*old.LastNaturalMiningStartedAt.Time)/r.cfg.MiningSessionDuration.Min)%2 == 0 {
+	old, err := storage.Get[getCurrentMiningSession](ctx, r.db, serializedUsersKey(id))
+	if err != nil || len(old) == 0 {
+		if err == nil {
+			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
+		}
+
+		return errors.Wrapf(err, "failed to get miningSummary for id:%v", id)
+	}
+	if !old[0].MiningSessionSoloEndedAt.IsNil() &&
+		!old[0].MiningSessionSoloLastStartedAt.IsNil() &&
+		old[0].MiningSessionSoloEndedAt.After(*now.Time) &&
+		(now.Sub(*old[0].MiningSessionSoloLastStartedAt.Time)/r.cfg.MiningSessionDuration.Min)%2 == 0 {
 		return ErrDuplicate
 	}
-	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old, now, rollbackNegativeMiningProgress)
+	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress) //nolint:lll // .
 	if err != nil {
 		return err
 	}
-	newMS := r.newMiningSummary(old, now)
-	if err = r.insertNewMiningSession(ctx, userID, old, newMS, shouldRollback); err != nil {
-		return errors.Wrapf(err, "failed to insertNewMiningSession:%#v,userID:%v,rollbackNegativeMiningProgress:%v", newMS, userID, shouldRollback)
+	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
+		return errors.Wrapf(err, "failed to updateTMinus1 for id:%v", id)
+	}
+	oldMS := &startOrExtendMiningSession{
+		ResurrectSoloUsedAt:                  old[0].ResurrectSoloUsedAt,
+		MiningSessionSoloLastStartedAt:       old[0].MiningSessionSoloLastStartedAt,
+		MiningSessionSoloStartedAt:           old[0].MiningSessionSoloStartedAt,
+		MiningSessionSoloEndedAt:             old[0].MiningSessionSoloEndedAt,
+		MiningSessionSoloDayOffLastAwardedAt: old[0].MiningSessionSoloDayOffLastAwardedAt,
+		MiningSessionSoloPreviouslyEndedAt:   old[0].MiningSessionSoloPreviouslyEndedAt,
+	}
+	newMS, extension := r.newStartOrExtendMiningSession(oldMS, now)
+	newMS.ID = id
+	if shouldRollback != nil && *shouldRollback && oldMS.ResurrectSoloUsedAt.IsNil() {
+		newMS.ResurrectSoloUsedAt = time.New(stdlibtime.Date(3000, 0, 0, 0, 0, 0, 0, nil)) //nolint:gomnd // .
+	}
+	sess := &MiningSession{
+		LastNaturalMiningStartedAt: newMS.MiningSessionSoloLastStartedAt,
+		StartedAt:                  newMS.MiningSessionSoloStartedAt,
+		EndedAt:                    newMS.MiningSessionSoloEndedAt,
+		PreviouslyEndedAt:          newMS.MiningSessionSoloPreviouslyEndedAt,
+		Extension:                  extension,
+		MiningStreak:               r.calculateMiningStreak(now, newMS.MiningSessionSoloStartedAt, newMS.MiningSessionSoloEndedAt),
+		UserID:                     &userID,
+	}
+	if err = r.sendMiningSessionMessage(ctx, sess); err != nil {
+		return errors.Wrapf(err, "failed to sendMiningSessionMessage:%#v", sess)
+	}
+	if err = storage.Set(ctx, r.db, newMS); err != nil {
+		return errors.Wrapf(err, "failed to insertNewMiningSession:%#v", newMS)
 	}
 
 	return errors.Wrapf(retry(ctx, func() error {
 		summary, gErr := r.GetMiningSummary(ctx, userID)
 		if gErr == nil {
-			if summary.MiningSession == nil || summary.MiningSession.StartedAt == nil || summary.MiningSession.StartedAt.UnixMicro() != now.UnixMicro() {
+			if summary.MiningSession == nil || summary.MiningSession.StartedAt.IsNil() || !summary.MiningSession.StartedAt.Equal(*now.Time) {
 				gErr = ErrNotFound
 			} else {
 				*ms = *summary
@@ -57,248 +120,109 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	}), "permanently failed to GetMiningSummary for userID:%v", userID)
 }
 
-func (r *repository) getInternalMiningSummary(ctx context.Context, userID string) (*miningSummary, error) { //nolint:funlen // Big SQL.
-	sql := fmt.Sprintf(`SELECT DISTINCT ON (u.user_id) 
-						       u.last_natural_mining_started_at,
-							   u.last_mining_started_at,
-							   u.last_mining_ended_at,
-							   u.previous_mining_started_at,
-							   u.previous_mining_ended_at,
-							   u.last_free_mining_session_awarded_at,
-							   negative_balance.amount as negative_total_no_pre_staking_bonus_balance_amount,
-							   negative_t0_balance.amount as negative_total_t0_no_pre_staking_bonus_balance_amount,
-							   negative_t1_balance.amount as negative_total_t1_no_pre_staking_bonus_balance_amount,
-							   negative_t2_balance.amount as negative_total_t2_no_pre_staking_bonus_balance_amount,
-							   0 AS mining_streak,
-							   COALESCE(st.years,0) AS pre_staking_years,
-							   COALESCE(st.allocation,0) AS pre_staking_allocation,
-							   COALESCE(st_b.bonus,0) as pre_staking_bonus
-						FROM users u 
-							LEFT JOIN pre_stakings st
-								   ON st.worker_index = $1
-								  AND st.user_id = u.user_id
-							LEFT JOIN pre_staking_bonuses st_b
-								   ON st.worker_index = $1
-								  AND st.years = st_b.years
-							LEFT JOIN balances_worker negative_balance
-								   ON u.rollback_used_at IS NULL
-								  AND negative_balance.worker_index = $1
-								  AND negative_balance.user_id = u.user_id
-								  AND negative_balance.negative = TRUE
-								  AND negative_balance.type = %[1]v
-								  AND negative_balance.type_detail = ''
-							LEFT JOIN balances_worker negative_t0_balance
-								   ON u.rollback_used_at IS NULL
-								  AND negative_t0_balance.worker_index = $1
-								  AND negative_t0_balance.user_id = u.user_id
-								  AND negative_t0_balance.negative = TRUE
-								  AND negative_t0_balance.type = %[1]v
-								  AND negative_t0_balance.type_detail = '%[2]v_' || u.referred_by
-							LEFT JOIN balances_worker negative_t1_balance
-								   ON u.rollback_used_at IS NULL
-								  AND negative_t1_balance.worker_index = $1
-								  AND negative_t1_balance.user_id = u.user_id
-								  AND negative_t1_balance.negative = TRUE
-								  AND negative_t1_balance.type = %[1]v
-								  AND negative_t1_balance.type_detail = '%[3]v'
-							LEFT JOIN balances_worker negative_t2_balance
-								   ON u.rollback_used_at IS NULL
-								  AND negative_t2_balance.worker_index = $1
-								  AND negative_t2_balance.user_id = u.user_id
-								  AND negative_t2_balance.negative = TRUE
-								  AND negative_t2_balance.type = %[1]v
-								  AND negative_t2_balance.type_detail = '%[4]v'
-						WHERE u.user_id = $2
-						ORDER BY u.user_id, st.allocation DESC nulls last, st.years DESC nulls last`,
-		totalNoPreStakingBonusBalanceType, t0BalanceTypeDetail, t1BalanceTypeDetail, t2BalanceTypeDetail)
-	resp, err := storage.Get[miningSummary](ctx, r.db, sql, r.workerIndex(ctx), userID)
-	if err != nil && storage.IsErr(err, storage.ErrNotFound) {
-		return nil, ErrRelationNotFound
+//nolint:funlen // .
+func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int64) error {
+	if idTMinus1 < 1 || idT0 < 1 {
+		return nil
+	}
+	if oldTminus1Data, err := storage.Get[struct {
+		UserID string `redis:"user_id"`
+	}](ctx, r.db, serializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
+		return errors.Wrapf(err, "failed to get state for t-1:%v", idTMinus1)
+	}
+	idTMinus1 = 0
+	if t0Data, err := storage.Get[struct {
+		IDT0 int64 `redis:"id_t0"`
+	}](ctx, r.db, serializedUsersKey(idT0)); err != nil {
+		return errors.Wrapf(err, "failed to get state for t0:%v", idT0)
+	} else if len(t0Data) != 0 {
+		idTMinus1 = t0Data[0].IDT0
+	}
+	type (
+		replaceIDTMinus1 struct {
+			deserializedUsersKey
+			IDTMinus1              int64   `redis:"id_tminus1"`
+			BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+			SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+		}
+	)
+	if err := storage.Set(ctx, r.db, &replaceIDTMinus1{deserializedUsersKey: deserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}); err != nil {
+		return errors.Wrapf(err, "failed to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
+	}
+	stdlibtime.Sleep(stdlibtime.Second)
+	afterReplaceIDTMinus1, err := storage.Get[struct {
+		BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+	}](ctx, r.db, serializedUsersKey(id))
+	if err != nil || len(afterReplaceIDTMinus1) == 0 || (afterReplaceIDTMinus1[0].BalanceForTMinus1 == 0.0 && afterReplaceIDTMinus1[0].SlashingRateForTMinus1 == 0.0) { //nolint:lll // .
+		if err == nil && len(afterReplaceIDTMinus1) == 0 {
+			err = errors.Wrapf(ErrRelationNotFound, "missing state[2] for id:%v", id)
+		}
+
+		return errors.Wrapf(err, "failed to get state for id:%v, after t-1 id was updated", id)
 	}
 
-	return resp, errors.Wrapf(err, "failed to get the current mining summary for userID:%v", userID)
+	return errors.Wrapf(storage.Set(ctx, r.db, &replaceIDTMinus1{deserializedUsersKey: deserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}),
+		"failed[2] to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
 }
 
 func (r *repository) validateRollbackNegativeMiningProgress(
-	currentMiningSummary *miningSummary, now *time.Time, rollbackNegativeMiningProgress *bool,
+	preStakingAllocation, preStakingBonus uint16,
+	slashingRateSolo, slashingRateT0, slashingRateT1, slashingRateT2 float64,
+	miningSessionSoloEndedAt, resurrectSoloUsedAt, now *time.Time,
+	rollbackNegativeMiningProgress *bool,
 ) (*bool, error) {
-	if currentMiningSummary.LastMiningEndedAt == nil {
+	if !resurrectSoloUsedAt.IsNil() || miningSessionSoloEndedAt.IsNil() ||
+		(now.Sub(*miningSessionSoloEndedAt.Time) < r.cfg.RollbackNegativeMining.Available.After ||
+			now.Sub(*miningSessionSoloEndedAt.Time) > r.cfg.RollbackNegativeMining.Available.Until) {
 		return nil, nil //nolint:nilnil // Nope.
 	}
-	amountLost := currentMiningSummary.calculateAmountLost()
-	if !amountLost.IsZero() &&
-		(now.Sub(*currentMiningSummary.LastMiningEndedAt.Time) < r.cfg.RollbackNegativeMining.Available.After ||
-			now.Sub(*currentMiningSummary.LastMiningEndedAt.Time) > r.cfg.RollbackNegativeMining.Available.Until) {
-		amountLost = nil
+	amountLost := (slashingRateSolo + slashingRateT0 + slashingRateT1 + slashingRateT2) * now.Sub(*miningSessionSoloEndedAt.Time).Seconds()
+	amountLost = ((amountLost * float64(100-preStakingAllocation)) / 100) + ((amountLost * float64(preStakingAllocation*(preStakingBonus+100))) / (100 * 100))
+	if amountLost == 0.0 {
+		return nil, nil //nolint:nilnil // Nope.
 	}
-	if rollbackNegativeMiningProgress == nil && !amountLost.IsZero() {
+	if rollbackNegativeMiningProgress == nil {
 		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
-			"amount":                amountLost.UnsafeICE(),
-			"duringTheLastXSeconds": now.Sub(*currentMiningSummary.LastMiningEndedAt.Time).Milliseconds() / 1e3, //nolint:gomnd // To get to seconds.
+			"amount":                fmt.Sprint(amountLost),
+			"duringTheLastXSeconds": uint64(now.Sub(*miningSessionSoloEndedAt.Time).Seconds()),
 		})
-	} else if rollbackNegativeMiningProgress != nil && amountLost.IsZero() {
-		return nil, nil //nolint:nilnil // Nope.
 	}
 
 	return rollbackNegativeMiningProgress, nil
 }
 
-func (m *miningSummary) calculateAmountLost() *coin.ICEFlake {
-	standardAmount := m.NegativeTotalNoPreStakingBonusBalanceAmount.
-		MultiplyUint64(percentage100 - m.PreStakingAllocation).
-		DivideUint64(percentage100)
-	preStakingAmount := m.NegativeTotalNoPreStakingBonusBalanceAmount.
-		MultiplyUint64(m.PreStakingAllocation * (m.PreStakingBonus + percentage100)).
-		DivideUint64(percentage100 * percentage100)
-	standardT0Amount := m.NegativeTotalT0NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(percentage100 - m.PreStakingAllocation).
-		DivideUint64(percentage100)
-	preStakingT0Amount := m.NegativeTotalT0NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(m.PreStakingAllocation * (m.PreStakingBonus + percentage100)).
-		DivideUint64(percentage100 * percentage100)
-	standardT1Amount := m.NegativeTotalT1NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(percentage100 - m.PreStakingAllocation).
-		DivideUint64(percentage100)
-	preStakingT1Amount := m.NegativeTotalT1NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(m.PreStakingAllocation * (m.PreStakingBonus + percentage100)).
-		DivideUint64(percentage100 * percentage100)
-	standardT2Amount := m.NegativeTotalT2NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(percentage100 - m.PreStakingAllocation).
-		DivideUint64(percentage100)
-	preStakingT2Amount := m.NegativeTotalT2NoPreStakingBonusBalanceAmount.
-		MultiplyUint64(m.PreStakingAllocation * (m.PreStakingBonus + percentage100)).
-		DivideUint64(percentage100 * percentage100)
-
-	return standardAmount.Add(preStakingAmount).
-		Add(standardT0Amount).Add(preStakingT0Amount).
-		Add(standardT1Amount).Add(preStakingT1Amount).
-		Add(standardT2Amount).Add(preStakingT2Amount)
-}
-
-func (r *repository) newMiningSummary(old *miningSummary, now *time.Time) *miningSummary {
-	resp := &miningSummary{
-		LastMiningStartedAt:        now,
-		LastNaturalMiningStartedAt: now,
-		LastMiningEndedAt:          time.New(now.Add(r.cfg.MiningSessionDuration.Max)),
-		PreviousMiningEndedAt:      old.LastMiningEndedAt,
-		Extension:                  r.cfg.MiningSessionDuration.Max,
+func (r *repository) newStartOrExtendMiningSession(old *startOrExtendMiningSession, now *time.Time) (*startOrExtendMiningSession, stdlibtime.Duration) {
+	resp := &startOrExtendMiningSession{
+		ResurrectSoloUsedAt:                old.ResurrectSoloUsedAt,
+		MiningSessionSoloStartedAt:         now,
+		MiningSessionSoloLastStartedAt:     now,
+		MiningSessionSoloEndedAt:           time.New(now.Add(r.cfg.MiningSessionDuration.Max)),
+		MiningSessionSoloPreviouslyEndedAt: old.MiningSessionSoloEndedAt,
 	}
-	if old.LastMiningEndedAt.IsNil() || old.LastMiningStartedAt.IsNil() || old.LastMiningEndedAt.Before(*now.Time) {
-		return resp
+	if old.MiningSessionSoloEndedAt.IsNil() || old.MiningSessionSoloStartedAt.IsNil() || old.MiningSessionSoloEndedAt.Before(*now.Time) {
+		return resp, r.cfg.MiningSessionDuration.Max
 	}
-	resp.PreviousMiningEndedAt = old.PreviousMiningEndedAt
-	resp.LastMiningStartedAt = old.LastMiningStartedAt
-	resp.LastFreeMiningSessionAwardedAt = old.LastFreeMiningSessionAwardedAt
-	resp.MiningStreak = r.calculateMiningStreak(now, resp.LastMiningStartedAt, resp.LastMiningEndedAt)
+	resp.MiningSessionSoloPreviouslyEndedAt = old.MiningSessionSoloPreviouslyEndedAt
+	resp.MiningSessionSoloStartedAt = old.MiningSessionSoloStartedAt
+	resp.MiningSessionSoloDayOffLastAwardedAt = old.MiningSessionSoloDayOffLastAwardedAt
 	var durationSinceLastFreeMiningSessionAwarded stdlibtime.Duration
-	if resp.LastFreeMiningSessionAwardedAt.IsNil() {
-		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.LastMiningStartedAt.Time)
+	if resp.MiningSessionSoloDayOffLastAwardedAt.IsNil() {
+		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloStartedAt.Time)
 	} else {
-		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.LastFreeMiningSessionAwardedAt.Time)
+		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloDayOffLastAwardedAt.Time)
 	}
 	freeMiningSession := uint64(0)
 	minimumDurationForAwardingFreeMiningSession := stdlibtime.Duration(r.cfg.ConsecutiveNaturalMiningSessionsRequiredFor1ExtraFreeArtificialMiningSession.Max) * r.cfg.MiningSessionDuration.Max //nolint:lll // .
 	if durationSinceLastFreeMiningSessionAwarded >= minimumDurationForAwardingFreeMiningSession {
-		resp.LastFreeMiningSessionAwardedAt = now
+		resp.MiningSessionSoloDayOffLastAwardedAt = now
 		freeMiningSession++
 	}
-	if freeSessions := stdlibtime.Duration(r.calculateRemainingFreeMiningSessions(now, old.LastMiningEndedAt) + freeMiningSession); freeSessions > 0 {
-		resp.LastMiningEndedAt = time.New(resp.LastMiningEndedAt.Add(freeSessions * r.cfg.MiningSessionDuration.Max))
-	}
-	resp.Extension = resp.LastMiningEndedAt.Sub(*old.LastMiningEndedAt.Time)
-
-	return resp
-}
-
-func (r *repository) insertNewMiningSession( //nolint:funlen,gocognit,revive // Big script.
-	ctx context.Context, userID string, old, ms *miningSummary, rollbackNegativeMiningSession *bool,
-) error {
-	var rollbackUsedAt, rollbackUsedAtCondition string
-	if rollbackNegativeMiningSession != nil && *rollbackNegativeMiningSession {
-		rollbackUsedAt = "rollback_used_at = $1,"
-		rollbackUsedAtCondition = "AND rollback_used_at IS NULL"
-	}
-	var previousMiningEndedAtVal *stdlibtime.Time
-	if old.LastMiningEndedAt != nil {
-		previousMiningEndedAtVal = old.LastMiningEndedAt.Time
-	}
-	var lastFreeMiningSessionAwardedAtVal *stdlibtime.Time
-	if ms.LastFreeMiningSessionAwardedAt != nil {
-		lastFreeMiningSessionAwardedAtVal = ms.LastFreeMiningSessionAwardedAt.Time
+	if freeSessions := stdlibtime.Duration(r.calculateRemainingFreeMiningSessions(now, old.MiningSessionSoloEndedAt) + freeMiningSession); freeSessions > 0 {
+		resp.MiningSessionSoloEndedAt = time.New(resp.MiningSessionSoloEndedAt.Add(freeSessions * r.cfg.MiningSessionDuration.Max))
 	}
 
-	return errors.Wrap(storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
-		sql := fmt.Sprintf(`UPDATE users
-							   SET updated_at = $1,
-								   last_natural_mining_started_at = $1,
-								   last_mining_started_at = $2,
-								   last_mining_ended_at = $3,
-								   previous_mining_started_at = (CASE WHEN last_mining_started_at = $2 THEN previous_mining_started_at ELSE last_mining_started_at END),
-								   previous_mining_ended_at = (CASE WHEN last_mining_started_at = $2 THEN previous_mining_ended_at ELSE last_mining_ended_at END),
-								   %[1]v							   
-								   last_free_mining_session_awarded_at = $4
-							   WHERE user_id = $5
-								 AND COALESCE(last_mining_ended_at,'1999-01-08 04:05:06'::timestamp) = COALESCE($6,'1999-01-08 04:05:06'::timestamp)
-								 %[2]v`, rollbackUsedAt, rollbackUsedAtCondition)
-		if rowsAffected, err := conn.Exec(ctx, sql,
-			ms.LastNaturalMiningStartedAt.Time,
-			ms.LastMiningStartedAt.Time,
-			ms.LastMiningEndedAt.Time,
-			lastFreeMiningSessionAwardedAtVal,
-			userID,
-			previousMiningEndedAtVal); err != nil {
-			return errors.Wrapf(err, "failed to update users for starting a new mining session for: %#v", ms)
-		} else if rowsAffected.RowsAffected() != 1 {
-			return ErrRaceCondition
-		}
-		sql = `INSERT INTO balance_recalculation_worker(user_id,enabled,last_mining_started_at,last_mining_ended_at,hash_code,worker_index) 
-												 VALUES($1     ,TRUE   ,$2                    ,$3                  ,$4       ,$5)
-			   ON CONFLICT(worker_index, user_id)
-					DO UPDATE
-						  SET enabled = EXCLUDED.enabled,
-							  last_mining_started_at = EXCLUDED.last_mining_started_at,
-							  last_mining_ended_at = EXCLUDED.last_mining_ended_at
-						WHERE balance_recalculation_worker.enabled != EXCLUDED.enabled
-						   OR coalesce(balance_recalculation_worker.last_mining_started_at,'1999-01-08 04:05:06'::timestamp) != EXCLUDED.last_mining_started_at
-						   OR coalesce(balance_recalculation_worker.last_mining_ended_at,'1999-01-08 04:05:06'::timestamp) != EXCLUDED.last_mining_ended_at`
-		if _, err := conn.Exec(ctx, sql,
-			userID,
-			ms.LastMiningStartedAt.Time,
-			ms.LastMiningEndedAt.Time,
-			r.hashCode(ctx),
-			r.workerIndex(ctx)); err != nil {
-			return errors.Wrapf(err, "failed to update balance_recalculation_worker for starting a new mining session for: %#v", ms)
-		}
-		sql = `INSERT INTO blockchain_balance_synchronization_worker(user_id, hash_code, worker_index) 
- 															 VALUES ($1     , $2        , $3) 
- 			   ON CONFLICT (worker_index, user_id) DO NOTHING`
-		if _, err := conn.Exec(ctx, sql, userID, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
-			return errors.Wrapf(err, "failed to insert blockchain_balance_synchronization_worker_%v for userId:%v", r.workerIndex(ctx), userID)
-		}
-		sql = `INSERT INTO extra_bonus_processing_worker(user_id, hash_code, worker_index) 
- 										         VALUES ($1     , $2        , $3) 
- 			   ON CONFLICT (worker_index, user_id) DO NOTHING`
-		if _, err := conn.Exec(ctx, sql, userID, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
-			return errors.Wrapf(err, "failed to insert extra_bonus_processing_worker_%v for userId:%v", r.workerIndex(ctx), userID)
-		}
-		sql = `INSERT INTO mining_rates_recalculation_worker(user_id, hash_code, worker_index) 
- 										             VALUES ($1     , $2        , $3) 
- 			   ON CONFLICT (worker_index, user_id) DO NOTHING`
-		if _, err := conn.Exec(ctx, sql, userID, r.hashCode(ctx), r.workerIndex(ctx)); err != nil {
-			return errors.Wrapf(err, "failed to insert mining_rates_recalculation_worker_%v for userId:%v", r.workerIndex(ctx), userID)
-		}
-		sess := &MiningSession{
-			LastNaturalMiningStartedAt: ms.LastNaturalMiningStartedAt,
-			StartedAt:                  ms.LastMiningStartedAt,
-			EndedAt:                    ms.LastMiningEndedAt,
-			PreviouslyEndedAt:          ms.PreviousMiningEndedAt,
-			Extension:                  ms.Extension,
-			MiningStreak:               ms.MiningStreak,
-			UserID:                     &userID,
-		}
-
-		return errors.Wrapf(r.sendMiningSessionMessage(ctx, sess), "failed to sendMiningSessionMessage:%#v", sess)
-	}), "insertNewMiningSession transaction failed")
+	return resp, resp.MiningSessionSoloEndedAt.Sub(*old.MiningSessionSoloEndedAt.Time)
 }
 
 func (r *repository) sendMiningSessionMessage(ctx context.Context, ms *MiningSession) error {
@@ -307,7 +231,7 @@ func (r *repository) sendMiningSessionMessage(ctx context.Context, ms *MiningSes
 		return errors.Wrapf(err, "failed to marshal %#v", ms)
 	}
 	msg := &messagebroker.Message{
-		Timestamp: *ms.LastNaturalMiningStartedAt.Time, //TODO why?
+		Timestamp: *ms.LastNaturalMiningStartedAt.Time,
 		Headers:   map[string]string{"producer": "freezer"},
 		Key:       *ms.UserID,
 		Topic:     r.cfg.MessageBroker.Topics[2].Name,

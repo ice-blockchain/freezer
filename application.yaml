@@ -27,27 +27,8 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 tokenomics: &tokenomics
-  workers:
-    balanceRecalculationConcurrency: 2
-    blockchainBalanceSynchronizationConcurrency: 2
-    extraBonusProcessingConcurrency: 2
-    initializeExtraBonusWorkers: true
-    miningRatesRecalculationBatchSize: 100
-    balanceRecalculationBatchSize: 100
-    extraBonusProcessingBatchSize: 500
-    blockchainBalanceSynchronizationSize: 100
-    balanceCalculationBeforeSingleIterationProcessingDelay: 10s
-    balanceCalculationBeforeGroupIterationProcessingDelay: 10s
-    blockchainBalanceSynchronizationBeforeSingleIterationProcessingDelay: 10s
-    blockchainBalanceSynchronizationBeforeGroupIterationProcessingDelay: 10s
-    extraBonusBeforeSingleIterationProcessingDelay: 10s
-    extraBonusBeforeGroupIterationProcessingDelay: 10s
-    refreshMiningRatesProcessingSeedingStreamEmitFrequency: 10s
-  wintr/connectors/storage/v2:
-    runDDL: true
-    primaryURL: postgresql://root:pass@localhost:5432/ice
-    replicaURLs:
-      - postgresql://root:pass@localhost:5432/ice
+  wintr/connectors/storage/v3:
+    url: redis://default:@localhost:6379
   messageBroker: &tokenomicsMessageBroker
     consumerGroup: freezer-local
     createTopics: true
@@ -66,36 +47,12 @@ tokenomics: &tokenomics
         partitions: 10
         replicationFactor: 1
         retention: 10s
-      - name: mining-rates-table
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: balances-table
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: add-balance-commands
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: pre-stakings-table
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: available-daily-bonuses
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
-      - name: started-days-off
-        partitions: 10
-        replicationFactor: 1
-        retention: 10s
       ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
       - name: users-table
         partitions: 10
         replicationFactor: 1
         retention: 10s
-      - name: global-table
+      - name: completed-tasks
         partitions: 10
         replicationFactor: 1
         retention: 10s
@@ -109,21 +66,17 @@ tokenomics: &tokenomics
         retention: 10s
     consumingTopics:
       - name: users-table
-      - name: global-table
       - name: mining-sessions-table
-      - name: add-balance-commands
+      - name: completed-tasks
       - name: viewed-news
       - name: user-device-metadata-table
   wintr/multimedia/picture:
     urlDownload: https://ice-staging.b-cdn.net/profile
-  workerCount: 10
   referralBonusMiningRates:
     t0: 25
     t1: 25
     t2: 5
   rollbackNegativeMining:
-    aggressiveDegradationStartsAfter: 30m
-    lastXMiningSessionsCollectingInterval: 1m
     available:
       after: 5m
       until: 60m
@@ -142,17 +95,17 @@ tokenomics: &tokenomics
     consecutiveDurationsRequired: 7
     activeUserMilestones:
       - users: 0
-        baseMiningRate: 320000000000
+        baseMiningRate: 32
       - users: 2
-        baseMiningRate: 160000000000
+        baseMiningRate: 16
       - users: 4
-        baseMiningRate: 80000000000
+        baseMiningRate: 8
       - users: 6
-        baseMiningRate: 40000000000
+        baseMiningRate: 4
       - users: 8
-        baseMiningRate: 20000000000
+        baseMiningRate: 2
       - users: 10
-        baseMiningRate: 10000000000
+        baseMiningRate: 1
   extraBonuses:
     duration: 24m
     utcOffsetDuration: 6s

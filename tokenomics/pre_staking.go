@@ -57,7 +57,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	if existing != nil {
 		existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
-		if (existing.PreStakingAllocation == uint16(percentage100) || existing.PreStakingAllocation == uint16(st.Allocation)) &&
+		if (existing.PreStakingAllocation == 100 || existing.PreStakingAllocation == uint16(st.Allocation)) &&
 			(existingYears == MaxPreStakingYears || existingYears == st.Years) {
 			st.Allocation = uint64(existing.PreStakingAllocation)
 			st.Years = existingYears

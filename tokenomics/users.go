@@ -211,8 +211,10 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 			deserializedUsersKey
 			IDT0                   int64   `redis:"id_t0"`
 			IDTMinus1              int64   `redis:"id_tminus1"`
+			BalanceT0              int64   `redis:"balance_t0"`
 			BalanceForT0           float64 `redis:"balance_for_t0"`
 			BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+			SlashingRateT0         float64 `redis:"slashing_rate_t0"`
 			SlashingRateForT0      float64 `redis:"slashing_rate_for_t0"`
 			SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 		}
@@ -249,12 +251,16 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 	if err = storage.Set(ctx, s.db, newPartialState); err != nil {
 		return errors.Wrapf(err, "failed to replace newPartialState:%#v", newPartialState)
 	}
-	stdlibtime.Sleep(stdlibtime.Second)
+	if oldIDT0 > 0 {
+		stdlibtime.Sleep(stdlibtime.Second)
+	}
 	dbUserAfterT0Changed, err := storage.Get[struct {
 		IDT0                   int64   `redis:"id_t0"`
 		IDTMinus1              int64   `redis:"id_tminus1"`
+		BalanceT0              int64   `redis:"balance_t0"`
 		BalanceForT0           float64 `redis:"balance_for_t0"`
 		BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
+		SlashingRateT0         float64 `redis:"slashing_rate_t0"`
 		SlashingRateForT0      float64 `redis:"slashing_rate_for_t0"`
 		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 	}](ctx, s.db, serializedUsersKey(id))
@@ -267,9 +273,11 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 	}
 	if dbUserAfterT0Changed[0].IDT0 != newPartialState.IDT0 ||
 		dbUserAfterT0Changed[0].IDTMinus1 != newPartialState.IDTMinus1 ||
+		dbUserAfterT0Changed[0].BalanceT0 != 0.0 ||
 		dbUserAfterT0Changed[0].BalanceForT0 != 0.0 ||
 		dbUserAfterT0Changed[0].BalanceForTMinus1 != 0.0 ||
 		dbUserAfterT0Changed[0].SlashingRateForT0 != 0.0 ||
+		dbUserAfterT0Changed[0].SlashingRateT0 != 0.0 ||
 		dbUserAfterT0Changed[0].SlashingRateForTMinus1 != 0.0 {
 		return errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed[2] to replace newPartialState:%#v", newPartialState)
 	}
