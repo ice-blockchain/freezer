@@ -6,11 +6,12 @@ package tokenomics
 
 import (
 	"fmt"
-	"github.com/ice-blockchain/wintr/time"
 	"testing"
 	stdlibtime "time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen,maintidx // .

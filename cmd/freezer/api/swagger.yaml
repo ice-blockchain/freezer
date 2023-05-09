@@ -118,7 +118,7 @@ definitions:
         example: 300
         type: integer
     type: object
-  tokenomics.MiningRateSummary-coin_ICE:
+  tokenomics.MiningRateSummary-string:
     properties:
       amount:
         example: 1,234,232.001
@@ -136,20 +136,20 @@ definitions:
     - PositiveMiningRateType
     - NegativeMiningRateType
     - NoneMiningRateType
-  tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE:
+  tokenomics.MiningRates-tokenomics_MiningRateSummary-string:
     properties:
       base:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       positiveTotalNoPreStakingBonus:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       preStaking:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       standard:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       total:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       totalNoPreStakingBonus:
-        $ref: '#/definitions/tokenomics.MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRateSummary-string'
       type:
         $ref: '#/definitions/tokenomics.MiningRateType'
     type: object
@@ -177,7 +177,7 @@ definitions:
         example: 2
         type: integer
       miningRates:
-        $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE'
+        $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string'
       miningSession:
         $ref: '#/definitions/tokenomics.MiningSession'
       miningStreak:
@@ -575,10 +575,6 @@ paths:
             $ref: '#/definitions/server.ErrorResponse'
         "403":
           description: if hidden by the user
-          schema:
-            $ref: '#/definitions/server.ErrorResponse'
-        "404":
-          description: if not found
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "422":

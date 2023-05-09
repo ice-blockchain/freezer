@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"

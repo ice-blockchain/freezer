@@ -5,13 +5,13 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"regexp"
 	"sort"
 	"strings"
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"

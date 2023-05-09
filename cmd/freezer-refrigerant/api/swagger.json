@@ -365,7 +365,7 @@
                 }
             }
         },
-        "tokenomics.MiningRateSummary-coin_ICE": {
+        "tokenomics.MiningRateSummary-string": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -390,26 +390,26 @@
                 "NoneMiningRateType"
             ]
         },
-        "tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE": {
+        "tokenomics.MiningRates-tokenomics_MiningRateSummary-string": {
             "type": "object",
             "properties": {
                 "base": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "positiveTotalNoPreStakingBonus": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "preStaking": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "standard": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "total": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "totalNoPreStakingBonus": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "type": {
                     "$ref": "#/definitions/tokenomics.MiningRateType"
@@ -449,7 +449,7 @@
                     "example": 2
                 },
                 "miningRates": {
-                    "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string"
                 },
                 "miningSession": {
                     "$ref": "#/definitions/tokenomics.MiningSession"

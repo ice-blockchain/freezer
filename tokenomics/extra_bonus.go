@@ -5,11 +5,11 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"strings"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"

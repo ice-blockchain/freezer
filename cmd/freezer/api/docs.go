@@ -557,12 +557,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
                     },
-                    "404": {
-                        "description": "if not found",
-                        "schema": {
-                            "$ref": "#/definitions/server.ErrorResponse"
-                        }
-                    },
                     "422": {
                         "description": "if syntax fails",
                         "schema": {
@@ -750,7 +744,7 @@ const docTemplate = `{
                 }
             }
         },
-        "tokenomics.MiningRateSummary-coin_ICE": {
+        "tokenomics.MiningRateSummary-string": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -775,26 +769,26 @@ const docTemplate = `{
                 "NoneMiningRateType"
             ]
         },
-        "tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE": {
+        "tokenomics.MiningRates-tokenomics_MiningRateSummary-string": {
             "type": "object",
             "properties": {
                 "base": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "positiveTotalNoPreStakingBonus": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "preStaking": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "standard": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "total": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "totalNoPreStakingBonus": {
-                    "$ref": "#/definitions/tokenomics.MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRateSummary-string"
                 },
                 "type": {
                     "$ref": "#/definitions/tokenomics.MiningRateType"
@@ -834,7 +828,7 @@ const docTemplate = `{
                     "example": 2
                 },
                 "miningRates": {
-                    "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-coin_ICE"
+                    "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string"
                 },
                 "miningSession": {
                     "$ref": "#/definitions/tokenomics.MiningSession"
@@ -888,6 +882,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "API that handles everything related to read-only operations for user's tokenomics and statistics about it.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

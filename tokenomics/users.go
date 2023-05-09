@@ -5,18 +5,20 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	stdlibtime "time"
+
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/ice-blockchain/eskimo/users"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
-	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
-	"strconv"
-	"strings"
-	stdlibtime "time"
 )
 
 func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:gocognit // .
