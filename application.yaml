@@ -47,6 +47,18 @@ tokenomics: &tokenomics
         partitions: 10
         replicationFactor: 1
         retention: 10s
+      - name: balances-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: available-daily-bonuses
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
+      - name: started-days-off
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
       ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
       - name: users-table
         partitions: 10
@@ -131,6 +143,20 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
+miner:
+  <<: *tokenomics
+  development: true
+  workers: 10
+  batchSize: 100
+extra-bonus-notifier:
+  <<: *tokenomics
+  workers: 10
+  batchSize: 100
+  chunks: 1000
+balance-synchronizer:
+  <<: *tokenomics
+  workers: 10
+  batchSize: 100
 tokenomics_test:
   <<: *tokenomics
   messageBroker:

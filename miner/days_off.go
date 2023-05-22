@@ -47,7 +47,7 @@ func dayOffStartedMessage(ctx context.Context, event *DayOffStarted) *messagebro
 	return &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     event.UserID,
-		Topic:   cfg.MessageBroker.ProducingTopics[0].Name,
+		Topic:   cfg.MessageBroker.Topics[5].Name,
 		Value:   valueBytes,
 	}
 }

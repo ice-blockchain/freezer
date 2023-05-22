@@ -177,7 +177,7 @@ func shouldSendBalanceUpdatedMessage(ctx context.Context, iteration uint64, usr 
 	return &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     event.UserID,
-		Topic:   cfg.MessageBroker.ProducingTopics[0].Name,
+		Topic:   cfg.MessageBroker.Topics[3].Name,
 		Value:   valueBytes,
 	}
 }

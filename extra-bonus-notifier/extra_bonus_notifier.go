@@ -225,7 +225,7 @@ func extraBonusAvailableMessage(ctx context.Context, event *ExtraBonusAvailable)
 	return &messagebroker.Message{
 		Headers: map[string]string{"producer": "freezer"},
 		Key:     event.UserID,
-		Topic:   cfg.MessageBroker.ProducingTopics[0].Name,
+		Topic:   cfg.MessageBroker.Topics[4].Name,
 		Value:   valueBytes,
 	}
 }
