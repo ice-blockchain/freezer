@@ -151,14 +151,14 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	}
 	type (
 		userPartialState struct {
-			DeserializedUsersKey
 			UserID                         string `redis:"user_id"`
 			ProfilePictureName             string `redis:"profile_picture_name"`
 			Username                       string `redis:"username"`
 			MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address"`
 			BlockchainAccountAddress       string `redis:"blockchain_account_address"`
-			IDT0                           int64  `redis:"id_t0"`
-			HideRanking                    bool   `redis:"hide_ranking"`
+			DeserializedUsersKey
+			IDT0        int64 `redis:"id_t0"`
+			HideRanking bool  `redis:"hide_ranking"`
 		}
 	)
 	dbUser, err := storage.Get[userPartialState](ctx, s.db, SerializedUsersKey(internalID))
@@ -394,10 +394,8 @@ func (k *DeserializedUsersKey) Key() string {
 	if k == nil || k.ID == 0 {
 		return ""
 	}
-	if k.GetHistoryPart != nil {
-		if historyPart := k.GetHistoryPart(); historyPart != "" {
-			return SerializedUsersKey(k.ID) + "~" + historyPart
-		}
+	if k.HistoryPart != "" {
+		return SerializedUsersKey(k.ID) + "~" + k.HistoryPart
 	}
 
 	return SerializedUsersKey(k.ID)
@@ -411,10 +409,7 @@ func (k *DeserializedUsersKey) SetKey(val string) {
 		val = val[6:]
 	}
 	if historyStart := strings.IndexRune(val, '~'); historyStart > 0 {
-		historyPart := val[historyStart+1:]
-		k.GetHistoryPart = func() string {
-			return historyPart
-		}
+		k.HistoryPart = val[historyStart+1:]
 		val = val[:historyStart]
 	}
 	var err error

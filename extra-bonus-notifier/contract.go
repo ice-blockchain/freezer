@@ -40,9 +40,9 @@ var (
 
 type (
 	user struct {
-		*UpdatedUser
 		tokenomics.ExtraBonusStartedAtField
 		tokenomics.UserIDField
+		UpdatedUser
 		tokenomics.UTCOffsetField
 	}
 	UpdatedUser struct {

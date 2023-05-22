@@ -39,9 +39,9 @@ var (
 
 type (
 	user struct {
-		tokenomics.DeserializedUsersKey
 		tokenomics.UserIDField
 		tokenomics.MiningBlockchainAccountAddressField
+		tokenomics.DeserializedUsersKey
 		tokenomics.BalanceTotalStandardField
 		tokenomics.BalanceTotalPreStakingField
 	}

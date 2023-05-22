@@ -347,8 +347,8 @@ type (
 		Negative    bool       `json:"negative,omitempty" example:"false"`
 	}
 	DeserializedUsersKey struct {
-		GetHistoryPart func() string `redis:"-"`
-		ID             int64         `redis:"-"`
+		HistoryPart string `redis:"-"`
+		ID          int64  `redis:"-"`
 	}
 
 	usersTableSource struct {

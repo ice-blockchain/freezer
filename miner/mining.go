@@ -40,7 +40,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceLastUpdatedAt.Hour() != now.Hour() ||
 		(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute()) {
 		history = &(*usr)
-		history.GetHistoryPart = getHistoryPart(history.BalanceLastUpdatedAt)
+		history.HistoryPart = historyPart(history.BalanceLastUpdatedAt)
 		updatedUser.BalanceTotalSlashed = 0
 		updatedUser.BalanceTotalMinted = 0
 	}
@@ -183,11 +183,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	return updatedUser, history
 }
 
-func getHistoryPart(date *time.Time) func() string {
+func historyPart(date *time.Time) string {
 	const hourFormat, minuteFormat = "2006-01-02T15", "2006-01-02T15:04"
 	if cfg.Development {
-		return func() string { return date.Format(minuteFormat) }
+		return date.Format(minuteFormat)
 	} else {
-		return func() string { return date.Format(hourFormat) }
+		return date.Format(hourFormat)
 	}
 }

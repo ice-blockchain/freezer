@@ -179,7 +179,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			updatedUser, history := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if updatedUser != nil {
-				updatedUsers = append(updatedUsers, updatedUser.UpdatedUser)
+				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			}
 			if history != nil {
 				histories = append(histories, history)
