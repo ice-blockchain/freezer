@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: ice License 1.0
+
+development: true
+logger:
+  encoder: console
+  level: debug
+miner:
+  miningSessionDuration:
+    max: 24h
+  extraBonuses:
+    duration: 24h

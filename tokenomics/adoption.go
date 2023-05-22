@@ -145,7 +145,7 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 }
 
 func (r *repository) notifyAdoptionChange(ctx context.Context, nextAdoption *Adoption[float64]) error {
-	oldAdoption, err := r.getAdoption(ctx, nextAdoption.Milestone-1)
+	oldAdoption, err := getAdoption(ctx, r.db, nextAdoption.Milestone-1)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return errors.Wrapf(err, "failed to get adoption for milestone:%v", nextAdoption.Milestone-1)
 	}
@@ -181,8 +181,8 @@ func (r *repository) mustInitAdoptions(ctx context.Context) {
 	}
 }
 
-func (r *repository) getAdoption(ctx context.Context, milestone uint64) (*Adoption[float64], error) {
-	resp, err := storage.Get[Adoption[float64]](ctx, r.db, adoptionsKey(milestone))
+func getAdoption(ctx context.Context, db storage.DB, milestone uint64) (*Adoption[float64], error) {
+	resp, err := storage.Get[Adoption[float64]](ctx, db, adoptionsKey(milestone))
 	if err != nil || len(resp) == 0 {
 		if err == nil || errors.Is(err, redis.Nil) {
 			err = ErrNotFound
@@ -206,24 +206,24 @@ func getAllAdoptions[DENOM ~string | ~float64](ctx context.Context, db storage.D
 	return allAdoptions, errors.Wrap(err, "failed to get all adoptions")
 }
 
-func (r *repository) getCurrentAdoption(ctx context.Context) (*Adoption[float64], error) {
-	if milestone, err := r.db.Get(ctx, "current_adoption_milestone").Uint64(); err != nil || milestone == 0 {
+func GetCurrentAdoption(ctx context.Context, db storage.DB) (*Adoption[float64], error) {
+	if milestone, err := db.Get(ctx, "current_adoption_milestone").Uint64(); err != nil || milestone == 0 {
 		if (err == nil && milestone == 0) || (err != nil && errors.Is(err, redis.Nil)) {
 			err = ErrNotFound
 		}
 
 		return nil, errors.Wrap(err, "failed to get current_adoption_milestone")
 	} else {
-		return r.getAdoption(ctx, milestone)
+		return getAdoption(ctx, db, milestone)
 	}
 }
 
 func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[float64], error) { //nolint:funlen // .
-	currentAdoption, err := r.getCurrentAdoption(ctx)
+	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to getCurrentAdoption")
 	}
-	nextAdoption, err := r.getAdoption(ctx, currentAdoption.Milestone+1)
+	nextAdoption, err := getAdoption(ctx, r.db, currentAdoption.Milestone+1)
 	if err != nil || !nextAdoption.AchievedAt.IsNil() {
 		if err != nil && errors.Is(err, ErrNotFound) {
 			timeToCheckForAdoptionSwitch = time.New(time.Now().Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
@@ -316,7 +316,7 @@ func (r *repository) revertSwitchToNextAdoption(ctx context.Context, nextAdoptio
 }
 
 func (r *repository) mustNotifyCurrentAdoption(ctx context.Context) {
-	adoption, err := r.getCurrentAdoption(ctx)
+	adoption, err := GetCurrentAdoption(ctx, r.db)
 	log.Panic(errors.Wrapf(err, "failed to get getCurrentAdoption")) //nolint:revive // Intended.
 	snapshot := &AdoptionSnapshot{Adoption: adoption, Before: adoption}
 	log.Panic(errors.Wrapf(r.sendAdoptionSnapshotMessage(ctx, snapshot), "failed to sendAdoptionSnapshotMessage: %#v", snapshot))

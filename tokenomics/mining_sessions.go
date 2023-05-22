@@ -26,7 +26,7 @@ type (
 		MiningSessionSoloEndedAt             *time.Time `redis:"mining_session_solo_ended_at"`
 		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at"`
 		MiningSessionSoloPreviouslyEndedAt   *time.Time `redis:"mining_session_solo_previously_ended_at"`
-		deserializedUsersKey
+		DeserializedUsersKey
 	}
 	getCurrentMiningSession struct {
 		ResurrectSoloUsedAt                  *time.Time `redis:"resurrect_solo_used_at"`
@@ -56,7 +56,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	now := time.Now()
-	old, err := storage.Get[getCurrentMiningSession](ctx, r.db, serializedUsersKey(id))
+	old, err := storage.Get[getCurrentMiningSession](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(old) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -127,33 +127,33 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 	}
 	if oldTminus1Data, err := storage.Get[struct {
 		UserID string `redis:"user_id"`
-	}](ctx, r.db, serializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
+	}](ctx, r.db, SerializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
 		return errors.Wrapf(err, "failed to get state for t-1:%v", idTMinus1)
 	}
 	idTMinus1 = 0
 	if t0Data, err := storage.Get[struct {
 		IDT0 int64 `redis:"id_t0"`
-	}](ctx, r.db, serializedUsersKey(idT0)); err != nil {
+	}](ctx, r.db, SerializedUsersKey(idT0)); err != nil {
 		return errors.Wrapf(err, "failed to get state for t0:%v", idT0)
 	} else if len(t0Data) != 0 {
 		idTMinus1 = t0Data[0].IDT0
 	}
 	type (
 		replaceIDTMinus1 struct {
-			deserializedUsersKey
+			DeserializedUsersKey
 			IDTMinus1              int64   `redis:"id_tminus1"`
 			BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
 			SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 		}
 	)
-	if err := storage.Set(ctx, r.db, &replaceIDTMinus1{deserializedUsersKey: deserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}); err != nil {
+	if err := storage.Set(ctx, r.db, &replaceIDTMinus1{DeserializedUsersKey: DeserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}); err != nil {
 		return errors.Wrapf(err, "failed to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
 	}
 	stdlibtime.Sleep(stdlibtime.Second)
 	afterReplaceIDTMinus1, err := storage.Get[struct {
 		BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
 		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
-	}](ctx, r.db, serializedUsersKey(id))
+	}](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(afterReplaceIDTMinus1) == 0 || (afterReplaceIDTMinus1[0].BalanceForTMinus1 == 0.0 && afterReplaceIDTMinus1[0].SlashingRateForTMinus1 == 0.0) { //nolint:lll // .
 		if err == nil && len(afterReplaceIDTMinus1) == 0 {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state[2] for id:%v", id)
@@ -162,7 +162,7 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 		return errors.Wrapf(err, "failed to get state for id:%v, after t-1 id was updated", id)
 	}
 
-	return errors.Wrapf(storage.Set(ctx, r.db, &replaceIDTMinus1{deserializedUsersKey: deserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}),
+	return errors.Wrapf(storage.Set(ctx, r.db, &replaceIDTMinus1{DeserializedUsersKey: DeserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}),
 		"failed[2] to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
 }
 
@@ -288,25 +288,25 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}
 	referees, err := storage.Get[struct {
-		deserializedUsersKey
+		DeserializedUsersKey
 		IDT0      int64 `redis:"id_t0"`
 		IDTMinus1 int64 `redis:"id_tminus1"`
-	}](ctx, s.db, serializedUsersKey(id))
+	}](ctx, s.db, SerializedUsersKey(id))
 	if err != nil || len(referees) == 0 || (referees[0].IDT0 < 1 && referees[0].IDTMinus1 < 1) {
 		return errors.Wrapf(err, "failed to get referees for id:%v, userID:%v", id, *ms.UserID)
 	}
 	if referees[0].IDT0 < 1 || referees[0].IDTMinus1 < 1 {
 		if referees[0].IDT0 >= 1 {
-			err = s.db.HIncrBy(ctx, serializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
+			err = s.db.HIncrBy(ctx, SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
 		}
 		if referees[0].IDTMinus1 >= 1 {
-			err = s.db.HIncrBy(ctx, serializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
+			err = s.db.HIncrBy(ctx, SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
 		}
 	} else {
 		responses, txErr := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
 			return multierror.Append( //nolint:wrapcheck // .
-				pipeliner.HIncrBy(ctx, serializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err(),
-				pipeliner.HIncrBy(ctx, serializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err(),
+				pipeliner.HIncrBy(ctx, SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err(),
+				pipeliner.HIncrBy(ctx, SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err(),
 			).ErrorOrNil()
 		})
 		if txErr == nil {
@@ -323,7 +323,11 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 }
 
 func (r *repository) sessionNumber(date *time.Time) uint64 {
-	return uint64(date.Unix()) / uint64(r.cfg.MiningSessionDuration.Min/stdlibtime.Second)
+	return SessionNumber(date, r.cfg.MiningSessionDuration.Min)
+}
+
+func SessionNumber(date *time.Time, miningSessionResetDeadline stdlibtime.Duration) uint64 {
+	return uint64(date.Unix()) / uint64(miningSessionResetDeadline/stdlibtime.Second)
 }
 
 func (ms *MiningSession) duplGuardKey(repo *repository, guardType string) string {

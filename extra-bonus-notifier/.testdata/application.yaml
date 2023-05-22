@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: ice License 1.0
+
+development: true
+logger:
+  encoder: console
+  level: debug
+extra-bonus-notifier:
+  chunks: 1000
+  extraBonuses:
+    duration: 24h
+    utcOffsetDuration: 1m
+    claimWindow: 1h
+    availabilityWindow: 10h
+    flatValues:
+      - 100
+      - 100
+      - 100
+      - 100
+      - 100

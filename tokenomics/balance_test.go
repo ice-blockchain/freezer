@@ -18,7 +18,7 @@ import (
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -355,7 +355,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus30MinutesTimezone(t 
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -691,7 +691,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus30MinutesTimezone(t *
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -1027,7 +1027,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Minus45MinutesTimezone(t 
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -1363,7 +1363,7 @@ func TestProcessBalanceHistory_ChildIsHour_ParentIsDay_Plus45MinutesTimezone(t *
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -1726,7 +1726,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus30MinuteTimezone(
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -2089,7 +2089,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus30MinuteTimezone(t
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
@@ -2452,7 +2452,7 @@ func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Minus45MinuteTimezone(
 //nolint:funlen,dupl,maintidx // .
 func TestProcessBalanceHistory_ChildIsMinute_ParentIsHour_Plus45MinuteTimezone(t *testing.T) {
 	t.Parallel()
-	repo := &repository{cfg: &config{
+	repo := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`

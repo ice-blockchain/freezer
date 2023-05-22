@@ -37,7 +37,7 @@ func (r *repository) GetBalanceSummary(
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	res, err := storage.Get[getBalanceSummary](ctx, r.db, serializedUsersKey(id))
+	res, err := storage.Get[getBalanceSummary](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(res) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -45,9 +45,9 @@ func (r *repository) GetBalanceSummary(
 
 		return nil, errors.Wrapf(err, "failed to get balanceSummary for id:%v", id)
 	}
-	t1Standard, t1PreStaking := applyPreStaking(res[0].BalanceT0+res[0].BalanceT1, res[0].PreStakingAllocation, res[0].PreStakingBonus)
-	t2Standard, t2PreStaking := applyPreStaking(res[0].BalanceT2, res[0].PreStakingAllocation, res[0].PreStakingBonus)
-	soloStandard, soloPreStaking := applyPreStaking(res[0].BalanceSolo, res[0].PreStakingAllocation, res[0].PreStakingBonus)
+	t1Standard, t1PreStaking := ApplyPreStaking(res[0].BalanceT0+res[0].BalanceT1, res[0].PreStakingAllocation, res[0].PreStakingBonus)
+	t2Standard, t2PreStaking := ApplyPreStaking(res[0].BalanceT2, res[0].PreStakingAllocation, res[0].PreStakingBonus)
+	soloStandard, soloPreStaking := ApplyPreStaking(res[0].BalanceSolo, res[0].PreStakingAllocation, res[0].PreStakingBonus)
 
 	return &BalanceSummary{
 		Balances: Balances[string]{
@@ -318,7 +318,7 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 			).ErrorOrNil()
 		}
 	}()
-	adoption, err := s.getCurrentAdoption(ctx)
+	adoption, err := GetCurrentAdoption(ctx, s.db)
 	if err != nil {
 		return errors.Wrap(err, "failed to getCurrentAdoption")
 	}
@@ -328,12 +328,12 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 	}
 	prize := adoption.BaseMiningRate * adoptionMultiplicationFactor
 
-	return errors.Wrapf(s.db.HIncrByFloat(ctx, serializedUsersKey(id), "balance_solo_pending", prize).Err(),
+	return errors.Wrapf(s.db.HIncrByFloat(ctx, SerializedUsersKey(id), "balance_solo_pending", prize).Err(),
 		"failed to incr balance_solo_pending for userID:%v by %v", val.UserID, prize)
 }
 
 //nolint:gomnd // .
-func applyPreStaking(amount float64, preStakingAllocation, preStakingBonus uint16) (float64, float64) {
+func ApplyPreStaking(amount float64, preStakingAllocation, preStakingBonus uint16) (float64, float64) {
 	standardAmount := (amount * float64(100-preStakingAllocation)) / 100
 	preStakingAmount := (amount * float64(100+preStakingBonus) * float64(preStakingAllocation)) / 10000
 

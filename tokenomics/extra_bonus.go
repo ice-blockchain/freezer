@@ -34,12 +34,12 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 
 	return errors.Wrapf(storage.Set(ctx, r.db, &struct {
 		ExtraBonusStartedAt *time.Time `redis:"extra_bonus_started_at"`
-		deserializedUsersKey
+		DeserializedUsersKey
 		ExtraBonus uint16 `redis:"extra_bonus"`
 		NewsSeen   uint16 `redis:"news_seen"`
 	}{
 		ExtraBonusStartedAt:  now,
-		deserializedUsersKey: deserializedUsersKey{ID: id},
+		DeserializedUsersKey: DeserializedUsersKey{ID: id},
 		ExtraBonus:           bonus.AvailableExtraBonus,
 	}), "failed to claim extra bonus:%#v", ebs)
 }
@@ -102,10 +102,10 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &dm)
 	}
 	val := &struct {
-		deserializedUsersKey
+		DeserializedUsersKey
 		UTCOffset int16 `redis:"utc_offset"`
 	}{
-		deserializedUsersKey: deserializedUsersKey{ID: id},
+		DeserializedUsersKey: DeserializedUsersKey{ID: id},
 		UTCOffset:            int16(duration / stdlibtime.Minute),
 	}
 
@@ -146,6 +146,6 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &vn)
 	}
 
-	return errors.Wrapf(s.db.HIncrBy(ctx, serializedUsersKey(id), "news_seen", 1).Err(),
+	return errors.Wrapf(s.db.HIncrBy(ctx, SerializedUsersKey(id), "news_seen", 1).Err(),
 		"failed to increment news_seen for userID:%v,id:%v", vn.UserID, id)
 }

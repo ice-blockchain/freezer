@@ -16,7 +16,7 @@ import (
 
 func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen,maintidx // .
 	t.Parallel()
-	rep := &repository{cfg: &config{
+	rep := &repository{cfg: &Config{
 		GlobalAggregationInterval: struct {
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`

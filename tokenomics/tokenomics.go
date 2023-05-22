@@ -21,7 +21,7 @@ import (
 )
 
 func New(ctx context.Context, _ context.CancelFunc) Repository {
-	var cfg config
+	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
 	db := storage.MustConnect(ctx, applicationYamlKey)
@@ -35,7 +35,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
-	var cfg config
+	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	prc := &processor{repository: &repository{
 		cfg:           &cfg,
@@ -144,7 +144,7 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 	return
 }
 
-func (c *config) totalActiveUsersAggregationIntervalDateFormat() string {
+func (c *Config) totalActiveUsersAggregationIntervalDateFormat() string {
 	const hoursInADay = 24
 	switch c.AdoptionMilestoneSwitch.Duration { //nolint:exhaustive // We don't care about the others.
 	case stdlibtime.Minute:
@@ -160,7 +160,7 @@ func (c *config) totalActiveUsersAggregationIntervalDateFormat() string {
 	}
 }
 
-func (c *config) globalAggregationIntervalChildDateFormat() string {
+func (c *Config) globalAggregationIntervalChildDateFormat() string {
 	const hoursInADay = 24
 	switch c.GlobalAggregationInterval.Child { //nolint:exhaustive // We don't care about the others.
 	case stdlibtime.Minute:
@@ -176,7 +176,7 @@ func (c *config) globalAggregationIntervalChildDateFormat() string {
 	}
 }
 
-func (c *config) globalAggregationIntervalParentDateFormat() string {
+func (c *Config) globalAggregationIntervalParentDateFormat() string {
 	const hoursInADay = 24
 	switch c.GlobalAggregationInterval.Parent { //nolint:exhaustive // We don't care about the others.
 	case stdlibtime.Minute:

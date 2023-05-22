@@ -3,6 +3,8 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/ice-blockchain/freezer/tokenomics"
 )
 
@@ -47,6 +49,7 @@ type (
 	// | service implements server.State and is responsible for managing the state and lifecycle of the package.
 	service struct {
 		tokenomicsProcessor tokenomics.Processor
+		wg                  *sync.WaitGroup
 	}
 	config struct {
 		Host    string `yaml:"host"`

@@ -12,7 +12,7 @@ import (
 
 type (
 	preStaking struct {
-		deserializedUsersKey
+		DeserializedUsersKey
 		PreStakingBonus      uint16 `redis:"pre_staking_bonus"`
 		PreStakingAllocation uint16 `redis:"pre_staking_allocation"`
 	}
@@ -38,7 +38,7 @@ func (r *repository) getPreStaking(ctx context.Context, userID string) (*preStak
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	usr, err := storage.Get[preStaking](ctx, r.db, serializedUsersKey(id))
+	usr, err := storage.Get[preStaking](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(usr) == 0 || usr[0].PreStakingAllocation == 0 {
 		if err == nil && (len(usr) == 0 || usr[0].PreStakingAllocation == 0) {
 			err = ErrNotFound
@@ -71,7 +71,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	st.Bonus = uint64(PreStakingBonusesPerYear[uint8(st.Years)])
 	existing = &preStaking{
-		deserializedUsersKey: deserializedUsersKey{ID: id},
+		DeserializedUsersKey: DeserializedUsersKey{ID: id},
 		PreStakingBonus:      uint16(st.Bonus),
 		PreStakingAllocation: uint16(st.Allocation),
 	}

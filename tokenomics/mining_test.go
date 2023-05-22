@@ -14,7 +14,7 @@ import (
 
 func TestRepositoryCalculateMiningSession(t *testing.T) {
 	t.Parallel()
-	var cfg config
+	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	repo := &repository{cfg: &cfg}
 

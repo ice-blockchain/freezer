@@ -191,6 +191,139 @@ type (
 	}
 )
 
+// DB fields.
+type (
+	BalanceLastUpdatedAtField struct {
+		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
+	}
+	MiningSessionSoloLastStartedAtField struct {
+		MiningSessionSoloLastStartedAt *time.Time `redis:"mining_session_solo_last_started_at,omitempty"`
+	}
+	MiningSessionSoloStartedAtField struct {
+		MiningSessionSoloStartedAt *time.Time `redis:"mining_session_solo_started_at,omitempty"`
+	}
+	MiningSessionSoloEndedAtField struct {
+		MiningSessionSoloEndedAt *time.Time `redis:"mining_session_solo_ended_at,omitempty"`
+	}
+	PreviousMiningSessionSoloEndedAtField struct {
+		PreviousMiningSessionSoloEndedAt *time.Time `redis:"previous_mining_session_solo_ended_at,omitempty"`
+	}
+	ExtraBonusStartedAtField struct {
+		ExtraBonusStartedAt *time.Time `redis:"extra_bonus_started_at,omitempty"`
+	}
+	ResurrectSoloUsedAtField struct {
+		ResurrectSoloUsedAt *time.Time `redis:"resurrect_solo_used_at,omitempty"`
+	}
+	ResurrectT0UsedAtField struct {
+		ResurrectT0UsedAt *time.Time `redis:"resurrect_t0_used_at,omitempty"`
+	}
+	ResurrectTMinus1UsedAtField struct {
+		ResurrectTMinus1UsedAt *time.Time `redis:"resurrect_tminus1_used_at,omitempty"`
+	}
+	UserIDField struct {
+		UserID string `redis:"user_id"`
+	}
+	IDT0Field struct {
+		IDT0 int64 `redis:"id_t0,omitempty"`
+	}
+	IDTMinus1Field struct {
+		IDTMinus1 int64 `redis:"id_tminus1,omitempty"`
+	}
+	BalanceTotalStandardField struct {
+		BalanceTotalStandard float64 `redis:"balance_total_standard"`
+	}
+	BalanceTotalPreStakingField struct {
+		BalanceTotalPreStaking float64 `redis:"balance_total_pre_staking"`
+	}
+	BalanceTotalMintedField struct {
+		BalanceTotalMinted float64 `redis:"balance_total_minted"`
+	}
+	BalanceTotalSlashedField struct {
+		BalanceTotalSlashed float64 `redis:"balance_total_slashed"`
+	}
+	BalanceSoloPendingField struct {
+		BalanceSoloPending float64 `redis:"balance_solo_pending,omitempty"`
+	}
+	BalanceT1PendingField struct {
+		BalanceT1Pending float64 `redis:"balance_t1_pending,omitempty"`
+	}
+	BalanceT2PendingField struct {
+		BalanceT2Pending float64 `redis:"balance_t2_pending,omitempty"`
+	}
+	BalanceSoloPendingAppliedField struct {
+		BalanceSoloPendingApplied float64 `redis:"balance_solo_pending_applied,omitempty"`
+	}
+	BalanceT1PendingAppliedField struct {
+		BalanceT1PendingApplied float64 `redis:"balance_t1_pending_applied,omitempty"`
+	}
+	BalanceT2PendingAppliedField struct {
+		BalanceT2PendingApplied float64 `redis:"balance_t2_pending_applied,omitempty"`
+	}
+	BalanceSoloField struct {
+		BalanceSolo float64 `redis:"balance_solo"`
+	}
+	BalanceT0Field struct {
+		BalanceT0 float64 `redis:"balance_t0"`
+	}
+	BalanceT1Field struct {
+		BalanceT1 float64 `redis:"balance_t1"`
+	}
+	BalanceT2Field struct {
+		BalanceT2 float64 `redis:"balance_t2"`
+	}
+	BalanceForT0Field struct {
+		BalanceForT0 float64 `redis:"balance_for_t0"`
+	}
+	BalanceForTMinus1Field struct {
+		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
+	}
+	SlashingRateSoloField struct {
+		SlashingRateSolo float64 `redis:"slashing_rate_solo"`
+	}
+	SlashingRateT0Field struct {
+		SlashingRateT0 float64 `redis:"slashing_rate_t0"`
+	}
+	SlashingRateT1Field struct {
+		SlashingRateT1 float64 `redis:"slashing_rate_t1"`
+	}
+	SlashingRateT2Field struct {
+		SlashingRateT2 float64 `redis:"slashing_rate_t2"`
+	}
+	SlashingRateForT0Field struct {
+		SlashingRateForT0 float64 `redis:"slashing_rate_for_t0"`
+	}
+	SlashingRateForTMinus1Field struct {
+		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+	}
+	ActiveT1ReferralsField struct {
+		ActiveT1Referrals int32 `redis:"active_t1_referrals,omitempty"`
+	}
+	ActiveT2ReferralsField struct {
+		ActiveT2Referrals int32 `redis:"active_t2_referrals,omitempty"`
+	}
+	PreStakingBonusField struct {
+		PreStakingBonus uint16 `redis:"pre_staking_bonus,omitempty"`
+	}
+	PreStakingAllocationField struct {
+		PreStakingAllocation uint16 `redis:"pre_staking_allocation,omitempty"`
+	}
+	ExtraBonusField struct {
+		ExtraBonus uint16 `redis:"extra_bonus,omitempty"`
+	}
+	ExtraBonusLastClaimAvailableAtField struct {
+		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
+	}
+	ExtraBonusDaysClaimNotAvailableField struct {
+		ExtraBonusDaysClaimNotAvailable uint16 `redis:"extra_bonus_days_claim_not_available"`
+	}
+	UTCOffsetField struct {
+		UTCOffset int16 `redis:"utc_offset,omitempty"`
+	}
+	MiningBlockchainAccountAddressField struct {
+		MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address,omitempty"`
+	}
+)
+
 // Private API.
 
 const (
@@ -205,72 +338,17 @@ const (
 type (
 	balance struct {
 		UpdatedAt   *time.Time `json:"updatedAt,omitempty" example:"2022-01-03T16:20:52.156534Z"`
-		Amount      float64    `json:"amount,omitempty" example:"1,235.777777777"`
 		UserID      string     `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		TypeDetail  string     `json:"typeDetail,omitempty" example:"/2022-01-03"`
+		Type        string     `json:"type,omitempty" example:"1"`
+		Amount      float64    `json:"amount,omitempty" example:"1,235.777777777"`
 		HashCode    int64      `json:"hashCode,omitempty" example:"11"`
 		WorkerIndex int16      `json:"workerIndex,omitempty" example:"11"`
-		Type        string     `json:"type,omitempty" example:"1"`
 		Negative    bool       `json:"negative,omitempty" example:"false"`
 	}
-	miner struct {
-		BalanceLastUpdatedAt          *time.Time `redis:"balance_last_updated_at"`
-		LastStartMiningTappedAt       *time.Time `redis:"last_start_mining_tapped_at"`
-		MiningSessionSoloStartedAt    *time.Time `redis:"mining_session_solo_started_at"`
-		MiningSessionT0StartedAt      *time.Time `redis:"mining_session_t0_started_at"`
-		MiningSessionTMinus1StartedAt *time.Time `redis:"mining_session_tminus1_started_at"`
-		MiningSessionSoloEndedAt      *time.Time `redis:"mining_session_solo_ended_at"`
-		MiningSessionT0EndedAt        *time.Time `redis:"mining_session_t0_ended_at"`
-		MiningSessionTMinus1EndedAt   *time.Time `redis:"mining_session_tminus1_ended_at"`
-		ExtraBonusStartedAt           *time.Time `redis:"extra_bonus_started_at"`
-		ExtraBonusEndedAt             *time.Time `redis:"extra_bonus_ended_at"`
-		ResurrectSoloUsedAt           *time.Time `redis:"resurrect_solo_used_at"`
-		ResurrectT0UsedAt             *time.Time `redis:"resurrect_t0_used_at"`
-		ResurrectTMinus1UsedAt        *time.Time `redis:"resurrect_tminus1_used_at"`
-		UserID                        int64      `redis:"-"`
-		BalanceTotal                  int64      `redis:"balance_total"`
-		BalanceTotalMinted            int64      `redis:"balance_total_minted"`
-		BalanceTotalSlashed           int64      `redis:"balance_total_slashed"`
-		BalanceSolo                   int64      `redis:"balance_solo"`
-		BalanceT0                     int64      `redis:"balance_t0"`
-		BalanceT1                     int64      `redis:"balance_t1"`
-		BalanceT2                     int64      `redis:"balance_t2"`
-		BalanceForT0                  int64      `redis:"balance_for_t0"`
-		BalanceForTMinus1             int64      `redis:"balance_for_tminus1"`
-		SlashingRateSolo              float64    `redis:"slashing_rate_solo"`
-		SlashingRateT0                float64    `redis:"slashing_rate_t0"`
-		SlashingRateT1                float64    `redis:"slashing_rate_t1"`
-		SlashingRateT2                float64    `redis:"slashing_rate_t2"`
-		SlashingRateForT0             float64    `redis:"slashing_rate_for_t0"`
-		SlashingRateForTMinus1        float64    `redis:"slashing_rate_for_tminus1"`
-		ActiveT1Referrals             uint32     `redis:"active_t1_referrals"`
-		ActiveT2Referrals             uint32     `redis:"active_t2_referrals"`
-		ExtraBonus                    uint16     `redis:"extra_bonus"`
-		PreStakingBonus               uint16     `redis:"pre_staking_bonus"`
-		PreStakingAllocation          uint16     `redis:"pre_staking_allocation"`
-		LastExtraBonusIndexNotified   uint16     `redis:"extra_bonus_last_notified_index"`
-		NewsSeen                      uint16     `redis:"news_seen"`
-		UTCOffset                     int16      `redis:"utc_offset"`
-	}
-	user struct {
-		FreeMiningSessionLastAwardedAt *time.Time `redis:"day_off_last_awarded_at"`
-		LastNaturalMiningStartedAt     *time.Time `redis:"mining_session_solo_last_start_mining_tapped_at"`
-		UserID                         string     `redis:"user_id"`
-		ProfilePictureName             string     `redis:"profile_picture_name"`
-		Username                       string     `redis:"username"`
-		MiningBlockchainAccountAddress string     `redis:"mining_blockchain_account_address"`
-		BlockchainAccountAddress       string     `redis:"blockchain_account_address"`
-		ID                             int64      `redis:"-"`
-		IDT0                           int64      `redis:"id_t0"`
-		IDTMinus1                      int64      `redis:"id_tminus1"`
-		UTCOffset                      int16      `redis:"utc_offset"`
-		NewsSeen                       int16      `redis:"news_seen"`
-		LastExtraBonusIndexNotified    int16      `redis:"extra_bonus_last_notified_index"`
-		HideRanking                    bool       `redis:"hide_ranking"`
-		KYCPassed                      bool       `redis:"kyc_passed"`
-	}
-	deserializedUsersKey struct {
-		ID int64 `redis:"-"`
+	DeserializedUsersKey struct {
+		GetHistoryPart func() string `redis:"-"`
+		ID             int64         `redis:"-"`
 	}
 
 	usersTableSource struct {
@@ -294,7 +372,7 @@ type (
 	}
 
 	repository struct {
-		cfg           *config
+		cfg           *Config
 		shutdown      func() error
 		db            storage.DB
 		mb            messagebroker.Client
@@ -305,7 +383,7 @@ type (
 		*repository
 	}
 
-	config struct {
+	Config struct {
 		messagebroker.Config    `mapstructure:",squash"` //nolint:tagliatelle // Nope.
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
@@ -325,7 +403,6 @@ type (
 			DelayedClaimPenaltyWindow stdlibtime.Duration `yaml:"delayedClaimPenaltyWindow"`
 			AvailabilityWindow        stdlibtime.Duration `yaml:"availabilityWindow"`
 			TimeToAvailabilityWindow  stdlibtime.Duration `yaml:"timeToAvailabilityWindow"`
-			Chunks                    uint64              `yaml:"chunks"`
 		} `yaml:"extraBonuses"`
 		RollbackNegativeMining struct {
 			Available struct {

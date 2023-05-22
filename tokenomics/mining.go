@@ -27,21 +27,27 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		return nil, errors.Wrapf(err, "failed to get cached global_rank for id:%v", id)
 	}
 	if rank == 0 {
-		if rank, err = r.db.ZRevRank(ctx, "top_miners", serializedUsersKey(id)).Uint64(); err != nil {
+		if rank, err = r.db.ZRevRank(ctx, "top_miners", SerializedUsersKey(id)).Uint64(); err != nil {
 			if errors.Is(err, redis.Nil) {
 				return &RankingSummary{GlobalRank: 0}, nil
 			}
 
 			return nil, errors.Wrapf(err, "failed to ZRevRank top_miners for userID:%v", userID)
 		}
-		if err = r.db.SetEx(ctx, fmt.Sprintf("global_rank:%v", id), rank, stdlibtime.Hour).Err(); err != nil {
+		var expiration stdlibtime.Duration
+		if r.cfg.MiningSessionDuration.Max == 24*stdlibtime.Hour {
+			expiration = 5 * stdlibtime.Minute
+		} else {
+			expiration = 5 * stdlibtime.Second
+		}
+		if err = r.db.SetEx(ctx, fmt.Sprintf("global_rank:%v", id), rank, expiration).Err(); err != nil {
 			return nil, errors.Wrapf(err, "failed to set cached global_rank for id:%v", id)
 		}
 	}
 	if userID != requestingUserID(ctx) {
 		if usr, gErr := storage.Get[struct {
 			HideRanking bool `redis:"hide_ranking"`
-		}](ctx, r.db, serializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
+		}](ctx, r.db, SerializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
 			if gErr == nil {
 				gErr = ErrGlobalRankHidden
 			}
@@ -78,7 +84,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		}
 	}
 	for ix, id := range ids {
-		ids[ix] = serializedUsersKey(id)
+		ids[ix] = SerializedUsersKey(id)
 	}
 	topMiners, err = storage.Get[Miner](ctx, r.db, ids...)
 	sort.SliceStable(topMiners, func(ii, jj int) bool { return topMiners[ii].Username < topMiners[jj].Username })
@@ -121,7 +127,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	now := time.Now()
-	ms, err := storage.Get[getMiningSummary](ctx, r.db, serializedUsersKey(id))
+	ms, err := storage.Get[getMiningSummary](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(ms) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -129,7 +135,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 
 		return nil, errors.Wrapf(err, "failed to get miningSummary for id:%v", id)
 	}
-	currentAdoption, err := r.getCurrentAdoption(ctx)
+	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to getCurrentAdoption")
 	}
@@ -154,18 +160,25 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 }
 
 func (r *repository) calculateMiningSession(now, start, end *time.Time) (ms *MiningSession) {
-	if end == nil || end.Before(*now.Time) {
+	if ms = CalculateMiningSession(now, start, end, r.cfg.MiningSessionDuration.Max); ms != nil {
+		ms.ResettableStartingAt = time.New(ms.StartedAt.Add(r.cfg.MiningSessionDuration.Min))
+		ms.WarnAboutExpirationStartingAt = time.New(ms.StartedAt.Add(r.cfg.MiningSessionDuration.WarnAboutExpirationAfter))
+	}
+
+	return ms
+}
+
+func CalculateMiningSession(now, start, end *time.Time, miningSessionDuration stdlibtime.Duration) (ms *MiningSession) {
+	if start.IsNil() || end.IsNil() || end.Before(*now.Time) {
 		return nil
 	}
-	lastMiningStartedAt := time.New(start.Add((now.Sub(*start.Time) / r.cfg.MiningSessionDuration.Max) * r.cfg.MiningSessionDuration.Max))
-	free := start.Add(r.cfg.MiningSessionDuration.Max).Before(*now.Time)
+	lastMiningStartedAt := time.New(start.Add((now.Sub(*start.Time) / miningSessionDuration) * miningSessionDuration))
+	free := start.Add(miningSessionDuration).Before(*now.Time)
 
 	return &MiningSession{
-		StartedAt:                     lastMiningStartedAt,
-		EndedAt:                       time.New(lastMiningStartedAt.Add(r.cfg.MiningSessionDuration.Max)),
-		Free:                          &free,
-		ResettableStartingAt:          time.New(lastMiningStartedAt.Add(r.cfg.MiningSessionDuration.Min)),
-		WarnAboutExpirationStartingAt: time.New(lastMiningStartedAt.Add(r.cfg.MiningSessionDuration.WarnAboutExpirationAfter)),
+		StartedAt: lastMiningStartedAt,
+		EndedAt:   time.New(lastMiningStartedAt.Add(miningSessionDuration)),
+		Free:      &free,
 	}
 }
 

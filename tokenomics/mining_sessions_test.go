@@ -16,7 +16,7 @@ import (
 
 func TestRepositoryNewStartOrExtendMiningSession_CloseToMin(t *testing.T) { //nolint:funlen // .
 	t.Parallel()
-	var cfg config
+	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	repo := &repository{cfg: &cfg}
 	actual := make([]*startOrExtendMiningSession, 0, 27)
@@ -247,7 +247,7 @@ func TestRepositoryNewStartOrExtendMiningSession_CloseToMin(t *testing.T) { //no
 
 func TestRepositoryNewstartOrExtendMiningSession_CloseToMax(t *testing.T) { //nolint:funlen,maintidx // .
 	t.Parallel()
-	var cfg config
+	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	repo := &repository{cfg: &cfg}
 	actual := make([]*startOrExtendMiningSession, 0, 27)
