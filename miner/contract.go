@@ -44,13 +44,13 @@ var (
 
 type (
 	user struct {
+		*UpdatedUser
 		tokenomics.MiningSessionSoloLastStartedAtField
 		tokenomics.MiningSessionSoloStartedAtField
 		tokenomics.MiningSessionSoloEndedAtField
 		tokenomics.PreviousMiningSessionSoloEndedAtField
 		tokenomics.ExtraBonusStartedAtField
 		tokenomics.UserIDField
-		UpdatedUser
 		tokenomics.BalanceSoloPendingField
 		tokenomics.BalanceT1PendingField
 		tokenomics.BalanceT2PendingField

@@ -174,7 +174,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		for _, usr := range userResults {
 			if isExtraBonusAvailable(now, ebn.extraBonusStartDate, ebn.extraBonusIndicesDistribution, usr) {
 				eba := &ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: usr.extraBonusIndex}
-				updatedUsers = append(updatedUsers, &usr.UpdatedUser)
+				updatedUsers = append(updatedUsers, usr.UpdatedUser)
 				msgs = append(msgs, extraBonusAvailableMessage(ctx, eba))
 			}
 		}
