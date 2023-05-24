@@ -81,7 +81,7 @@ func (ebn *extraBonusNotifier) mustGetExtraBonusIndicesDistribution(ctx context.
 
 		return
 	}
-	value := make([]string, cfg.Chunks)
+	value := make([]string, 0, totalChunkNumber)
 	for j := uint16(1); j <= totalExtraBonusDays; j++ {
 		offsets := make([]uint16, totalChunkNumber)
 		for i := uint16(0); i < totalChunkNumber; i++ {
