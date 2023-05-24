@@ -53,46 +53,54 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		return errors.Wrapf(err, "failed to getInternalID for user:%#v", usr)
 	}
 	dbUserBeforeMiningStopped, err := storage.Get[struct {
-		MiningSessionSoloEndedAt *time.Time `redis:"mining_session_solo_ended_at"`
-		UserID                   string     `redis:"user_id"`
+		MiningSessionSoloEndedAtField
+		UserIDField
 	}](ctx, s.db, SerializedUsersKey(id))
 	if err != nil || len(dbUserBeforeMiningStopped) == 0 {
 		if err == nil && len(dbUserBeforeMiningStopped) == 0 {
 			err = ErrNotFound
 		}
 
-		return errors.Wrapf(err, "failed to get current state for user:%#v", usr)
+		return errors.Wrapf(err, "[1]failed to get current state for user:%#v", usr)
 	}
 	if err = storage.Set(ctx, s.db, &struct {
-		MiningSessionSoloStartedAt       *time.Time `redis:"mining_session_solo_started_at"`
-		MiningSessionSoloEndedAt         *time.Time `redis:"mining_session_solo_ended_at"`
-		PreviousMiningSessionSoloEndedAt *time.Time `redis:"previous_mining_session_solo_ended_at"`
+		MiningSessionSoloStartedAtField
+		MiningSessionSoloEndedAtField
+		MiningSessionSoloPreviouslyEndedAtField
 		DeserializedUsersKey
 	}{
-		DeserializedUsersKey:             DeserializedUsersKey{ID: id},
-		PreviousMiningSessionSoloEndedAt: time.Now(),
+		MiningSessionSoloStartedAtField:         MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: new(time.Time)},
+		MiningSessionSoloEndedAtField:           MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: new(time.Time)},
+		MiningSessionSoloPreviouslyEndedAtField: MiningSessionSoloPreviouslyEndedAtField{MiningSessionSoloPreviouslyEndedAt: time.Now()},
+		DeserializedUsersKey:                    DeserializedUsersKey{ID: id},
 	}); err != nil {
 		return errors.Wrapf(err, "failed to manually stop mining due to user deletion message for user:%#v", usr)
 	}
 	stdlibtime.Sleep(stdlibtime.Second)
 	dbUserAfterMiningStopped, err := storage.Get[struct {
-		UserID            string  `redis:"user_id"`
-		IDT0              int64   `redis:"id_t0"`
-		IDTMinus1         int64   `redis:"id_tminus1"`
-		BalanceForT0      float64 `redis:"balance_for_t0"`
-		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
+		UserIDField
+		IDT0Field
+		IDTMinus1Field
+		BalanceForT0Field
+		BalanceForTMinus1Field
 	}](ctx, s.db, SerializedUsersKey(id))
 	if err != nil || len(dbUserAfterMiningStopped) == 0 {
 		if err == nil && len(dbUserAfterMiningStopped) == 0 {
 			err = ErrNotFound
 		}
 
-		return errors.Wrapf(err, "failed to get current state for user:%#v", usr)
+		return errors.Wrapf(err, "[2]failed to get current state for user:%#v", usr)
 	}
 	results, err := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		if dbUserAfterMiningStopped[0].IDT0 < 0 {
+			dbUserAfterMiningStopped[0].IDT0 *= -1
+		}
+		if dbUserAfterMiningStopped[0].IDTMinus1 < 0 {
+			dbUserAfterMiningStopped[0].IDTMinus1 *= -1
+		}
 		if idT0Key := SerializedUsersKey(dbUserAfterMiningStopped[0].IDT0); idT0Key != "" {
-			if dbUserAfterMiningStopped[0].BalanceForT0 > 0.0 {
-				if err = pipeliner.HIncrByFloat(ctx, idT0Key, "balance_t1", -dbUserAfterMiningStopped[0].BalanceForT0).Err(); err != nil {
+			if amount := dbUserAfterMiningStopped[0].BalanceForT0; amount > 0.0 {
+				if err = pipeliner.HIncrByFloat(ctx, idT0Key, "balance_t1_pending", -amount).Err(); err != nil {
 					return err
 				}
 			}
@@ -104,8 +112,8 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 			}
 		}
 		if idTMinus1Key := SerializedUsersKey(dbUserAfterMiningStopped[0].IDTMinus1); idTMinus1Key != "" {
-			if dbUserAfterMiningStopped[0].BalanceForTMinus1 > 0.0 {
-				if err = pipeliner.HIncrByFloat(ctx, idTMinus1Key, "balance_t2", -dbUserAfterMiningStopped[0].BalanceForTMinus1).Err(); err != nil {
+			if amount := dbUserAfterMiningStopped[0].BalanceForTMinus1; amount > 0.0 {
+				if err = pipeliner.HIncrByFloat(ctx, idTMinus1Key, "balance_t2_pending", -amount).Err(); err != nil {
 					return err
 				}
 			}
@@ -116,9 +124,9 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 				}
 			}
 		}
-		_, toAdd := s.usernameKeywords(usr.Username, "")
-		for _, usernameKeyword := range toAdd {
-			if err = pipeliner.SRem(ctx, usernameKeyword, id).Err(); err != nil {
+		toRemove, _ := s.usernameKeywords(usr.Username, "")
+		for _, usernameKeyword := range toRemove {
+			if err = pipeliner.SRem(ctx, "lookup:"+usernameKeyword, id).Err(); err != nil {
 				return err
 			}
 		}
@@ -150,18 +158,18 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		return errors.Wrapf(err, "failed to getOrInitInternalID for user:%#v", usr)
 	}
 	type (
-		userPartialState struct {
-			UserID                         string `redis:"user_id"`
-			ProfilePictureName             string `redis:"profile_picture_name"`
-			Username                       string `redis:"username"`
-			MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address"`
-			BlockchainAccountAddress       string `redis:"blockchain_account_address"`
+		user struct {
+			UserIDField
+			ProfilePictureNameField
+			UsernameField
+			MiningBlockchainAccountAddressField
+			BlockchainAccountAddressField
 			DeserializedUsersKey
-			IDT0        int64 `redis:"id_t0"`
-			HideRanking bool  `redis:"hide_ranking"`
+			IDT0Field
+			HideRankingField
 		}
 	)
-	dbUser, err := storage.Get[userPartialState](ctx, s.db, SerializedUsersKey(internalID))
+	dbUser, err := storage.Get[user](ctx, s.db, SerializedUsersKey(internalID))
 	if err != nil || len(dbUser) == 0 {
 		if err == nil && len(dbUser) == 0 {
 			err = errors.Errorf("missing state for user:%#v", usr)
@@ -169,21 +177,25 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 
 		return errors.Wrapf(err, "failed to get current user for internalID:%v", internalID)
 	}
-	newPartialState := &userPartialState{
-		DeserializedUsersKey:           DeserializedUsersKey{ID: internalID},
-		IDT0:                           dbUser[0].IDT0,
-		UserID:                         usr.ID,
-		ProfilePictureName:             s.pictureClient.StripDownloadURL(usr.ProfilePictureURL),
-		Username:                       usr.Username,
-		MiningBlockchainAccountAddress: usr.MiningBlockchainAccountAddress,
-		BlockchainAccountAddress:       usr.BlockchainAccountAddress,
-		HideRanking:                    s.hideRanking(usr),
+	newPartialState := new(user)
+	newPartialState.ID = internalID
+	newPartialState.ProfilePictureName = s.pictureClient.StripDownloadURL(usr.ProfilePictureURL)
+	newPartialState.Username = usr.Username
+	newPartialState.MiningBlockchainAccountAddress = usr.MiningBlockchainAccountAddress
+	newPartialState.BlockchainAccountAddress = usr.BlockchainAccountAddress
+	newPartialState.HideRanking = s.hideRanking(usr)
+	if newPartialState.ProfilePictureName != dbUser[0].ProfilePictureName ||
+		newPartialState.Username != dbUser[0].Username ||
+		newPartialState.MiningBlockchainAccountAddress != dbUser[0].MiningBlockchainAccountAddress ||
+		newPartialState.BlockchainAccountAddress != dbUser[0].BlockchainAccountAddress ||
+		newPartialState.HideRanking != dbUser[0].HideRanking {
+		err = storage.Set(ctx, s.db, newPartialState)
 	}
 
 	return multierror.Append( //nolint:wrapcheck // Not Needed.
-		errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed to replace user:%#v", usr),
-		errors.Wrapf(s.updateReferredBy(ctx, dbUser[0].ID, dbUser[0].IDT0, usr.ID, usr.ReferredBy), "failed to updateReferredBy for user:%#v", usr),
-		errors.Wrapf(s.updateUsernameKeywords(ctx, dbUser[0].ID, dbUser[0].Username, usr.Username), "failed to updateUsernameKeywords for oldUser:%#v, user:%#v", dbUser, usr), //nolint:lll // .
+		errors.Wrapf(err, "failed to replace user:%#v", usr),
+		errors.Wrapf(s.updateReferredBy(ctx, internalID, dbUser[0].IDT0, usr.ID, usr.ReferredBy), "failed to updateReferredBy for user:%#v", usr),
+		errors.Wrapf(s.updateUsernameKeywords(ctx, internalID, dbUser[0].Username, usr.Username), "failed to updateUsernameKeywords for oldUser:%#v, user:%#v", dbUser, usr), //nolint:lll // .
 	).ErrorOrNil()
 }
 
@@ -201,23 +213,23 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 		return nil
 	}
 	type (
-		t0Changed struct {
+		user struct {
+			UserIDField
 			DeserializedUsersKey
-			IDT0      int64 `redis:"id_t0"`
-			IDTMinus1 int64 `redis:"id_tminus1"`
-		}
-		referral struct {
-			DeserializedUsersKey
-			IDT0 int64 `redis:"id_t0"`
+			IDT0ResettableField
+			IDTMinus1ResettableField
 		}
 	)
-	newPartialState := &t0Changed{DeserializedUsersKey: DeserializedUsersKey{ID: id}}
-	if t0Referral, err2 := storage.Get[referral](ctx, s.db, SerializedUsersKey(idT0)); err2 != nil {
+	newPartialState := &user{DeserializedUsersKey: DeserializedUsersKey{ID: id}}
+	if t0Referral, err2 := storage.Get[user](ctx, s.db, SerializedUsersKey(idT0)); err2 != nil {
 		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", idT0)
 	} else if len(t0Referral) == 1 {
 		newPartialState.IDT0 = -t0Referral[0].ID
-		if t0Referral[0].IDT0 > 0 {
-			if tMinus1Referral, err3 := storage.Get[referral](ctx, s.db, SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
+		if t0Referral[0].IDT0 != 0 {
+			if t0Referral[0].IDT0 < 0 {
+				t0Referral[0].IDT0 *= -1
+			}
+			if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
 				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
 			} else if len(tMinus1Referral) == 1 {
 				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
@@ -240,12 +252,12 @@ func (s *usersTableSource) updateUsernameKeywords(
 	}
 	results, err := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
 		for _, keyword := range toAdd {
-			if cmdErr := pipeliner.SAdd(ctx, keyword, id).Err(); cmdErr != nil {
+			if cmdErr := pipeliner.SAdd(ctx, "lookup:"+keyword, id).Err(); cmdErr != nil {
 				return cmdErr
 			}
 		}
 		for _, keyword := range toRemove {
-			if cmdErr := pipeliner.SRem(ctx, keyword, id).Err(); cmdErr != nil {
+			if cmdErr := pipeliner.SRem(ctx, "lookup:"+keyword, id).Err(); cmdErr != nil {
 				return cmdErr
 			}
 		}

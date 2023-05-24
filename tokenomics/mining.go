@@ -45,9 +45,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		}
 	}
 	if userID != requestingUserID(ctx) {
-		if usr, gErr := storage.Get[struct {
-			HideRanking bool `redis:"hide_ranking"`
-		}](ctx, r.db, SerializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
+		if usr, gErr := storage.Get[struct{ HideRankingField }](ctx, r.db, SerializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
 			if gErr == nil {
 				gErr = ErrGlobalRankHidden
 			}
@@ -67,58 +65,54 @@ var (
 	everythingNotAllowedInUsernamePattern = regexp.MustCompile(everythingNotAllowedInUsernameRegex)
 )
 
-func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, err error) {
-	var ids []string
+func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, err error) { //nolint:funlen // .
+	var (
+		ids           []string
+		sortTopMiners func(int, int) bool
+	)
 	if keyword == "" {
+		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].balance < topMiners[jj].balance }
 		rangeBy := &redis.ZRangeBy{Min: "0", Max: "+inf", Offset: int64(offset), Count: int64(limit)}
 		if ids, err = r.db.ZRevRangeByScore(ctx, "top_miners", rangeBy).Result(); err != nil {
 			return nil, errors.Wrapf(err, "failed to ZRevRangeByScore for miners for offset:%v,limit:%v", offset, limit)
 		}
 	} else { //nolint:revive // Nope.
+		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].Username < topMiners[jj].Username }
 		key := string(everythingNotAllowedInUsernamePattern.ReplaceAll([]byte(strings.ToLower(keyword)), []byte("")))
 		if key == "" || !strings.EqualFold(key, keyword) {
 			return nil, nil
 		}
-		if ids, _, err = r.db.SScan(ctx, key, offset, "", int64(limit)).Result(); err != nil {
+		if ids, _, err = r.db.SScan(ctx, "lookup:"+key, offset, "", int64(limit)).Result(); err != nil {
 			return nil, errors.Wrapf(err, "failed to SScan for miners for keyword:%v,offset:%v,limit:%v", key, offset, limit)
 		}
 	}
 	for ix, id := range ids {
 		ids[ix] = SerializedUsersKey(id)
 	}
-	topMiners, err = storage.Get[Miner](ctx, r.db, ids...)
-	sort.SliceStable(topMiners, func(ii, jj int) bool { return topMiners[ii].Username < topMiners[jj].Username })
-	for _, topMiner := range topMiners {
-		topMiner.ProfilePictureURL = r.pictureClient.DownloadURL(topMiner.ProfilePictureURL)
+	resp, err := storage.Get[struct {
+		UserIDField
+		UsernameField
+		ProfilePictureNameField
+		BalanceTotalStandardField
+		BalanceTotalPreStakingField
+	}](ctx, r.db, ids...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
+	}
+	topMiners = make([]*Miner, 0, len(resp))
+	defer sort.SliceStable(topMiners, sortTopMiners)
+	for _, topMiner := range resp {
+		topMiners = append(topMiners, &Miner{
+			Balance:           fmt.Sprint(topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking),
+			balance:           topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking,
+			UserID:            topMiner.UserID,
+			Username:          topMiner.Username,
+			ProfilePictureURL: r.pictureClient.DownloadURL(topMiner.ProfilePictureName),
+		})
 	}
 
-	return topMiners, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
+	return topMiners, nil
 }
-
-type (
-	getMiningSummary struct {
-		MiningSessionSoloLastStartedAt  *time.Time `redis:"mining_session_solo_last_started_at"`
-		MiningSessionSoloStartedAt      *time.Time `redis:"mining_session_solo_started_at"`
-		MiningSessionSoloEndedAt        *time.Time `redis:"mining_session_solo_ended_at"`
-		MiningSessionT0EndedAt          *time.Time `redis:"mining_session_t0_ended_at"`
-		ExtraBonusStartedAt             *time.Time `redis:"extra_bonus_started_at"`
-		ExtraBonusLastClaimAvailableAt  *time.Time `redis:"extra_bonus_last_claim_available_at"`
-		ExtraBonusDaysClaimNotAvailable uint16     `redis:"extra_bonus_days_claim_not_available"`
-		ExtraBonus                      uint16     `redis:"extra_bonus"`
-		NewsSeen                        uint16     `redis:"news_seen"`
-		PreStakingBonus                 uint16     `redis:"pre_staking_bonus"`
-		PreStakingAllocation            uint16     `redis:"pre_staking_allocation"`
-		UTCOffset                       int16      `redis:"utc_offset"`
-		ActiveT1Referrals               uint32     `redis:"active_t1_referrals"`
-		ActiveT2Referrals               uint32     `redis:"active_t2_referrals"`
-		IDT0                            int64      `redis:"id_t0"`
-		BalanceTotal                    float64    `redis:"balance_total"`
-		SlashingRateSolo                float64    `redis:"slashing_rate_solo"`
-		SlashingRateT0                  float64    `redis:"slashing_rate_t0"`
-		SlashingRateT1                  float64    `redis:"slashing_rate_t1"`
-		SlashingRateT2                  float64    `redis:"slashing_rate_t2"`
-	}
-)
 
 //nolint:funlen // .
 func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*MiningSummary, error) {
@@ -127,7 +121,28 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	now := time.Now()
-	ms, err := storage.Get[getMiningSummary](ctx, r.db, SerializedUsersKey(id))
+	ms, err := storage.Get[struct {
+		MiningSessionSoloLastStartedAtField
+		MiningSessionSoloStartedAtField
+		MiningSessionSoloEndedAtField
+		ExtraBonusStartedAtField
+		ExtraBonusLastClaimAvailableAtField
+		BalanceTotalStandardField
+		BalanceTotalPreStakingField
+		SlashingRateSoloField
+		SlashingRateT0Field
+		SlashingRateT1Field
+		SlashingRateT2Field
+		IDT0Field
+		ActiveT1ReferralsField
+		ActiveT2ReferralsField
+		ExtraBonusDaysClaimNotAvailableField
+		ExtraBonusField
+		NewsSeenField
+		PreStakingBonusField
+		PreStakingAllocationField
+		UTCOffsetField
+	}](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(ms) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -139,10 +154,11 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to getCurrentAdoption")
 	}
-	var t0, extraBonus uint16
-	if ms[0].IDT0 > 0 && !ms[0].MiningSessionT0EndedAt.IsNil() && ms[0].MiningSessionT0EndedAt.After(*now.Time) {
-		t0 = 1
+	t0, err := r.isT0Online(ctx, ms[0].IDT0, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to check if t0 is online for idT0:%v", ms[0].IDT0)
 	}
+	var extraBonus uint16
 	if !ms[0].ExtraBonusStartedAt.IsNil() && ms[0].ExtraBonusStartedAt.Add(r.cfg.ExtraBonuses.Duration).After(*now.Time) {
 		extraBonus = ms[0].ExtraBonus
 	}
@@ -152,11 +168,26 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		MiningStreak:                r.calculateMiningStreak(now, ms[0].MiningSessionSoloStartedAt, ms[0].MiningSessionSoloEndedAt),
 		MiningSession:               r.calculateMiningSession(now, ms[0].MiningSessionSoloLastStartedAt, ms[0].MiningSessionSoloEndedAt),
 		RemainingFreeMiningSessions: r.calculateRemainingFreeMiningSessions(now, ms[0].MiningSessionSoloEndedAt),
-		MiningRates:                 r.calculateMiningRateSummaries(extraBonus, t0, ms[0].PreStakingAllocation, ms[0].PreStakingBonus, ms[0].ActiveT1Referrals, ms[0].ActiveT2Referrals, currentAdoption.BaseMiningRate, negativeMiningRate, ms[0].BalanceTotal, now, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
+		MiningRates:                 r.calculateMiningRateSummaries(extraBonus, t0, ms[0].PreStakingAllocation, ms[0].PreStakingBonus, ms[0].ActiveT1Referrals, ms[0].ActiveT2Referrals, currentAdoption.BaseMiningRate, negativeMiningRate, ms[0].BalanceTotalStandard+ms[0].BalanceTotalPreStaking, now, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
 		ExtraBonusSummary: ExtraBonusSummary{
-			AvailableExtraBonus: r.calculateExtraBonus(id, ms[0].NewsSeen, ms[0].ExtraBonusDaysClaimNotAvailable, ms[0].UTCOffset, now, ms[0].MiningSessionSoloStartedAt, ms[0].MiningSessionSoloEndedAt, ms[0].ExtraBonusStartedAt, ms[0].ExtraBonusLastClaimAvailableAt), //nolint:lll // .
+			AvailableExtraBonus: r.calculateExtraBonus(ms[0].NewsSeen, ms[0].ExtraBonusDaysClaimNotAvailable, ms[0].UTCOffset, now, ms[0].ExtraBonusLastClaimAvailableAt, ms[0].MiningSessionSoloStartedAt, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
 		},
 	}, nil
+}
+
+func (r *repository) isT0Online(ctx context.Context, idT0 int64, now *time.Time) (uint16, error) {
+	if idT0 == 0 {
+		return 0, nil
+	}
+	if idT0 < 0 {
+		idT0 *= -1
+	}
+	t0Ref, err := storage.Get[struct{ MiningSessionSoloEndedAtField }](ctx, r.db, SerializedUsersKey(idT0))
+	if err == nil && len(t0Ref) == 1 && !t0Ref[0].MiningSessionSoloEndedAt.IsNil() && t0Ref[0].MiningSessionSoloEndedAt.After(*now.Time) {
+		return 1, nil
+	}
+
+	return 0, errors.Wrapf(err, "failed to get MiningSessionSoloEndedAtField for idT0:%v", idT0)
 }
 
 func (r *repository) calculateMiningSession(now, start, end *time.Time) (ms *MiningSession) {
@@ -185,7 +216,7 @@ func CalculateMiningSession(now, start, end *time.Time, miningSessionDuration st
 //nolint:funlen,gomnd,lll // A lot of calculations.
 func (r *repository) calculateMiningRateSummaries(
 	extraBonus, t0, preStakingAllocation, preStakingBonus uint16,
-	t1, t2 uint32,
+	t1, t2 int32,
 	baseMiningRate, negativeMiningRate, totalBalance float64,
 	now, miningSessionSoloEndedAt *time.Time,
 ) (miningRates *MiningRates[*MiningRateSummary[string]]) {
@@ -200,6 +231,12 @@ func (r *repository) calculateMiningRateSummaries(
 		positiveTotalNoPreStakingBonusVal uint64
 		preStakingBonusVal                uint64
 	)
+	if t1 < 0 {
+		t1 = 0
+	}
+	if t2 < 0 {
+		t2 = 0
+	}
 	if miningSessionSoloEndedAt.IsNil() { //nolint:gocritic,nestif // Wrong.
 		miningRates.Type = NoneMiningRateType
 	} else if miningSessionSoloEndedAt.After(*now.Time) {
@@ -217,7 +254,7 @@ func (r *repository) calculateMiningRateSummaries(
 		var localTotalBonus uint64
 		switch miningRates.Type {
 		case PositiveMiningRateType:
-			standardMiningRate = r.calculateMintedStandardCoins(t0, extraBonus, preStakingAllocation, t1, t2, baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
+			standardMiningRate = r.calculateMintedStandardCoins(t0, extraBonus, preStakingAllocation, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
 			if standardMiningRate > baseMiningRate {
 				localTotalBonus = uint64(((standardMiningRate - baseMiningRate) * 100) / baseMiningRate)
 			}
@@ -228,8 +265,8 @@ func (r *repository) calculateMiningRateSummaries(
 		miningRates.Standard = &MiningRateSummary[string]{
 			Amount: fmt.Sprint(standardMiningRate),
 			Bonuses: &MiningRateBonuses{
-				T1:    uint64(float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(t1*r.cfg.ReferralBonusMiningRates.T1))*uint64(100-preStakingAllocation)) / 100),
-				T2:    uint64(float64(t2*r.cfg.ReferralBonusMiningRates.T2*uint32(100-preStakingAllocation)) / 100),
+				T1:    uint64(float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1))*uint64(100-preStakingAllocation)) / 100),
+				T2:    uint64(float64(uint32(t2)*r.cfg.ReferralBonusMiningRates.T2*uint32(100-preStakingAllocation)) / 100),
 				Extra: uint64(float64(extraBonus*(100-preStakingAllocation)) / 100),
 				Total: localTotalBonus,
 			},
@@ -239,7 +276,7 @@ func (r *repository) calculateMiningRateSummaries(
 		var localTotalBonus uint64
 		switch miningRates.Type {
 		case PositiveMiningRateType:
-			preStakingMiningRate = r.calculateMintedPreStakingCoins(t0, extraBonus, preStakingAllocation, preStakingBonus, t1, t2, baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
+			preStakingMiningRate = r.calculateMintedPreStakingCoins(t0, extraBonus, preStakingAllocation, preStakingBonus, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
 			if preStakingMiningRate > baseMiningRate {
 				localTotalBonus = uint64(((preStakingMiningRate - baseMiningRate) * 100) / baseMiningRate)
 			}
@@ -247,8 +284,8 @@ func (r *repository) calculateMiningRateSummaries(
 			preStakingMiningRate = (negativeMiningRate * float64(preStakingBonus+100) * float64(preStakingAllocation)) / (100 * 100)
 		case NoneMiningRateType:
 		}
-		t1Bonus := float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(t1*r.cfg.ReferralBonusMiningRates.T1))*uint64(preStakingAllocation)) / 100
-		t2Bonus := float64(t2*r.cfg.ReferralBonusMiningRates.T2*uint32(preStakingAllocation)) / 100
+		t1Bonus := float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1))*uint64(preStakingAllocation)) / 100
+		t2Bonus := float64(uint32(t2)*r.cfg.ReferralBonusMiningRates.T2*uint32(preStakingAllocation)) / 100
 		extraBonusVal := float64(extraBonus*preStakingAllocation) / 100
 		preStakingBonusVal = uint64((float64(preStakingAllocation) * float64(preStakingBonus)) / 100)
 		miningRates.PreStaking = &MiningRateSummary[string]{
@@ -262,7 +299,7 @@ func (r *repository) calculateMiningRateSummaries(
 			},
 		}
 	}
-	positiveTotalNoPreStakingBonus := r.calculateMintedStandardCoins(t0, extraBonus, 0, t1, t2, baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
+	positiveTotalNoPreStakingBonus := r.calculateMintedStandardCoins(t0, extraBonus, 0, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
 	if positiveTotalNoPreStakingBonus > baseMiningRate {
 		positiveTotalNoPreStakingBonusVal = uint64(((positiveTotalNoPreStakingBonus - baseMiningRate) * 100) / baseMiningRate)
 	}
@@ -280,8 +317,8 @@ func (r *repository) calculateMiningRateSummaries(
 	miningRates.Total = &MiningRateSummary[string]{
 		Amount: fmt.Sprint(standardMiningRate + preStakingMiningRate),
 		Bonuses: &MiningRateBonuses{
-			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(t1*r.cfg.ReferralBonusMiningRates.T1),
-			T2:         uint64(t2 * r.cfg.ReferralBonusMiningRates.T2),
+			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
+			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),
 			Extra:      uint64(extraBonus),
 			PreStaking: preStakingBonusVal,
 			Total:      totalBonusVal,
@@ -290,8 +327,8 @@ func (r *repository) calculateMiningRateSummaries(
 	miningRates.TotalNoPreStakingBonus = &MiningRateSummary[string]{
 		Amount: fmt.Sprint(totalNoPreStakingBonusRate),
 		Bonuses: &MiningRateBonuses{
-			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(t1*r.cfg.ReferralBonusMiningRates.T1),
-			T2:         uint64(t2 * r.cfg.ReferralBonusMiningRates.T2),
+			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
+			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),
 			Extra:      uint64(extraBonus),
 			PreStaking: 0,
 			Total:      totalNoPreStakingBonusVal,
@@ -300,8 +337,8 @@ func (r *repository) calculateMiningRateSummaries(
 	miningRates.PositiveTotalNoPreStakingBonus = &MiningRateSummary[string]{
 		Amount: fmt.Sprint(positiveTotalNoPreStakingBonus),
 		Bonuses: &MiningRateBonuses{
-			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(t1*r.cfg.ReferralBonusMiningRates.T1),
-			T2:         uint64(t2 * r.cfg.ReferralBonusMiningRates.T2),
+			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
+			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),
 			Extra:      uint64(extraBonus),
 			PreStaking: 0,
 			Total:      positiveTotalNoPreStakingBonusVal,

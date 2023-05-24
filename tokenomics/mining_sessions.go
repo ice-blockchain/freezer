@@ -19,31 +19,25 @@ import (
 )
 
 type (
-	startOrExtendMiningSession struct {
-		ResurrectSoloUsedAt                  *time.Time `redis:"resurrect_solo_used_at"`
-		MiningSessionSoloLastStartedAt       *time.Time `redis:"mining_session_solo_last_started_at"`
-		MiningSessionSoloStartedAt           *time.Time `redis:"mining_session_solo_started_at"`
-		MiningSessionSoloEndedAt             *time.Time `redis:"mining_session_solo_ended_at"`
-		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at"`
-		MiningSessionSoloPreviouslyEndedAt   *time.Time `redis:"mining_session_solo_previously_ended_at"`
+	StartOrExtendMiningSession struct {
+		ResurrectSoloUsedAtField
+		MiningSessionSoloLastStartedAtField
+		MiningSessionSoloStartedAtField
+		MiningSessionSoloEndedAtField
+		MiningSessionSoloDayOffLastAwardedAtField
+		MiningSessionSoloPreviouslyEndedAtField
 		DeserializedUsersKey
 	}
 	getCurrentMiningSession struct {
-		ResurrectSoloUsedAt                  *time.Time `redis:"resurrect_solo_used_at"`
-		MiningSessionSoloLastStartedAt       *time.Time `redis:"mining_session_solo_last_started_at"`
-		MiningSessionSoloStartedAt           *time.Time `redis:"mining_session_solo_started_at"`
-		MiningSessionSoloEndedAt             *time.Time `redis:"mining_session_solo_ended_at"`
-		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at"`
-		MiningSessionSoloPreviouslyEndedAt   *time.Time `redis:"mining_session_solo_previously_ended_at"`
-		PreStakingAllocation                 uint16     `redis:"pre_staking_allocation"`
-		PreStakingBonus                      uint16     `redis:"pre_staking_bonus"`
-		BalanceTotal                         float64    `redis:"balance_total"`
-		SlashingRateSolo                     float64    `redis:"slashing_rate_solo"`
-		SlashingRateT0                       float64    `redis:"slashing_rate_t0"`
-		SlashingRateT1                       float64    `redis:"slashing_rate_t1"`
-		SlashingRateT2                       float64    `redis:"slashing_rate_t2"`
-		IDT0                                 int64      `redis:"id_t0"`
-		IDTMinus1                            int64      `redis:"id_tminus1"`
+		StartOrExtendMiningSession
+		SlashingRateSoloField
+		SlashingRateT0Field
+		SlashingRateT1Field
+		SlashingRateT2Field
+		IDT0Field
+		IDTMinus1Field
+		PreStakingAllocationField
+		PreStakingBonusField
 	}
 )
 
@@ -77,17 +71,9 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
 		return errors.Wrapf(err, "failed to updateTMinus1 for id:%v", id)
 	}
-	oldMS := &startOrExtendMiningSession{
-		ResurrectSoloUsedAt:                  old[0].ResurrectSoloUsedAt,
-		MiningSessionSoloLastStartedAt:       old[0].MiningSessionSoloLastStartedAt,
-		MiningSessionSoloStartedAt:           old[0].MiningSessionSoloStartedAt,
-		MiningSessionSoloEndedAt:             old[0].MiningSessionSoloEndedAt,
-		MiningSessionSoloDayOffLastAwardedAt: old[0].MiningSessionSoloDayOffLastAwardedAt,
-		MiningSessionSoloPreviouslyEndedAt:   old[0].MiningSessionSoloPreviouslyEndedAt,
-	}
-	newMS, extension := r.newStartOrExtendMiningSession(oldMS, now)
+	newMS, extension := r.newStartOrExtendMiningSession(&old[0].StartOrExtendMiningSession, now)
 	newMS.ID = id
-	if shouldRollback != nil && *shouldRollback && oldMS.ResurrectSoloUsedAt.IsNil() {
+	if shouldRollback != nil && *shouldRollback && old[0].ResurrectSoloUsedAt.IsNil() {
 		newMS.ResurrectSoloUsedAt = time.New(stdlibtime.Date(3000, 0, 0, 0, 0, 0, 0, nil)) //nolint:gomnd // .
 	}
 	sess := &MiningSession{
@@ -120,50 +106,36 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	}), "permanently failed to GetMiningSummary for userID:%v", userID)
 }
 
-//nolint:funlen // .
 func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int64) error {
-	if idTMinus1 < 1 || idT0 < 1 {
+	if idTMinus1 == 0 || idT0 == 0 {
 		return nil
 	}
-	if oldTminus1Data, err := storage.Get[struct {
-		UserID string `redis:"user_id"`
-	}](ctx, r.db, SerializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
+	if idTMinus1 < 0 {
+		idTMinus1 *= -1
+	}
+	if oldTminus1Data, err := storage.Get[struct{ UserIDField }](ctx, r.db, SerializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
 		return errors.Wrapf(err, "failed to get state for t-1:%v", idTMinus1)
 	}
 	idTMinus1 = 0
-	if t0Data, err := storage.Get[struct {
-		IDT0 int64 `redis:"id_t0"`
-	}](ctx, r.db, SerializedUsersKey(idT0)); err != nil {
+	if idT0 < 0 {
+		idT0 *= -1
+	}
+	if t0Data, err := storage.Get[struct{ IDT0Field }](ctx, r.db, SerializedUsersKey(idT0)); err != nil {
 		return errors.Wrapf(err, "failed to get state for t0:%v", idT0)
 	} else if len(t0Data) != 0 {
 		idTMinus1 = t0Data[0].IDT0
-	}
-	type (
-		replaceIDTMinus1 struct {
-			DeserializedUsersKey
-			IDTMinus1              int64   `redis:"id_tminus1"`
-			BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
-			SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
+		if idTMinus1 > 0 {
+			idTMinus1 *= -1
 		}
-	)
-	if err := storage.Set(ctx, r.db, &replaceIDTMinus1{DeserializedUsersKey: DeserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}); err != nil {
-		return errors.Wrapf(err, "failed to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
-	}
-	stdlibtime.Sleep(stdlibtime.Second)
-	afterReplaceIDTMinus1, err := storage.Get[struct {
-		BalanceForTMinus1      float64 `redis:"balance_for_tminus1"`
-		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
-	}](ctx, r.db, SerializedUsersKey(id))
-	if err != nil || len(afterReplaceIDTMinus1) == 0 || (afterReplaceIDTMinus1[0].BalanceForTMinus1 == 0.0 && afterReplaceIDTMinus1[0].SlashingRateForTMinus1 == 0.0) { //nolint:lll // .
-		if err == nil && len(afterReplaceIDTMinus1) == 0 {
-			err = errors.Wrapf(ErrRelationNotFound, "missing state[2] for id:%v", id)
-		}
-
-		return errors.Wrapf(err, "failed to get state for id:%v, after t-1 id was updated", id)
 	}
 
-	return errors.Wrapf(storage.Set(ctx, r.db, &replaceIDTMinus1{DeserializedUsersKey: DeserializedUsersKey{ID: id}, IDTMinus1: idTMinus1}),
-		"failed[2] to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
+	return errors.Wrapf(storage.Set(ctx, r.db, &struct {
+		DeserializedUsersKey
+		IDTMinus1ResettableField
+	}{
+		DeserializedUsersKey:     DeserializedUsersKey{ID: id},
+		IDTMinus1ResettableField: IDTMinus1ResettableField{IDTMinus1: idTMinus1},
+	}), "failed to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
 }
 
 func (r *repository) validateRollbackNegativeMiningProgress(
@@ -192,20 +164,17 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 	return rollbackNegativeMiningProgress, nil
 }
 
-func (r *repository) newStartOrExtendMiningSession(old *startOrExtendMiningSession, now *time.Time) (*startOrExtendMiningSession, stdlibtime.Duration) {
-	resp := &startOrExtendMiningSession{
-		ResurrectSoloUsedAt:                old.ResurrectSoloUsedAt,
-		MiningSessionSoloStartedAt:         now,
-		MiningSessionSoloLastStartedAt:     now,
-		MiningSessionSoloEndedAt:           time.New(now.Add(r.cfg.MiningSessionDuration.Max)),
-		MiningSessionSoloPreviouslyEndedAt: old.MiningSessionSoloEndedAt,
-	}
+func (r *repository) newStartOrExtendMiningSession(old *StartOrExtendMiningSession, now *time.Time) (*StartOrExtendMiningSession, stdlibtime.Duration) {
+	resp := new(StartOrExtendMiningSession)
+	resp.MiningSessionSoloStartedAt = now
+	resp.MiningSessionSoloLastStartedAt = now
+	resp.MiningSessionSoloEndedAt = time.New(now.Add(r.cfg.MiningSessionDuration.Max))
+	resp.MiningSessionSoloPreviouslyEndedAt = old.MiningSessionSoloEndedAt
+
 	if old.MiningSessionSoloEndedAt.IsNil() || old.MiningSessionSoloStartedAt.IsNil() || old.MiningSessionSoloEndedAt.Before(*now.Time) {
 		return resp, r.cfg.MiningSessionDuration.Max
 	}
-	resp.MiningSessionSoloPreviouslyEndedAt = old.MiningSessionSoloPreviouslyEndedAt
-	resp.MiningSessionSoloStartedAt = old.MiningSessionSoloStartedAt
-	resp.MiningSessionSoloDayOffLastAwardedAt = old.MiningSessionSoloDayOffLastAwardedAt
+	resp.MiningSessionSoloPreviouslyEndedAt, resp.MiningSessionSoloStartedAt = nil, nil
 	var durationSinceLastFreeMiningSessionAwarded stdlibtime.Duration
 	if resp.MiningSessionSoloDayOffLastAwardedAt.IsNil() {
 		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloStartedAt.Time)
@@ -289,13 +258,19 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	}
 	referees, err := storage.Get[struct {
 		DeserializedUsersKey
-		IDT0      int64 `redis:"id_t0"`
-		IDTMinus1 int64 `redis:"id_tminus1"`
+		IDT0Field
+		IDTMinus1Field
 	}](ctx, s.db, SerializedUsersKey(id))
-	if err != nil || len(referees) == 0 || (referees[0].IDT0 < 1 && referees[0].IDTMinus1 < 1) {
+	if err != nil || len(referees) == 0 || (referees[0].IDT0 == 0 && referees[0].IDTMinus1 == 0) {
 		return errors.Wrapf(err, "failed to get referees for id:%v, userID:%v", id, *ms.UserID)
 	}
-	if referees[0].IDT0 < 1 || referees[0].IDTMinus1 < 1 {
+	if referees[0].IDT0 < 0 {
+		referees[0].IDT0 *= -1
+	}
+	if referees[0].IDTMinus1 < 0 {
+		referees[0].IDTMinus1 *= -1
+	}
+	if referees[0].IDT0 == 0 || referees[0].IDTMinus1 == 0 {
 		if referees[0].IDT0 >= 1 {
 			err = s.db.HIncrBy(ctx, SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
 		}

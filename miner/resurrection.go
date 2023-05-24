@@ -9,7 +9,7 @@ import (
 
 func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 	if !usr.ResurrectSoloUsedAt.IsNil() && usr.ResurrectSoloUsedAt.After(*now.Time) {
-		resurrectDelta := usr.MiningSessionSoloStartedAt.Sub(*usr.PreviousMiningSessionSoloEndedAt.Time).Hours()
+		resurrectDelta := usr.MiningSessionSoloStartedAt.Sub(*usr.MiningSessionSoloPreviouslyEndedAt.Time).Hours()
 
 		usr.BalanceSolo += usr.SlashingRateSolo * resurrectDelta
 		usr.BalanceT0 += usr.SlashingRateT0 * resurrectDelta
@@ -26,7 +26,7 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 	}
 
 	if t0Ref != nil && !t0Ref.ResurrectSoloUsedAt.IsNil() && usr.ResurrectT0UsedAt.IsNil() {
-		resurrectDelta := t0Ref.MiningSessionSoloStartedAt.Sub(*t0Ref.PreviousMiningSessionSoloEndedAt.Time).Hours()
+		resurrectDelta := t0Ref.MiningSessionSoloStartedAt.Sub(*t0Ref.MiningSessionSoloPreviouslyEndedAt.Time).Hours()
 
 		usr.BalanceForT0 += usr.SlashingRateForT0 * resurrectDelta
 
@@ -37,7 +37,7 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 	}
 
 	if tMinus1Ref != nil && !tMinus1Ref.ResurrectSoloUsedAt.IsNil() && usr.ResurrectTMinus1UsedAt.IsNil() {
-		resurrectDelta := tMinus1Ref.MiningSessionSoloStartedAt.Sub(*tMinus1Ref.PreviousMiningSessionSoloEndedAt.Time).Hours()
+		resurrectDelta := tMinus1Ref.MiningSessionSoloStartedAt.Sub(*tMinus1Ref.MiningSessionSoloPreviouslyEndedAt.Time).Hours()
 
 		usr.BalanceForTMinus1 += usr.SlashingRateForTMinus1 * resurrectDelta
 

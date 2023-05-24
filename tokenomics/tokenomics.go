@@ -55,6 +55,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 
 	prc.mustInitAdoptions(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
+	prc.extraBonusStartDate = MustGetExtraBonusStartDate(ctx, prc.db)
 
 	return prc
 }

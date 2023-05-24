@@ -55,10 +55,11 @@ var (
 type (
 	MiningRateType string
 	Miner          struct {
-		Balance           string `json:"balance,omitempty" redis:"balance_total" example:"12345.6334"`
-		UserID            string `json:"userId,omitempty" redis:"user_id"  example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Username          string `json:"username,omitempty" redis:"username" example:"jdoe"`
-		ProfilePictureURL string `json:"profilePictureUrl,omitempty" redis:"profile_picture_name" example:"https://somecdn.com/p1.jpg"`
+		Balance           string `json:"balance,omitempty" example:"12345.6334"`
+		UserID            string `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Username          string `json:"username,omitempty" example:"jdoe"`
+		ProfilePictureURL string `json:"profilePictureUrl,omitempty" example:"https://somecdn.com/p1.jpg"`
+		balance           float64
 	}
 	BalanceSummary struct {
 		Balances[string]
@@ -152,18 +153,9 @@ type (
 	ExtraBonusSummary struct {
 		UserID              string `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 		AvailableExtraBonus uint16 `json:"availableExtraBonus,omitempty" example:"2"`
-		ExtraBonusIndex     uint16 `json:"extraBonusIndex,omitempty" swaggerignore:"true" example:"1"`
 	}
 	RankingSummary struct {
 		GlobalRank uint64 `json:"globalRank,omitempty" example:"12333"`
-	}
-	FreeMiningSessionStarted struct {
-		StartedAt                   *time.Time `json:"startedAt,omitempty"`
-		EndedAt                     *time.Time `json:"endedAt,omitempty"`
-		UserID                      string     `json:"userId,omitempty" `
-		ID                          string     `json:"id,omitempty"`
-		RemainingFreeMiningSessions uint64     `json:"remainingFreeMiningSessions,omitempty"`
-		MiningStreak                uint64     `json:"miningStreak,omitempty" example:"11"`
 	}
 	ReadRepository interface {
 		GetBalanceSummary(ctx context.Context, userID string) (*BalanceSummary, error)
@@ -205,8 +197,8 @@ type (
 	MiningSessionSoloEndedAtField struct {
 		MiningSessionSoloEndedAt *time.Time `redis:"mining_session_solo_ended_at,omitempty"`
 	}
-	PreviousMiningSessionSoloEndedAtField struct {
-		PreviousMiningSessionSoloEndedAt *time.Time `redis:"previous_mining_session_solo_ended_at,omitempty"`
+	MiningSessionSoloPreviouslyEndedAtField struct {
+		MiningSessionSoloPreviouslyEndedAt *time.Time `redis:"mining_session_solo_previously_ended_at,omitempty"`
 	}
 	ExtraBonusStartedAtField struct {
 		ExtraBonusStartedAt *time.Time `redis:"extra_bonus_started_at,omitempty"`
@@ -220,14 +212,26 @@ type (
 	ResurrectTMinus1UsedAtField struct {
 		ResurrectTMinus1UsedAt *time.Time `redis:"resurrect_tminus1_used_at,omitempty"`
 	}
+	MiningSessionSoloDayOffLastAwardedAtField struct {
+		MiningSessionSoloDayOffLastAwardedAt *time.Time `redis:"mining_session_solo_day_off_last_awarded_at,omitempty"`
+	}
+	ExtraBonusLastClaimAvailableAtField struct {
+		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
+	}
 	UserIDField struct {
 		UserID string `redis:"user_id"`
 	}
-	IDT0Field struct {
-		IDT0 int64 `redis:"id_t0,omitempty"`
+	ProfilePictureNameField struct {
+		ProfilePictureName string `redis:"profile_picture_name,omitempty"`
 	}
-	IDTMinus1Field struct {
-		IDTMinus1 int64 `redis:"id_tminus1,omitempty"`
+	UsernameField struct {
+		Username string `redis:"username,omitempty"`
+	}
+	MiningBlockchainAccountAddressField struct {
+		MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address,omitempty"`
+	}
+	BlockchainAccountAddressField struct {
+		BlockchainAccountAddress string `redis:"blockchain_account_address,omitempty"`
 	}
 	BalanceTotalStandardField struct {
 		BalanceTotalStandard float64 `redis:"balance_total_standard"`
@@ -295,6 +299,22 @@ type (
 	SlashingRateForTMinus1Field struct {
 		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 	}
+	DeserializedUsersKey struct {
+		HistoryPart string `redis:"-"`
+		ID          int64  `redis:"-"`
+	}
+	IDT0Field struct {
+		IDT0 int64 `redis:"id_t0,omitempty"`
+	}
+	IDTMinus1Field struct {
+		IDTMinus1 int64 `redis:"id_tminus1,omitempty"`
+	}
+	IDT0ResettableField struct {
+		IDT0 int64 `redis:"id_t0"`
+	}
+	IDTMinus1ResettableField struct {
+		IDTMinus1 int64 `redis:"id_tminus1"`
+	}
 	ActiveT1ReferralsField struct {
 		ActiveT1Referrals int32 `redis:"active_t1_referrals,omitempty"`
 	}
@@ -310,17 +330,17 @@ type (
 	ExtraBonusField struct {
 		ExtraBonus uint16 `redis:"extra_bonus,omitempty"`
 	}
-	ExtraBonusLastClaimAvailableAtField struct {
-		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
+	NewsSeenField struct {
+		NewsSeen uint16 `redis:"news_seen"`
 	}
 	ExtraBonusDaysClaimNotAvailableField struct {
 		ExtraBonusDaysClaimNotAvailable uint16 `redis:"extra_bonus_days_claim_not_available"`
 	}
 	UTCOffsetField struct {
-		UTCOffset int16 `redis:"utc_offset,omitempty"`
+		UTCOffset int16 `redis:"utc_offset"`
 	}
-	MiningBlockchainAccountAddressField struct {
-		MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address,omitempty"`
+	HideRankingField struct {
+		HideRanking bool `redis:"hide_ranking"`
 	}
 )
 
@@ -346,11 +366,6 @@ type (
 		WorkerIndex int16      `json:"workerIndex,omitempty" example:"11"`
 		Negative    bool       `json:"negative,omitempty" example:"false"`
 	}
-	DeserializedUsersKey struct {
-		HistoryPart string `redis:"-"`
-		ID          int64  `redis:"-"`
-	}
-
 	usersTableSource struct {
 		*processor
 	}
@@ -372,11 +387,12 @@ type (
 	}
 
 	repository struct {
-		cfg           *Config
-		shutdown      func() error
-		db            storage.DB
-		mb            messagebroker.Client
-		pictureClient picture.Client
+		cfg                 *Config
+		extraBonusStartDate *time.Time
+		shutdown            func() error
+		db                  storage.DB
+		mb                  messagebroker.Client
+		pictureClient       picture.Client
 	}
 
 	processor struct {
@@ -394,9 +410,9 @@ type (
 			Duration                     stdlibtime.Duration `yaml:"duration"`
 		} `yaml:"adoptionMilestoneSwitch"`
 		ExtraBonuses struct {
-			FlatValues                []uint64            `yaml:"flatValues"`
-			NewsSeenValues            []uint64            `yaml:"newsSeenValues"`
-			MiningStreakValues        []uint64            `yaml:"miningStreakValues"`
+			FlatValues                []uint16            `yaml:"flatValues"`
+			NewsSeenValues            []uint16            `yaml:"newsSeenValues"`
+			MiningStreakValues        []uint16            `yaml:"miningStreakValues"`
 			Duration                  stdlibtime.Duration `yaml:"duration"`
 			UTCOffsetDuration         stdlibtime.Duration `yaml:"utcOffsetDuration" mapstructure:"utcOffsetDuration"`
 			ClaimWindow               stdlibtime.Duration `yaml:"claimWindow"`

@@ -11,9 +11,11 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -26,56 +28,119 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", ebs.UserID)
 	}
 	now := time.Now()
-	bonus, err := r.getAvailableExtraBonus(ctx, now, id)
+	ebs.AvailableExtraBonus, err = r.getAvailableExtraBonus(ctx, now, id)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getAvailableExtraBonus for userID:%v", ebs.UserID)
 	}
-	*ebs = *bonus
 
 	return errors.Wrapf(storage.Set(ctx, r.db, &struct {
-		ExtraBonusStartedAt *time.Time `redis:"extra_bonus_started_at"`
+		ExtraBonusStartedAtField
 		DeserializedUsersKey
-		ExtraBonus uint16 `redis:"extra_bonus"`
-		NewsSeen   uint16 `redis:"news_seen"`
+		ExtraBonusField
+		NewsSeenField
 	}{
-		ExtraBonusStartedAt:  now,
-		DeserializedUsersKey: DeserializedUsersKey{ID: id},
-		ExtraBonus:           bonus.AvailableExtraBonus,
+		ExtraBonusStartedAtField: ExtraBonusStartedAtField{ExtraBonusStartedAt: now},
+		DeserializedUsersKey:     DeserializedUsersKey{ID: id},
+		ExtraBonusField:          ExtraBonusField{ExtraBonus: ebs.AvailableExtraBonus},
 	}), "failed to claim extra bonus:%#v", ebs)
 }
 
 //nolint:funlen,lll // .
-func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time, id int64) (*ExtraBonusSummary, error) {
+func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time, id int64) (uint16, error) {
 	if ctx.Err() != nil {
-		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
+		return 0, errors.Wrap(ctx.Err(), "unexpected deadline")
+	}
+	usr, err := storage.Get[struct {
+		MiningSessionSoloStartedAtField
+		MiningSessionSoloEndedAtField
+		ExtraBonusLastClaimAvailableAtField
+		ExtraBonusStartedAtField
+		ExtraBonusDaysClaimNotAvailableField
+		NewsSeenField
+		UTCOffsetField
+	}](ctx, r.db, SerializedUsersKey(id))
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get extra bonus state before claiming it for id:%v", id)
+	}
+	if len(usr) == 0 {
+		return 0, ErrNotFound
+	}
+	var (
+		extraBonusLastClaimAvailableAt  = usr[0].ExtraBonusLastClaimAvailableAt
+		extraBonusStartedAt             = usr[0].ExtraBonusStartedAt
+		extraBonusDaysClaimNotAvailable = usr[0].ExtraBonusDaysClaimNotAvailable
+	)
+	if extraBonusLastClaimAvailableAt.IsNil() ||
+		extraBonusLastClaimAvailableAt.After(*now.Time) ||
+		extraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow).Before(*now.Time) {
+		return 0, ErrNotFound
+	}
+	if !extraBonusStartedAt.IsNil() &&
+		extraBonusStartedAt.After(*extraBonusLastClaimAvailableAt.Time) &&
+		extraBonusStartedAt.Before(extraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow)) {
+		return 0, ErrDuplicate
+	}
+	extraBonus := r.calculateExtraBonus(usr[0].NewsSeen, extraBonusDaysClaimNotAvailable, usr[0].UTCOffset, now, extraBonusLastClaimAvailableAt, usr[0].MiningSessionSoloStartedAt, usr[0].MiningSessionSoloEndedAt) //nolint:lll // .
+	if extraBonus == 0 {
+		return 0, ErrNotFound
 	}
 
-	return &ExtraBonusSummary{}, nil
+	return extraBonus, nil
 }
 
 func (r *repository) calculateExtraBonus(
-	id int64,
 	newsSeen, extraBonusDaysClaimNotAvailable uint16,
 	utcOffset int16,
-	now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, extraBonusStartedAt, extraBonusLastClaimAvailableAt *time.Time,
-) (extraBonus uint16) {
-	flatBonus, bonusPercentageRemaining := uint16(0), uint16(0)
-	if true {
+	now, extraBonusLastClaimAvailableAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt *time.Time,
+) uint16 {
+	const networkDelayDelta = 1.333
+	var (
+		firstDelayedClaimPenaltyWindow = int64(float64(r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkDelayDelta)
+		newsSeenBonusValues            = r.cfg.ExtraBonuses.NewsSeenValues
+		miningStreakValues             = r.cfg.ExtraBonuses.MiningStreakValues
+		utcOffsetDuration              = stdlibtime.Duration(utcOffset) * r.cfg.ExtraBonuses.UTCOffsetDuration
+		location                       = stdlibtime.FixedZone(utcOffsetDuration.String(), int(utcOffsetDuration.Seconds()))
+		extraBonusIndex                = uint16(extraBonusLastClaimAvailableAt.In(location).Sub(r.extraBonusStartDate.In(location)) / r.cfg.ExtraBonuses.Duration)
+		bonusPercentageRemaining       = 100 + extraBonusDaysClaimNotAvailable
+		miningStreak                   = r.calculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt)
+		flatBonusValue                 = r.cfg.ExtraBonuses.FlatValues[extraBonusIndex]
+	)
+	if flatBonusValue == 0 {
 		return 0
 	}
-	miningStreak := r.calculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt)
-	if miningStreak >= uint64(len(r.cfg.ExtraBonuses.MiningStreakValues)) {
-		extraBonus += uint16(r.cfg.ExtraBonuses.MiningStreakValues[len(r.cfg.ExtraBonuses.MiningStreakValues)-1])
-	} else {
-		extraBonus += uint16(r.cfg.ExtraBonuses.MiningStreakValues[miningStreak])
+	if delay := now.Sub(*extraBonusLastClaimAvailableAt.Time); delay.Nanoseconds() > firstDelayedClaimPenaltyWindow {
+		bonusPercentageRemaining -= 25 * uint16(delay/r.cfg.ExtraBonuses.DelayedClaimPenaltyWindow)
 	}
-	if newsSeenBonusValues := r.cfg.ExtraBonuses.NewsSeenValues; newsSeen >= uint16(len(newsSeenBonusValues)) {
-		extraBonus += uint16(newsSeenBonusValues[len(newsSeenBonusValues)-1])
-	} else {
-		extraBonus += uint16(newsSeenBonusValues[newsSeen])
+	if miningStreak >= uint64(len(miningStreakValues)) {
+		miningStreak = uint64(len(miningStreakValues) - 1)
+	}
+	if newsSeen >= uint16(len(newsSeenBonusValues)) {
+		newsSeen = uint16(len(newsSeenBonusValues) - 1)
 	}
 
-	return ((extraBonus + flatBonus) * bonusPercentageRemaining) / 100
+	return ((flatBonusValue + miningStreakValues[miningStreak] + newsSeenBonusValues[newsSeen]) * bonusPercentageRemaining) / 100
+}
+
+func MustGetExtraBonusStartDate(ctx context.Context, db storage.DB) (extraBonusStartDate *time.Time) {
+	extraBonusStartDateString, err := db.Get(ctx, "extra_bonus_start_date").Result()
+	if err != nil && errors.Is(err, redis.Nil) {
+		err = nil
+	}
+	log.Panic(errors.Wrap(err, "failed to get extra_bonus_start_date"))
+	if extraBonusStartDateString != "" {
+		extraBonusStartDate = new(time.Time)
+		log.Panic(errors.Wrapf(extraBonusStartDate.UnmarshalText([]byte(extraBonusStartDateString)), "failed to parse extra_bonus_start_date `%v`", extraBonusStartDateString)) //nolint:lll // .
+
+		return
+	}
+	extraBonusStartDate = time.New(stdlibtime.Now().Truncate(24 * stdlibtime.Hour))
+	set, sErr := db.SetNX(ctx, "extra_bonus_start_date", extraBonusStartDate, 0).Result()
+	log.Panic(errors.Wrap(sErr, "failed to set extra_bonus_start_date"))
+	if !set {
+		return MustGetExtraBonusStartDate(ctx, db)
+	}
+
+	return extraBonusStartDate
 }
 
 func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebroker.Message) error { //nolint:funlen // .
@@ -103,10 +168,10 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	}
 	val := &struct {
 		DeserializedUsersKey
-		UTCOffset int16 `redis:"utc_offset"`
+		UTCOffsetField
 	}{
 		DeserializedUsersKey: DeserializedUsersKey{ID: id},
-		UTCOffset:            int16(duration / stdlibtime.Minute),
+		UTCOffsetField:       UTCOffsetField{UTCOffset: int16(duration / stdlibtime.Minute)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, val), "failed to update users' timezone for %#v", &dm)

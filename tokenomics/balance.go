@@ -19,25 +19,21 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-type (
-	getBalanceSummary struct {
-		BalanceSolo          float64 `redis:"balance_solo"`
-		BalanceT0            float64 `redis:"balance_t0"`
-		BalanceT1            float64 `redis:"balance_t1"`
-		BalanceT2            float64 `redis:"balance_t2"`
-		PreStakingBonus      uint16  `redis:"pre_staking_bonus"`
-		PreStakingAllocation uint16  `redis:"pre_staking_allocation"`
-	}
-)
-
-func (r *repository) GetBalanceSummary(
+func (r *repository) GetBalanceSummary( //nolint:lll // .
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {
 	id, err := r.getOrInitInternalID(ctx, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	res, err := storage.Get[getBalanceSummary](ctx, r.db, SerializedUsersKey(id))
+	res, err := storage.Get[struct {
+		BalanceSoloField
+		BalanceT0Field
+		BalanceT1Field
+		BalanceT2Field
+		PreStakingBonusField
+		PreStakingAllocationField
+	}](ctx, r.db, SerializedUsersKey(id))
 	if err != nil || len(res) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)

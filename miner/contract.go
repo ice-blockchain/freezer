@@ -47,7 +47,7 @@ type (
 		tokenomics.MiningSessionSoloLastStartedAtField
 		tokenomics.MiningSessionSoloStartedAtField
 		tokenomics.MiningSessionSoloEndedAtField
-		tokenomics.PreviousMiningSessionSoloEndedAtField
+		tokenomics.MiningSessionSoloPreviouslyEndedAtField
 		tokenomics.ExtraBonusStartedAtField
 		tokenomics.UserIDField
 		UpdatedUser
@@ -93,7 +93,7 @@ type (
 	referral struct {
 		tokenomics.MiningSessionSoloStartedAtField
 		tokenomics.MiningSessionSoloEndedAtField
-		tokenomics.PreviousMiningSessionSoloEndedAtField
+		tokenomics.MiningSessionSoloPreviouslyEndedAtField
 		tokenomics.ResurrectSoloUsedAtField
 		tokenomics.DeserializedUsersKey
 	}

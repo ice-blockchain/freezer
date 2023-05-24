@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
@@ -33,7 +32,7 @@ func MustStartNotifyingExtraBonusAvailability(ctx context.Context) {
 		db: storage.MustConnect(context.Background(), applicationYamlKey),
 		mb: messagebroker.MustConnect(context.Background(), applicationYamlKey),
 	}
-	ebs.mustGetExtraBonusStartDate(ctx)
+	ebs.extraBonusStartDate = tokenomics.MustGetExtraBonusStartDate(ctx, ebs.db)
 	ebs.mustGetExtraBonusIndicesDistribution(ctx)
 
 	defer log.Panic(errors.Wrap(ebs.Close(), "failed to stop extraBonusNotifier"))
@@ -55,26 +54,6 @@ func (ebn *extraBonusNotifier) Close() error {
 		errors.Wrap(ebn.db.Close(), "failed to close db"),
 		errors.Wrap(ebn.mb.Close(), "failed to close mb"),
 	).ErrorOrNil()
-}
-
-func (ebn *extraBonusNotifier) mustGetExtraBonusStartDate(ctx context.Context) {
-	extraBonusStartDateString, err := ebn.db.Get(ctx, "extra_bonus_start_date").Result()
-	if err != nil && errors.Is(err, redis.Nil) {
-		err = nil
-	}
-	log.Panic(errors.Wrap(err, "failed to get extra_bonus_start_date"))
-	if extraBonusStartDateString != "" {
-		ebn.extraBonusStartDate = new(time.Time)
-		log.Panic(errors.Wrapf(ebn.extraBonusStartDate.UnmarshalText([]byte(extraBonusStartDateString)), "failed to parse extra_bonus_start_date `%v`", extraBonusStartDateString)) //nolint:lll // .
-
-		return
-	}
-	ebn.extraBonusStartDate = time.New(stdlibtime.Now().Truncate(24 * stdlibtime.Hour))
-	set, sErr := ebn.db.SetNX(ctx, "extra_bonus_start_date", ebn.extraBonusStartDate, 0).Result()
-	log.Panic(errors.Wrap(sErr, "failed to set extra_bonus_start_date"))
-	if !set {
-		ebn.mustGetExtraBonusStartDate(ctx)
-	}
 }
 
 func (ebn *extraBonusNotifier) mustGetExtraBonusIndicesDistribution(ctx context.Context) {

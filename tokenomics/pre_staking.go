@@ -13,8 +13,8 @@ import (
 type (
 	preStaking struct {
 		DeserializedUsersKey
-		PreStakingBonus      uint16 `redis:"pre_staking_bonus"`
-		PreStakingAllocation uint16 `redis:"pre_staking_allocation"`
+		PreStakingBonusField
+		PreStakingAllocationField
 	}
 )
 
@@ -71,9 +71,9 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	st.Bonus = uint64(PreStakingBonusesPerYear[uint8(st.Years)])
 	existing = &preStaking{
-		DeserializedUsersKey: DeserializedUsersKey{ID: id},
-		PreStakingBonus:      uint16(st.Bonus),
-		PreStakingAllocation: uint16(st.Allocation),
+		DeserializedUsersKey:      DeserializedUsersKey{ID: id},
+		PreStakingBonusField:      PreStakingBonusField{PreStakingBonus: uint16(st.Bonus)},
+		PreStakingAllocationField: PreStakingAllocationField{PreStakingAllocation: uint16(st.Allocation)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)
