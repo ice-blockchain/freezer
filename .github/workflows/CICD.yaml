@@ -175,7 +175,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        package: [ "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
     runs-on: ubuntu-latest
     #    runs-on: self-hosted-ubuntu-latest-x64
@@ -226,7 +226,7 @@ jobs:
     name: Benchmark
     strategy:
       matrix:
-        package: [ "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
     runs-on: ubuntu-latest
     #    runs-on: self-hosted-ubuntu-latest-x64

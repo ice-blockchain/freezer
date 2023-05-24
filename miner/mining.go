@@ -11,7 +11,8 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	if usr == nil || usr.MiningSessionSoloStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil() {
 		return nil, nil
 	}
-	updatedUser = &(*usr)
+	clonedUser1 := *usr
+	updatedUser = &clonedUser1
 	resurrect(now, updatedUser, t0Ref, tMinus1Ref)
 	changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) &&
@@ -39,7 +40,8 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceLastUpdatedAt.YearDay() != now.YearDay() ||
 		updatedUser.BalanceLastUpdatedAt.Hour() != now.Hour() ||
 		(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute()) {
-		history = &(*usr)
+		clonedUser2 := *usr
+		history = &clonedUser2
 		history.HistoryPart = historyPart(history.BalanceLastUpdatedAt)
 		updatedUser.BalanceTotalSlashed = 0
 		updatedUser.BalanceTotalMinted = 0

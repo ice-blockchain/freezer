@@ -227,7 +227,7 @@ start-test-environment-%:
 	go run -v local.go --type $*
 
 getAddLicense:
-	GO111MODULE=off go get -v -u github.com/google/addlicense
+	go install github.com/google/addlicense@latest
 
 addLicense: getAddLicense
 	`go env GOPATH`/bin/addlicense -f LICENSE.header * .github/*
@@ -242,8 +242,8 @@ fix-field-alignment:
 format-imports:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/daixiang0/gci@latest
-	gci write -s standard -s default -s "prefix(github.com/ice-blockchain)" ./..
-	goimports -w -local github.com/ice-blockchain ./..
+	gci write -s standard -s default -s "prefix(github.com/ice-blockchain)" .
+	goimports -w -local github.com/ice-blockchain .
 
 print-token-%:
 	go run -v local.go --generateAuth $*

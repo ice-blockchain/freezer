@@ -51,7 +51,7 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 		usr.SlashingRateSolo, usr.SlashingRateT0, usr.SlashingRateT1, usr.SlashingRateT2 = 0, 0, 0, 0
 	}
 
-	if usr.BalanceForT0 > 0 && t0Ref != nil && !t0Ref.MiningSessionSoloEndedAt.IsNil() && t0Ref.MiningSessionSoloEndedAt.After(*now.Time) {
+	if usr.SlashingRateForT0 > 0 && t0Ref != nil && !t0Ref.MiningSessionSoloEndedAt.IsNil() && t0Ref.MiningSessionSoloEndedAt.After(*now.Time) {
 		usr.SlashingRateForT0 = 0
 	}
 

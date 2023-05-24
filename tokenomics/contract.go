@@ -183,7 +183,7 @@ type (
 	}
 )
 
-// DB fields.
+// DB Users Hash fields.
 type (
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
