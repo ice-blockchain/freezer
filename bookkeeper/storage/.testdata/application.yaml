@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: ice License 1.0
+
+development: true
+logger:
+  encoder: console
+  level: debug
+self:
+  bookkeeper/storage:
+    runDDL: true
+    urls:
+      - localhost:9000
+    db: default
+    poolSize: 1
+    credentials:
+      user: default
+      password:
+

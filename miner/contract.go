@@ -5,9 +5,9 @@ package miner
 import (
 	stdlibtime "time"
 
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -27,8 +27,9 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey = "miner"
-	requestDeadline    = 30 * stdlibtime.Second
+	applicationYamlKey       = "miner"
+	parentApplicationYamlKey = "tokenomics"
+	requestDeadline          = 30 * stdlibtime.Second
 )
 
 // .
@@ -36,66 +37,66 @@ var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg struct {
 		tokenomics.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		Development       bool                     `yaml:"development"`
 		Workers           int64                    `yaml:"workers"`
 		BatchSize         int64                    `yaml:"batchSize"`
+		Development       bool                     `yaml:"development"`
 	}
 )
 
 type (
 	user struct {
-		tokenomics.MiningSessionSoloLastStartedAtField
-		tokenomics.MiningSessionSoloStartedAtField
-		tokenomics.MiningSessionSoloEndedAtField
-		tokenomics.MiningSessionSoloPreviouslyEndedAtField
-		tokenomics.ExtraBonusStartedAtField
-		tokenomics.UserIDField
+		model.MiningSessionSoloLastStartedAtField
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.MiningSessionSoloPreviouslyEndedAtField
+		model.ExtraBonusStartedAtField
+		model.UserIDField
 		UpdatedUser
-		tokenomics.BalanceSoloPendingField
-		tokenomics.BalanceT1PendingField
-		tokenomics.BalanceT2PendingField
-		tokenomics.ActiveT1ReferralsField
-		tokenomics.ActiveT2ReferralsField
-		tokenomics.PreStakingBonusField
-		tokenomics.PreStakingAllocationField
-		tokenomics.ExtraBonusField
+		model.BalanceSoloPendingField
+		model.BalanceT1PendingField
+		model.BalanceT2PendingField
+		model.ActiveT1ReferralsField
+		model.ActiveT2ReferralsField
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
+		model.ExtraBonusField
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
-		tokenomics.BalanceLastUpdatedAtField
-		tokenomics.ResurrectSoloUsedAtField
-		tokenomics.ResurrectT0UsedAtField
-		tokenomics.ResurrectTMinus1UsedAtField
-		tokenomics.DeserializedUsersKey
-		tokenomics.IDT0Field
-		tokenomics.IDTMinus1Field
-		tokenomics.BalanceTotalStandardField
-		tokenomics.BalanceTotalPreStakingField
-		tokenomics.BalanceTotalMintedField
-		tokenomics.BalanceTotalSlashedField
-		tokenomics.BalanceSoloPendingAppliedField
-		tokenomics.BalanceT1PendingAppliedField
-		tokenomics.BalanceT2PendingAppliedField
-		tokenomics.BalanceSoloField
-		tokenomics.BalanceT0Field
-		tokenomics.BalanceT1Field
-		tokenomics.BalanceT2Field
-		tokenomics.BalanceForT0Field
-		tokenomics.BalanceForTMinus1Field
-		tokenomics.SlashingRateSoloField
-		tokenomics.SlashingRateT0Field
-		tokenomics.SlashingRateT1Field
-		tokenomics.SlashingRateT2Field
-		tokenomics.SlashingRateForT0Field
-		tokenomics.SlashingRateForTMinus1Field
+		model.BalanceLastUpdatedAtField
+		model.ResurrectSoloUsedAtField
+		model.ResurrectT0UsedAtField
+		model.ResurrectTMinus1UsedAtField
+		model.DeserializedUsersKey
+		model.IDT0Field
+		model.IDTMinus1Field
+		model.BalanceTotalStandardField
+		model.BalanceTotalPreStakingField
+		model.BalanceTotalMintedField
+		model.BalanceTotalSlashedField
+		model.BalanceSoloPendingAppliedField
+		model.BalanceT1PendingAppliedField
+		model.BalanceT2PendingAppliedField
+		model.BalanceSoloField
+		model.BalanceT0Field
+		model.BalanceT1Field
+		model.BalanceT2Field
+		model.BalanceForT0Field
+		model.BalanceForTMinus1Field
+		model.SlashingRateSoloField
+		model.SlashingRateT0Field
+		model.SlashingRateT1Field
+		model.SlashingRateT2Field
+		model.SlashingRateForT0Field
+		model.SlashingRateForTMinus1Field
 	}
 
 	referral struct {
-		tokenomics.MiningSessionSoloStartedAtField
-		tokenomics.MiningSessionSoloEndedAtField
-		tokenomics.MiningSessionSoloPreviouslyEndedAtField
-		tokenomics.ResurrectSoloUsedAtField
-		tokenomics.DeserializedUsersKey
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.MiningSessionSoloPreviouslyEndedAtField
+		model.ResurrectSoloUsedAtField
+		model.DeserializedUsersKey
 	}
 
 	referralThatStoppedMining struct {
@@ -104,7 +105,6 @@ type (
 	}
 
 	miner struct {
-		db storage.DB
 		mb messagebroker.Client
 	}
 )

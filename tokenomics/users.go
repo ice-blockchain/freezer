@@ -4,7 +4,6 @@ package tokenomics
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	stdlibtime "time"
@@ -15,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/eskimo/users"
+	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
@@ -53,9 +53,9 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		return errors.Wrapf(err, "failed to getInternalID for user:%#v", usr)
 	}
 	dbUserBeforeMiningStopped, err := storage.Get[struct {
-		MiningSessionSoloEndedAtField
-		UserIDField
-	}](ctx, s.db, SerializedUsersKey(id))
+		model.MiningSessionSoloEndedAtField
+		model.UserIDField
+	}](ctx, s.db, model.SerializedUsersKey(id))
 	if err != nil || len(dbUserBeforeMiningStopped) == 0 {
 		if err == nil && len(dbUserBeforeMiningStopped) == 0 {
 			err = ErrNotFound
@@ -64,26 +64,26 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		return errors.Wrapf(err, "[1]failed to get current state for user:%#v", usr)
 	}
 	if err = storage.Set(ctx, s.db, &struct {
-		MiningSessionSoloStartedAtField
-		MiningSessionSoloEndedAtField
-		MiningSessionSoloPreviouslyEndedAtField
-		DeserializedUsersKey
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.MiningSessionSoloPreviouslyEndedAtField
+		model.DeserializedUsersKey
 	}{
-		MiningSessionSoloStartedAtField:         MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: new(time.Time)},
-		MiningSessionSoloEndedAtField:           MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: new(time.Time)},
-		MiningSessionSoloPreviouslyEndedAtField: MiningSessionSoloPreviouslyEndedAtField{MiningSessionSoloPreviouslyEndedAt: time.Now()},
-		DeserializedUsersKey:                    DeserializedUsersKey{ID: id},
+		MiningSessionSoloStartedAtField:         model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: new(time.Time)},
+		MiningSessionSoloEndedAtField:           model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: new(time.Time)},
+		MiningSessionSoloPreviouslyEndedAtField: model.MiningSessionSoloPreviouslyEndedAtField{MiningSessionSoloPreviouslyEndedAt: time.Now()},
+		DeserializedUsersKey:                    model.DeserializedUsersKey{ID: id},
 	}); err != nil {
 		return errors.Wrapf(err, "failed to manually stop mining due to user deletion message for user:%#v", usr)
 	}
 	stdlibtime.Sleep(stdlibtime.Second)
 	dbUserAfterMiningStopped, err := storage.Get[struct {
-		UserIDField
-		IDT0Field
-		IDTMinus1Field
-		BalanceForT0Field
-		BalanceForTMinus1Field
-	}](ctx, s.db, SerializedUsersKey(id))
+		model.UserIDField
+		model.IDT0Field
+		model.IDTMinus1Field
+		model.BalanceForT0Field
+		model.BalanceForTMinus1Field
+	}](ctx, s.db, model.SerializedUsersKey(id))
 	if err != nil || len(dbUserAfterMiningStopped) == 0 {
 		if err == nil && len(dbUserAfterMiningStopped) == 0 {
 			err = ErrNotFound
@@ -98,7 +98,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		if dbUserAfterMiningStopped[0].IDTMinus1 < 0 {
 			dbUserAfterMiningStopped[0].IDTMinus1 *= -1
 		}
-		if idT0Key := SerializedUsersKey(dbUserAfterMiningStopped[0].IDT0); idT0Key != "" {
+		if idT0Key := model.SerializedUsersKey(dbUserAfterMiningStopped[0].IDT0); idT0Key != "" {
 			if amount := dbUserAfterMiningStopped[0].BalanceForT0; amount > 0.0 {
 				if err = pipeliner.HIncrByFloat(ctx, idT0Key, "balance_t1_pending", -amount).Err(); err != nil {
 					return err
@@ -111,7 +111,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 				}
 			}
 		}
-		if idTMinus1Key := SerializedUsersKey(dbUserAfterMiningStopped[0].IDTMinus1); idTMinus1Key != "" {
+		if idTMinus1Key := model.SerializedUsersKey(dbUserAfterMiningStopped[0].IDTMinus1); idTMinus1Key != "" {
 			if amount := dbUserAfterMiningStopped[0].BalanceForTMinus1; amount > 0.0 {
 				if err = pipeliner.HIncrByFloat(ctx, idTMinus1Key, "balance_t2_pending", -amount).Err(); err != nil {
 					return err
@@ -133,7 +133,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		if err = pipeliner.ZRem(ctx, "top_miners", id).Err(); err != nil {
 			return err
 		}
-		if err = pipeliner.Del(ctx, SerializedUsersKey(id), SerializedUsersKey(usr.ID)).Err(); err != nil {
+		if err = pipeliner.Del(ctx, model.SerializedUsersKey(id), model.SerializedUsersKey(usr.ID)).Err(); err != nil {
 			return err
 		}
 
@@ -159,17 +159,17 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	}
 	type (
 		user struct {
-			UserIDField
-			ProfilePictureNameField
-			UsernameField
-			MiningBlockchainAccountAddressField
-			BlockchainAccountAddressField
-			DeserializedUsersKey
-			IDT0Field
-			HideRankingField
+			model.UserIDField
+			model.ProfilePictureNameField
+			model.UsernameField
+			model.MiningBlockchainAccountAddressField
+			model.BlockchainAccountAddressField
+			model.DeserializedUsersKey
+			model.IDT0Field
+			model.HideRankingField
 		}
 	)
-	dbUser, err := storage.Get[user](ctx, s.db, SerializedUsersKey(internalID))
+	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
 	if err != nil || len(dbUser) == 0 {
 		if err == nil && len(dbUser) == 0 {
 			err = errors.Errorf("missing state for user:%#v", usr)
@@ -214,14 +214,14 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 	}
 	type (
 		user struct {
-			UserIDField
-			DeserializedUsersKey
-			IDT0ResettableField
-			IDTMinus1ResettableField
+			model.UserIDField
+			model.DeserializedUsersKey
+			model.IDT0ResettableField
+			model.IDTMinus1ResettableField
 		}
 	)
-	newPartialState := &user{DeserializedUsersKey: DeserializedUsersKey{ID: id}}
-	if t0Referral, err2 := storage.Get[user](ctx, s.db, SerializedUsersKey(idT0)); err2 != nil {
+	newPartialState := &user{DeserializedUsersKey: model.DeserializedUsersKey{ID: id}}
+	if t0Referral, err2 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(idT0)); err2 != nil {
 		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", idT0)
 	} else if len(t0Referral) == 1 {
 		newPartialState.IDT0 = -t0Referral[0].ID
@@ -229,7 +229,7 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 			if t0Referral[0].IDT0 < 0 {
 				t0Referral[0].IDT0 *= -1
 			}
-			if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
+			if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
 				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
 			} else if len(tMinus1Referral) == 1 {
 				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
@@ -354,7 +354,7 @@ func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (in
 	}
 	id, err := r.getInternalID(ctx, userID)
 	if err != nil && errors.Is(err, ErrNotFound) {
-		accessibleKeys := append(make([]string, 0, 1+1), "users_serial", SerializedUsersKey(userID))
+		accessibleKeys := append(make([]string, 0, 1+1), "users_serial", model.SerializedUsersKey(userID))
 		id, err = initInternalIDScript.EvalSha(ctx, r.db, accessibleKeys).Int64()
 		if err != nil && redis.HasErrorPrefix(err, "NOSCRIPT") {
 			log.Error(errors.Wrap(initInternalIDScript.Load(ctx, r.db).Err(), "failed to load initInternalIDScript"))
@@ -362,7 +362,7 @@ func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (in
 			return r.getOrInitInternalID(ctx, userID)
 		}
 		if err == nil {
-			accessibleKeys = append(make([]string, 0, 1), SerializedUsersKey(id))
+			accessibleKeys = append(make([]string, 0, 1), model.SerializedUsersKey(id))
 			for ctx.Err() == nil {
 				if err = initUserScript.EvalSha(ctx, r.db, accessibleKeys, userID).Err(); err == nil || errors.Is(err, redis.Nil) || strings.Contains(err.Error(), "race condition") {
 					if err != nil && strings.Contains(err.Error(), "race condition") {
@@ -387,7 +387,7 @@ func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (in
 }
 
 func (r *repository) getInternalID(ctx context.Context, userID string) (int64, error) {
-	idAsString, err := r.db.Get(ctx, SerializedUsersKey(userID)).Result()
+	idAsString, err := r.db.Get(ctx, model.SerializedUsersKey(userID)).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return 0, errors.Wrapf(err, "failed to get internal id for external userID:%v", userID)
 	}
@@ -400,50 +400,4 @@ func (r *repository) getInternalID(ctx context.Context, userID string) (int64, e
 	}
 
 	return id, nil
-}
-
-func (k *DeserializedUsersKey) Key() string {
-	if k == nil || k.ID == 0 {
-		return ""
-	}
-	if k.HistoryPart != "" {
-		return SerializedUsersKey(k.ID) + "~" + k.HistoryPart
-	}
-
-	return SerializedUsersKey(k.ID)
-}
-
-func (k *DeserializedUsersKey) SetKey(val string) {
-	if val == "" || val == "users:" {
-		return
-	}
-	if val[0] == 'u' {
-		val = val[6:]
-	}
-	if historyStart := strings.IndexRune(val, '~'); historyStart > 0 {
-		k.HistoryPart = val[historyStart+1:]
-		val = val[:historyStart]
-	}
-	var err error
-	k.ID, err = strconv.ParseInt(val, 10, 64)
-	log.Panic(err)
-}
-
-func SerializedUsersKey(val any) string {
-	switch typedVal := val.(type) {
-	case string:
-		if typedVal == "" {
-			return ""
-		}
-
-		return "users:" + typedVal
-	case int64:
-		if typedVal == 0 {
-			return ""
-		}
-
-		return "users:" + strconv.FormatInt(typedVal, 10)
-	default:
-		panic(fmt.Sprintf("%#v cannot be used as users key", val))
-	}
 }

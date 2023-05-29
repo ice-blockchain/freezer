@@ -6,6 +6,7 @@ logger:
   level: debug
 extra-bonus-notifier:
   chunks: 1000
+tokenomics:
   extraBonuses:
     duration: 24h
     utcOffsetDuration: 1m

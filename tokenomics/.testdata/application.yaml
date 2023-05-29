@@ -7,6 +7,15 @@ logger:
 tokenomics: &tokenomics
   wintr/connectors/storage/v3:
     url: redis://default:@localhost:6379
+  bookkeeper/storage:
+    runDDL: true
+    urls:
+      - localhost:9000
+    db: default
+    poolSize: 1
+    credentials:
+      user: default
+      password:
   messageBroker: &tokenomicsMessageBroker
     consumerGroup: tokenomics-testing
     createTopics: true

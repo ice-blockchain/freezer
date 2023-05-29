@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
+	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -25,11 +26,15 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
 	db := storage.MustConnect(ctx, applicationYamlKey)
+	dwhClient := dwh.MustConnect(ctx, applicationYamlKey)
 
 	return &repository{
-		cfg:           &cfg,
-		shutdown:      db.Close,
+		cfg: &cfg,
+		shutdown: func() error {
+			return multierror.Append(db.Close(), dwhClient.Close()).ErrorOrNil()
+		},
 		db:            db,
+		dwh:           dwhClient,
 		pictureClient: picture.New(applicationYamlKey),
 	}
 }
@@ -64,6 +69,13 @@ func (r *repository) Close() error {
 	return errors.Wrap(r.shutdown(), "closing repository failed")
 }
 
+func (r *repository) CheckHealth(ctx context.Context) error {
+	return multierror.Append( //nolint:wrapcheck // Not needed.
+		errors.Wrap(r.pingDB(ctx), "db ping failed"),
+		errors.Wrap(r.dwh.Ping(ctx), "dwh ping failed"),
+	).ErrorOrNil()
+}
+
 func closeAll(mbConsumer, mbProducer messagebroker.Client, db storage.DB, otherClosers ...func() error) func() error {
 	return func() error {
 		err1 := errors.Wrap(mbConsumer.Close(), "closing mbConsumer connection failed")
@@ -86,12 +98,8 @@ func (p *processor) Close() error {
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if resp := p.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
-		if resp.Err() == nil {
-			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
-		}
-
-		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
+	if err := p.pingDB(ctx); err != nil {
+		return err
 	}
 	type ts struct {
 		TS *time.Time `json:"ts"`
@@ -110,6 +118,18 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	}, responder)
 
 	return errors.Wrapf(<-responder, "[health-check] failed to send health check message to broker")
+}
+
+func (r *repository) pingDB(ctx context.Context) error {
+	if resp := r.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
+		if resp.Err() == nil {
+			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
+		}
+
+		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
+	}
+
+	return nil
 }
 
 func retry(ctx context.Context, op func() error) error {

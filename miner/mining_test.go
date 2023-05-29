@@ -632,7 +632,7 @@ func Test_MinerNil(t *testing.T) {
 
 	m, h := mine(testMiningBase, testTime, nil, nil, nil)
 	require.Nil(t, m)
-	require.Nil(t, h)
+	require.False(t, h)
 }
 
 func Test_MinerPending(t *testing.T) {
@@ -675,15 +675,11 @@ func Test_MinerWithHistory(t *testing.T) {
 
 	m, h := mine(testMiningBase, testTime, m, nil, nil)
 	require.NotNil(t, m)
-	require.NotNil(t, h)
+	require.True(t, h)
 
 	require.EqualValues(t, float64(testMiningBase)*2, m.BalanceSolo)
 
 	t.Logf("new:     %p", m)
-	t.Logf("history: %p", h)
-
-	// Pointers must be different.
-	require.False(t, m == h)
 }
 
 func Test_MinerNegativeBalance(t *testing.T) {

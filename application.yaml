@@ -27,6 +27,15 @@ cmd/freezer-refrigerant:
     limit: 20
     maxLimit: 1000
 tokenomics: &tokenomics
+  bookkeeper/storage: &bookkeeperStorage
+    runDDL: true
+    urls:
+      - localhost:9000
+    db: default
+    poolSize: 1
+    credentials:
+      user: default
+      password:
   wintr/connectors/storage/v3:
     url: redis://default:@localhost:6379
   messageBroker: &tokenomicsMessageBroker
@@ -144,17 +153,15 @@ tokenomics: &tokenomics
       - 9
       - 20
 miner:
-  <<: *tokenomics
+  bookkeeper/storage: *bookkeeperStorage
   development: true
   workers: 10
   batchSize: 100
 extra-bonus-notifier:
-  <<: *tokenomics
   workers: 10
   batchSize: 100
   chunks: 1000
 balance-synchronizer:
-  <<: *tokenomics
   workers: 10
   batchSize: 100
 tokenomics_test:

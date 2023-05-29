@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/terror"
@@ -20,24 +21,24 @@ import (
 
 type (
 	StartOrExtendMiningSession struct {
-		ResurrectSoloUsedAtField
-		MiningSessionSoloLastStartedAtField
-		MiningSessionSoloStartedAtField
-		MiningSessionSoloEndedAtField
-		MiningSessionSoloDayOffLastAwardedAtField
-		MiningSessionSoloPreviouslyEndedAtField
-		DeserializedUsersKey
+		model.ResurrectSoloUsedAtField
+		model.MiningSessionSoloLastStartedAtField
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.MiningSessionSoloDayOffLastAwardedAtField
+		model.MiningSessionSoloPreviouslyEndedAtField
+		model.DeserializedUsersKey
 	}
 	getCurrentMiningSession struct {
 		StartOrExtendMiningSession
-		SlashingRateSoloField
-		SlashingRateT0Field
-		SlashingRateT1Field
-		SlashingRateT2Field
-		IDT0Field
-		IDTMinus1Field
-		PreStakingAllocationField
-		PreStakingBonusField
+		model.SlashingRateSoloField
+		model.SlashingRateT0Field
+		model.SlashingRateT1Field
+		model.SlashingRateT2Field
+		model.IDT0Field
+		model.IDTMinus1Field
+		model.PreStakingAllocationField
+		model.PreStakingBonusField
 	}
 )
 
@@ -50,7 +51,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	now := time.Now()
-	old, err := storage.Get[getCurrentMiningSession](ctx, r.db, SerializedUsersKey(id))
+	old, err := storage.Get[getCurrentMiningSession](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil || len(old) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -113,14 +114,14 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 	if idTMinus1 < 0 {
 		idTMinus1 *= -1
 	}
-	if oldTminus1Data, err := storage.Get[struct{ UserIDField }](ctx, r.db, SerializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
+	if oldTminus1Data, err := storage.Get[struct{ model.UserIDField }](ctx, r.db, model.SerializedUsersKey(idTMinus1)); err != nil || len(oldTminus1Data) != 0 {
 		return errors.Wrapf(err, "failed to get state for t-1:%v", idTMinus1)
 	}
 	idTMinus1 = 0
 	if idT0 < 0 {
 		idT0 *= -1
 	}
-	if t0Data, err := storage.Get[struct{ IDT0Field }](ctx, r.db, SerializedUsersKey(idT0)); err != nil {
+	if t0Data, err := storage.Get[struct{ model.IDT0Field }](ctx, r.db, model.SerializedUsersKey(idT0)); err != nil {
 		return errors.Wrapf(err, "failed to get state for t0:%v", idT0)
 	} else if len(t0Data) != 0 {
 		idTMinus1 = t0Data[0].IDT0
@@ -130,11 +131,11 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, &struct {
-		DeserializedUsersKey
-		IDTMinus1ResettableField
+		model.DeserializedUsersKey
+		model.IDTMinus1ResettableField
 	}{
-		DeserializedUsersKey:     DeserializedUsersKey{ID: id},
-		IDTMinus1ResettableField: IDTMinus1ResettableField{IDTMinus1: idTMinus1},
+		DeserializedUsersKey:     model.DeserializedUsersKey{ID: id},
+		IDTMinus1ResettableField: model.IDTMinus1ResettableField{IDTMinus1: idTMinus1},
 	}), "failed to replaceIDTMinus1, id:%v, newIDTMinus1:%v", id, idTMinus1)
 }
 
@@ -257,10 +258,10 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}
 	referees, err := storage.Get[struct {
-		DeserializedUsersKey
-		IDT0Field
-		IDTMinus1Field
-	}](ctx, s.db, SerializedUsersKey(id))
+		model.DeserializedUsersKey
+		model.IDT0Field
+		model.IDTMinus1Field
+	}](ctx, s.db, model.SerializedUsersKey(id))
 	if err != nil || len(referees) == 0 || (referees[0].IDT0 == 0 && referees[0].IDTMinus1 == 0) {
 		return errors.Wrapf(err, "failed to get referees for id:%v, userID:%v", id, *ms.UserID)
 	}
@@ -272,16 +273,16 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	}
 	if referees[0].IDT0 == 0 || referees[0].IDTMinus1 == 0 {
 		if referees[0].IDT0 >= 1 {
-			err = s.db.HIncrBy(ctx, SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
+			err = s.db.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
 		}
 		if referees[0].IDTMinus1 >= 1 {
-			err = s.db.HIncrBy(ctx, SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
+			err = s.db.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
 		}
 	} else {
 		responses, txErr := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
 			return multierror.Append( //nolint:wrapcheck // .
-				pipeliner.HIncrBy(ctx, SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err(),
-				pipeliner.HIncrBy(ctx, SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err(),
+				pipeliner.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err(),
+				pipeliner.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err(),
 			).ErrorOrNil()
 		})
 		if txErr == nil {

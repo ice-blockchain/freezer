@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
@@ -19,13 +21,13 @@ import (
 )
 
 func init() {
+	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.Config)
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 }
 
 func MustStartMining(ctx context.Context) {
 	mi := &miner{
-		db: storage.MustConnect(context.Background(), applicationYamlKey),
-		mb: messagebroker.MustConnect(context.Background(), applicationYamlKey),
+		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
 	defer log.Panic(errors.Wrap(mi.Close(), "failed to stop miner"))
 
@@ -43,19 +45,34 @@ func MustStartMining(ctx context.Context) {
 
 func (m *miner) Close() error {
 	return multierror.Append(
-		errors.Wrap(m.db.Close(), "failed to close db"),
 		errors.Wrap(m.mb.Close(), "failed to close mb"),
 	).ErrorOrNil()
 }
 
 func (m *miner) mine(ctx context.Context, workerNumber int64) {
+	db := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error(db.Close())
+			panic(err)
+		}
+		log.Error(db.Close())
+	}()
+	dwhClient := dwh.MustConnect(context.Background(), applicationYamlKey)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error(dwhClient.Close())
+			panic(err)
+		}
+		log.Error(dwhClient.Close())
+	}()
 	var (
 		batchNumber                                                int64
 		now                                                        = time.Now()
 		currentAdoption                                            *tokenomics.Adoption[float64]
 		workers                                                    = cfg.Workers
 		batchSize                                                  = cfg.BatchSize
-		userKeys, referralKeys                                     = make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
+		userKeys, userHistoryKeys, referralKeys                    = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
 		userResults, referralResults                               = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
 		t0Referrals, tMinus1Referrals                              = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
 		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
@@ -64,7 +81,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		msgs                                                       = make([]*messagebroker.Message, 0, batchSize)
 		errs                                                       = make([]error, 0, batchSize)
 		updatedUsers                                               = make([]*UpdatedUser, 0, batchSize)
-		histories                                                  = make([]*user, 0, batchSize)
+		histories                                                  = make([]*model.User, 0, batchSize)
+		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
 	)
 	resetVars := func(success bool) {
 		now = time.Now()
@@ -74,12 +92,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if batchNumber == 0 || currentAdoption == nil {
 			for err := errors.New("init"); ctx.Err() == nil && err != nil; {
 				reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-				currentAdoption, err = tokenomics.GetCurrentAdoption(reqCtx, m.db)
+				currentAdoption, err = tokenomics.GetCurrentAdoption(reqCtx, db)
 				reqCancel()
 				log.Error(errors.Wrapf(err, "[miner] failed to GetCurrentAdoption for workerNumber:%v", workerNumber))
 			}
 		}
-		userKeys, referralKeys = userKeys[:0], referralKeys[:0]
+		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
@@ -104,11 +122,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		******************************************************************************************************************************************************/
 		if len(userKeys) == 0 {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
-				userKeys = append(userKeys, tokenomics.SerializedUsersKey((workers*ix)+workerNumber))
+				userKeys = append(userKeys, model.SerializedUsersKey((workers*ix)+workerNumber))
 			}
 		}
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[user](reqCtx, m.db, userKeys, &userResults); err != nil {
+		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 
@@ -135,14 +153,14 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		for idT0 := range t0Referrals {
-			referralKeys = append(referralKeys, tokenomics.SerializedUsersKey(idT0))
+			referralKeys = append(referralKeys, model.SerializedUsersKey(idT0))
 		}
 		for idTMinus1 := range tMinus1Referrals {
-			referralKeys = append(referralKeys, tokenomics.SerializedUsersKey(idTMinus1))
+			referralKeys = append(referralKeys, model.SerializedUsersKey(idTMinus1))
 		}
 
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[referral](reqCtx, m.db, referralKeys, &referralResults); err != nil {
+		if err := storage.Bind[referral](reqCtx, db, referralKeys, &referralResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get referrees for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)
@@ -177,12 +195,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDTMinus1 < 0 {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
-			updatedUser, history := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
+			updatedUser, shouldGenerateHistory := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if updatedUser != nil {
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			}
-			if history != nil {
-				histories = append(histories, history)
+			if shouldGenerateHistory {
+				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if userStoppedMining := didReferralJustStopMining(now, usr, updatedUser); userStoppedMining != nil {
 				referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
@@ -213,7 +231,35 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		reqCancel()
 
 		/******************************************************************************************************************************************************
-			5. Persisting the mining progress for the users.
+			5. Fetching all relevant fields that will be added to the history/bookkeeping.
+		******************************************************************************************************************************************************/
+
+		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+		if err := storage.Bind[model.User](reqCtx, db, userHistoryKeys, &histories); err != nil {
+			log.Error(errors.Wrapf(err, "[miner] failed to get histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			reqCancel()
+			resetVars(false)
+
+			continue
+		}
+		reqCancel()
+
+		/******************************************************************************************************************************************************
+			6. Inserting history/bookkeeping data.
+		******************************************************************************************************************************************************/
+
+		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+		if err := dwhClient.Insert(reqCtx, historyColumns, historyInsertMetadata, histories); err != nil {
+			log.Error(errors.Wrapf(err, "[miner] failed to insert histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			reqCancel()
+			resetVars(false)
+
+			continue
+		}
+		reqCancel()
+
+		/******************************************************************************************************************************************************
+			7. Persisting the mining progress for the users.
 		******************************************************************************************************************************************************/
 
 		for _, usr := range referralsThatStoppedMining {
@@ -227,29 +273,24 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		var pipeliner redis.Pipeliner
 		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining) > 0 {
-			pipeliner = m.db.TxPipeline()
+			pipeliner = db.TxPipeline()
 		} else {
-			pipeliner = m.db.Pipeline()
+			pipeliner = db.Pipeline()
 		}
 
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if responses, err := pipeliner.Pipelined(reqCtx, func(pipeliner redis.Pipeliner) error {
 			for id, value := range t1ReferralsThatStoppedMining {
-				if err := pipeliner.HIncrBy(reqCtx, tokenomics.SerializedUsersKey(id), "active_t1_referrals", -int64(value)).Err(); err != nil {
+				if err := pipeliner.HIncrBy(reqCtx, model.SerializedUsersKey(id), "active_t1_referrals", -int64(value)).Err(); err != nil {
 					return err
 				}
 			}
 			for id, value := range t2ReferralsThatStoppedMining {
-				if err := pipeliner.HIncrBy(reqCtx, tokenomics.SerializedUsersKey(id), "active_t2_referrals", -int64(value)).Err(); err != nil {
+				if err := pipeliner.HIncrBy(reqCtx, model.SerializedUsersKey(id), "active_t2_referrals", -int64(value)).Err(); err != nil {
 					return err
 				}
 			}
 			for _, value := range updatedUsers {
-				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
-					return err
-				}
-			}
-			for _, value := range histories {
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err
 				}

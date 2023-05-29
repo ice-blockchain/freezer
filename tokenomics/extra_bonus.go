@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
@@ -34,14 +35,14 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, &struct {
-		ExtraBonusStartedAtField
-		DeserializedUsersKey
-		ExtraBonusField
-		NewsSeenField
+		model.ExtraBonusStartedAtField
+		model.DeserializedUsersKey
+		model.ExtraBonusField
+		model.NewsSeenField
 	}{
-		ExtraBonusStartedAtField: ExtraBonusStartedAtField{ExtraBonusStartedAt: now},
-		DeserializedUsersKey:     DeserializedUsersKey{ID: id},
-		ExtraBonusField:          ExtraBonusField{ExtraBonus: ebs.AvailableExtraBonus},
+		ExtraBonusStartedAtField: model.ExtraBonusStartedAtField{ExtraBonusStartedAt: now},
+		DeserializedUsersKey:     model.DeserializedUsersKey{ID: id},
+		ExtraBonusField:          model.ExtraBonusField{ExtraBonus: ebs.AvailableExtraBonus},
 	}), "failed to claim extra bonus:%#v", ebs)
 }
 
@@ -51,14 +52,14 @@ func (r *repository) getAvailableExtraBonus(ctx context.Context, now *time.Time,
 		return 0, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
 	usr, err := storage.Get[struct {
-		MiningSessionSoloStartedAtField
-		MiningSessionSoloEndedAtField
-		ExtraBonusLastClaimAvailableAtField
-		ExtraBonusStartedAtField
-		ExtraBonusDaysClaimNotAvailableField
-		NewsSeenField
-		UTCOffsetField
-	}](ctx, r.db, SerializedUsersKey(id))
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.ExtraBonusLastClaimAvailableAtField
+		model.ExtraBonusStartedAtField
+		model.ExtraBonusDaysClaimNotAvailableField
+		model.NewsSeenField
+		model.UTCOffsetField
+	}](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get extra bonus state before claiming it for id:%v", id)
 	}
@@ -167,11 +168,11 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &dm)
 	}
 	val := &struct {
-		DeserializedUsersKey
-		UTCOffsetField
+		model.DeserializedUsersKey
+		model.UTCOffsetField
 	}{
-		DeserializedUsersKey: DeserializedUsersKey{ID: id},
-		UTCOffsetField:       UTCOffsetField{UTCOffset: int16(duration / stdlibtime.Minute)},
+		DeserializedUsersKey: model.DeserializedUsersKey{ID: id},
+		UTCOffsetField:       model.UTCOffsetField{UTCOffset: int16(duration / stdlibtime.Minute)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, val), "failed to update users' timezone for %#v", &dm)
@@ -211,6 +212,6 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &vn)
 	}
 
-	return errors.Wrapf(s.db.HIncrBy(ctx, SerializedUsersKey(id), "news_seen", 1).Err(),
+	return errors.Wrapf(s.db.HIncrBy(ctx, model.SerializedUsersKey(id), "news_seen", 1).Err(),
 		"failed to increment news_seen for userID:%v,id:%v", vn.UserID, id)
 }

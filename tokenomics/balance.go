@@ -6,13 +6,14 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
+	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
@@ -27,13 +28,13 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	res, err := storage.Get[struct {
-		BalanceSoloField
-		BalanceT0Field
-		BalanceT1Field
-		BalanceT2Field
-		PreStakingBonusField
-		PreStakingAllocationField
-	}](ctx, r.db, SerializedUsersKey(id))
+		model.BalanceSoloField
+		model.BalanceT0Field
+		model.BalanceT1Field
+		model.BalanceT2Field
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
+	}](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil || len(res) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -59,11 +60,12 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 }
 
 func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,cyclop,revive // Better to be grouped together.
-	ctx context.Context, userID string, start, end *time.Time, utcOffset stdlibtime.Duration, limit, offset uint64,
+	ctx context.Context, userID string, start, end *time.Time, _ stdlibtime.Duration, limit, offset uint64,
 ) ([]*BalanceHistoryEntry, error) {
 	if ctx.Err() != nil {
 		return nil, errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
+	start, end = time.New(start.UTC()), time.New(end.UTC())
 	var factor stdlibtime.Duration
 	if start.After(*end.Time) {
 		factor = -1
@@ -75,64 +77,29 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	)
 	mappedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
 	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
-	typeDetails := make([]string, 0, mappedLimit*2) //nolint:gomnd // Cuz we account for tz diff.
-	for ix := stdlibtime.Duration(0); ix < stdlibtime.Duration(cap(typeDetails)); ix++ {
-		date := start.Add((ix + stdlibtime.Duration(mappedOffset-mappedLimit)) * factor * r.cfg.GlobalAggregationInterval.Child)
-		typeDetails = append(typeDetails, fmt.Sprintf("/%v", date.Format(r.cfg.globalAggregationIntervalChildDateFormat())))
+	dates := make([]stdlibtime.Time, 0, mappedLimit)
+	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
+		dates = append(dates, start.Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
 	}
-	if true {
-		return make([]*BalanceHistoryEntry, 0, 0), nil //nolint:gosimple // Nope.
+	id, gErr := r.getOrInitInternalID(ctx, userID)
+	if gErr != nil {
+		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	adoptions, gErr := getAllAdoptions[float64](ctx, r.db)
 	if gErr != nil {
 		return nil, errors.Wrap(gErr, "failed to getAllAdoptions")
 	}
-	location := stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
-	filteredChildrenByParents := make(map[string]map[string]any, 1+1)
-	childDateLayout, parentDateLayout := r.cfg.globalAggregationIntervalChildDateFormat(), r.cfg.globalAggregationIntervalParentDateFormat()
-	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
-		date := start.Add((ix) * factor * r.cfg.GlobalAggregationInterval.Child)
-		if factor == -1 && date.Before(*end.Time) {
-			continue
-		}
-		if factor == 1 && date.After(*end.Time) {
-			continue
-		}
-		date = date.In(location)
-		childDateFormat, parentDateFormat := date.Format(childDateLayout), date.Format(parentDateLayout)
-		if _, found := filteredChildrenByParents[parentDateFormat]; !found {
-			filteredChildrenByParents[parentDateFormat] = make(map[string]any, mappedLimit)
-		}
-		if _, found := filteredChildrenByParents[parentDateFormat][childDateFormat]; !found {
-			filteredChildrenByParents[parentDateFormat][childDateFormat] = struct{}{}
-		}
-	}
-	resp := make([]*BalanceHistoryEntry, 0, 1+1)
-	for _, parent := range r.processBalanceHistory(nil, factor > 0, utcOffset, adoptions) {
-		parentDateFormat := parent.Time.Format(parentDateLayout)
-		if _, found := filteredChildrenByParents[parentDateFormat]; !found {
-			continue
-		}
-		children := make([]*BalanceHistoryEntry, 0, len(parent.TimeSeries))
-		for _, child := range parent.TimeSeries {
-			if _, found := filteredChildrenByParents[parentDateFormat][child.Time.Format(childDateLayout)]; !found {
-				continue
-			}
-			children = append(children, child)
-		}
-		if len(children) != 0 {
-			parent.TimeSeries = children
-			resp = append(resp, parent)
-		}
+	balanceHistory, gErr := r.dwh.SelectBalanceHistory(ctx, id, dates)
+	if gErr != nil {
+		return nil, errors.Wrapf(gErr, "failed to SelectBalanceHistory for id:%v,createdAts:%#v", id, dates)
 	}
 
-	return resp, nil
+	return r.processBalanceHistory(balanceHistory, factor > 0, adoptions), nil
 }
 
 func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
-	res []*balance,
+	res []*dwh.BalanceHistory,
 	startDateIsBeforeEndDate bool,
-	utcOffset stdlibtime.Duration,
 	adoptions []*Adoption[float64],
 ) []*BalanceHistoryEntry {
 	childDateLayout := r.cfg.globalAggregationIntervalChildDateFormat()
@@ -141,47 +108,38 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		*BalanceHistoryEntry
 		children map[string]*BalanceHistoryEntry
 	}, 1+1)
-	location := stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
 	for _, bal := range res {
-		child, err := stdlibtime.Parse(childDateLayout, strings.Replace(bal.TypeDetail, "/", "", 1))
-		log.Panic(err) //nolint:revive // Intended.
-		childFormat, parentFormat := child.Format(childDateLayout), child.Format(parentDateLayout)
+		childFormat, parentFormat := bal.CreatedAt.Format(childDateLayout), bal.CreatedAt.Format(parentDateLayout)
 		if _, found := parents[parentFormat]; !found {
-			parent, pErr := stdlibtime.Parse(parentDateLayout, parentFormat)
+			parent, pErr := stdlibtime.ParseInLocation(parentDateLayout, parentFormat, stdlibtime.UTC)
 			log.Panic(pErr) //nolint:revive // Intended.
 			parents[parentFormat] = &struct {
 				*BalanceHistoryEntry
 				children map[string]*BalanceHistoryEntry
 			}{
 				BalanceHistoryEntry: &BalanceHistoryEntry{
-					Time:    parent.In(location),
-					Balance: &BalanceHistoryBalanceDiff{},
+					Time:    parent,
+					Balance: new(BalanceHistoryBalanceDiff),
 				},
 				children: make(map[string]*BalanceHistoryEntry, int(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)),
 			}
 		}
 		if _, found := parents[parentFormat].children[childFormat]; !found {
 			parents[parentFormat].children[childFormat] = &BalanceHistoryEntry{
-				Time:    child.In(location),
-				Balance: &BalanceHistoryBalanceDiff{},
+				Time:    *bal.CreatedAt.Time,
+				Balance: new(BalanceHistoryBalanceDiff),
 			}
 		}
-		parents[parentFormat].children[childFormat].reduceBalance(bal.Negative, bal.Amount)
+		parents[parentFormat].children[childFormat].reduceBalance(true, bal.BalanceTotalSlashed)
+		parents[parentFormat].children[childFormat].reduceBalance(false, bal.BalanceTotalMinted)
 	}
 	history := make([]*BalanceHistoryEntry, 0, len(parents))
-	childMin30TzAdjustment, childMin45TzAdjustment := getTimezoneAdjustments(r.cfg.GlobalAggregationInterval.Child, utcOffset)
-	parentMin30TzAdjustment, parentMin45TzAdjustment := getTimezoneAdjustments(r.cfg.GlobalAggregationInterval.Parent, utcOffset)
 	for _, parentVal := range parents {
-		parentVal.Time = parentVal.Time.Add(parentMin30TzAdjustment).Add(parentMin45TzAdjustment)
 		parentVal.BalanceHistoryEntry.TimeSeries = make([]*BalanceHistoryEntry, 0, len(parentVal.children))
 		var baseMiningRate float64
 		for _, childVal := range parentVal.children {
-			childVal.Time = childVal.Time.Add(childMin30TzAdjustment).Add(childMin45TzAdjustment)
-			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, utcOffset, adoptions)
+			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, adoptions)
 			parentVal.reduceBalance(childVal.Balance.Negative, childVal.Balance.amount)
-			if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour && childVal.Time.Minute() != 0 {
-				childVal.Time = childVal.Time.Add(-stdlibtime.Duration(childVal.Time.Minute()) * stdlibtime.Minute)
-			}
 			childVal.Balance.Amount = fmt.Sprint(childVal.Balance.amount)
 			parentVal.BalanceHistoryEntry.TimeSeries = append(parentVal.BalanceHistoryEntry.TimeSeries, childVal)
 		}
@@ -207,23 +165,6 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 	return history
 }
 
-func getTimezoneAdjustments(aggregationInterval, utcOffset stdlibtime.Duration) (min30Child, min45Child stdlibtime.Duration) {
-	const halfHourTZFix = 30 * stdlibtime.Minute
-	const min45TZFix = 45 * stdlibtime.Minute
-	const min15TZFix = 15 * stdlibtime.Minute
-	if aggregationInterval >= stdlibtime.Hour && utcOffset.Abs()%stdlibtime.Hour == halfHourTZFix {
-		min30Child = -halfHourTZFix
-	} else if aggregationInterval >= stdlibtime.Hour && utcOffset.Abs()%stdlibtime.Hour == min45TZFix {
-		if utcOffset < 0 {
-			min45Child = -min15TZFix
-		} else {
-			min45Child = -min45TZFix
-		}
-	}
-
-	return
-}
-
 func (e *BalanceHistoryEntry) reduceBalance(negative bool, amount float64) { //nolint:revive // Not an issue here.
 	if negative != e.Balance.Negative {
 		if amount > e.Balance.amount { //nolint:gocritic // Nope.
@@ -240,8 +181,8 @@ func (e *BalanceHistoryEntry) reduceBalance(negative bool, amount float64) { //n
 	}
 }
 
-func (e *BalanceHistoryEntry) calculateBalanceDiffBonus( //nolint:funlen // .
-	delta, utcOffset stdlibtime.Duration, adoptions []*Adoption[float64],
+func (e *BalanceHistoryEntry) calculateBalanceDiffBonus(
+	delta stdlibtime.Duration, adoptions []*Adoption[float64],
 ) (baseMiningRate float64) {
 	endDate := e.Time.Add(delta)
 	calculateProportionalBaseMiningRate := func(currentBaseMiningRate float64, startDate stdlibtime.Time) float64 {
@@ -252,7 +193,7 @@ func (e *BalanceHistoryEntry) calculateBalanceDiffBonus( //nolint:funlen // .
 		if adoptions[ix].AchievedAt == nil {
 			continue
 		}
-		achievedAt := adoptions[ix].AchievedAt.Add(utcOffset)
+		achievedAt := *adoptions[ix].AchievedAt.Time
 		currentBaseMiningRate := adoptions[ix].BaseMiningRate
 		if achievedAt.Before(e.Time.Add(stdlibtime.Nanosecond)) {
 			if baseMiningRate == 0 {
@@ -324,7 +265,7 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 	}
 	prize := adoption.BaseMiningRate * adoptionMultiplicationFactor
 
-	return errors.Wrapf(s.db.HIncrByFloat(ctx, SerializedUsersKey(id), "balance_solo_pending", prize).Err(),
+	return errors.Wrapf(s.db.HIncrByFloat(ctx, model.SerializedUsersKey(id), "balance_solo_pending", prize).Err(),
 		"failed to incr balance_solo_pending for userID:%v by %v", val.UserID, prize)
 }
 

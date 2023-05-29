@@ -5,9 +5,9 @@ package extrabonusnotifier
 import (
 	stdlibtime "time"
 
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -23,8 +23,9 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey = "extra-bonus-notifier"
-	requestDeadline    = 30 * stdlibtime.Second
+	applicationYamlKey       = "extra-bonus-notifier"
+	parentApplicationYamlKey = "tokenomics"
+	requestDeadline          = 30 * stdlibtime.Second
 )
 
 // .
@@ -40,20 +41,19 @@ var (
 
 type (
 	user struct {
-		tokenomics.ExtraBonusStartedAtField
-		tokenomics.UserIDField
+		model.ExtraBonusStartedAtField
+		model.UserIDField
 		UpdatedUser
-		tokenomics.UTCOffsetField
+		model.UTCOffsetField
 	}
 	UpdatedUser struct {
-		tokenomics.ExtraBonusLastClaimAvailableAtField
-		tokenomics.DeserializedUsersKey
-		tokenomics.ExtraBonusDaysClaimNotAvailableField
+		model.ExtraBonusLastClaimAvailableAtField
+		model.DeserializedUsersKey
+		model.ExtraBonusDaysClaimNotAvailableField
 		extraBonusIndex uint16 `redis:"-"`
 	}
 
 	extraBonusNotifier struct {
-		db                            storage.DB
 		mb                            messagebroker.Client
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16

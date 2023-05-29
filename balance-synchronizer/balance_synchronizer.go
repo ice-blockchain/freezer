@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/ice-blockchain/freezer/tokenomics"
+	"github.com/ice-blockchain/freezer/model"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -19,13 +19,13 @@ import (
 )
 
 func init() {
+	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.Config)
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 }
 
 func MustStartSynchronizingBalance(ctx context.Context) {
 	bs := &balanceSynchronizer{
-		db: storage.MustConnect(context.Background(), applicationYamlKey),
-		mb: messagebroker.MustConnect(context.Background(), applicationYamlKey),
+		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
 	defer log.Panic(errors.Wrap(bs.Close(), "failed to stop balanceSynchronizer"))
 
@@ -43,12 +43,19 @@ func MustStartSynchronizingBalance(ctx context.Context) {
 
 func (bs *balanceSynchronizer) Close() error {
 	return multierror.Append(
-		errors.Wrap(bs.db.Close(), "failed to close db"),
 		errors.Wrap(bs.mb.Close(), "failed to close mb"),
 	).ErrorOrNil()
 }
 
 func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int64) {
+	db := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error(db.Close())
+			panic(err)
+		}
+		log.Error(db.Close())
+	}()
 	var (
 		batchNumber        int64
 		iteration          uint64
@@ -79,11 +86,11 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		******************************************************************************************************************************************************/
 		if len(userKeys) == 0 {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
-				userKeys = append(userKeys, tokenomics.SerializedUsersKey((workers*ix)+workerNumber))
+				userKeys = append(userKeys, model.SerializedUsersKey((workers*ix)+workerNumber))
 			}
 		}
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[user](reqCtx, bs.db, userKeys, &userResults); err != nil {
+		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[balanceSynchronizer] failed to get users for batchNumer:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 
@@ -98,7 +105,7 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		for _, usr := range userResults {
 			updatedUsers = append(updatedUsers, redis.Z{
 				Score:  usr.BalanceTotalStandard + usr.BalanceTotalPreStaking,
-				Member: tokenomics.SerializedUsersKey(usr.ID),
+				Member: model.SerializedUsersKey(usr.ID),
 			})
 			if msg := shouldSendBalanceUpdatedMessage(ctx, iteration, usr); msg != nil {
 				msgs = append(msgs, msg)
@@ -133,7 +140,7 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		******************************************************************************************************************************************************/
 
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := bs.db.ZAdd(reqCtx, "top_miners", updatedUsers...).Err(); err != nil {
+		if err := db.ZAdd(reqCtx, "top_miners", updatedUsers...).Err(); err != nil {
 			log.Error(errors.Wrapf(err, "[balanceSynchronizer] failed to ZAdd top_miners for batchNumer:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)

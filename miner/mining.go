@@ -7,9 +7,9 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser, history *user) {
+func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory bool) {
 	if usr == nil || usr.MiningSessionSoloStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil() {
-		return nil, nil
+		return nil, false
 	}
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
@@ -28,10 +28,10 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT1PendingApplied = updatedUser.BalanceT1Pending
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 
-			return updatedUser, nil
+			return updatedUser, false
 		}
 
-		return nil, nil
+		return nil, false
 	}
 
 	if updatedUser.BalanceLastUpdatedAt.IsNil() {
@@ -40,9 +40,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceLastUpdatedAt.YearDay() != now.YearDay() ||
 		updatedUser.BalanceLastUpdatedAt.Hour() != now.Hour() ||
 		(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute()) {
-		clonedUser2 := *usr
-		history = &clonedUser2
-		history.HistoryPart = historyPart(history.BalanceLastUpdatedAt)
+		shouldGenerateHistory = true
 		updatedUser.BalanceTotalSlashed = 0
 		updatedUser.BalanceTotalMinted = 0
 	}
@@ -182,14 +180,5 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
-	return updatedUser, history
-}
-
-func historyPart(date *time.Time) string {
-	const hourFormat, minuteFormat = "2006-01-02T15", "2006-01-02T15:04"
-	if cfg.Development {
-		return date.Format(minuteFormat)
-	} else {
-		return date.Format(hourFormat)
-	}
+	return updatedUser, shouldGenerateHistory
 }

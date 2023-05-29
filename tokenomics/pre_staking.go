@@ -7,14 +7,15 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 )
 
 type (
 	preStaking struct {
-		DeserializedUsersKey
-		PreStakingBonusField
-		PreStakingAllocationField
+		model.DeserializedUsersKey
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
 	}
 )
 
@@ -38,7 +39,7 @@ func (r *repository) getPreStaking(ctx context.Context, userID string) (*preStak
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	usr, err := storage.Get[preStaking](ctx, r.db, SerializedUsersKey(id))
+	usr, err := storage.Get[preStaking](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil || len(usr) == 0 || usr[0].PreStakingAllocation == 0 {
 		if err == nil && (len(usr) == 0 || usr[0].PreStakingAllocation == 0) {
 			err = ErrNotFound
@@ -71,9 +72,9 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	st.Bonus = uint64(PreStakingBonusesPerYear[uint8(st.Years)])
 	existing = &preStaking{
-		DeserializedUsersKey:      DeserializedUsersKey{ID: id},
-		PreStakingBonusField:      PreStakingBonusField{PreStakingBonus: uint16(st.Bonus)},
-		PreStakingAllocationField: PreStakingAllocationField{PreStakingAllocation: uint16(st.Allocation)},
+		DeserializedUsersKey:      model.DeserializedUsersKey{ID: id},
+		PreStakingBonusField:      model.PreStakingBonusField{PreStakingBonus: uint16(st.Bonus)},
+		PreStakingAllocationField: model.PreStakingAllocationField{PreStakingAllocation: uint16(st.Allocation)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)

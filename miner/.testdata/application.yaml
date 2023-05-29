@@ -4,7 +4,7 @@ development: true
 logger:
   encoder: console
   level: debug
-miner:
+tokenomics:
   miningSessionDuration:
     max: 24h
   extraBonuses:

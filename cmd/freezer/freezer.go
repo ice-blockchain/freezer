@@ -53,9 +53,8 @@ func (s *service) Close(ctx context.Context) error {
 
 func (s *service) CheckHealth(ctx context.Context) error {
 	log.Debug("checking health...", "package", "tokenomics")
-	_, err := s.tokenomicsRepository.GetAdoptionSummary(ctx)
 
-	return errors.Wrap(err, "get AdoptionSummary failed")
+	return errors.Wrap(s.tokenomicsRepository.CheckHealth(ctx), "check health failed")
 }
 
 func contextWithHashCode[REQ, RESP any](ctx context.Context, req *server.Request[REQ, RESP]) context.Context {

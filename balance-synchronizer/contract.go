@@ -5,9 +5,9 @@ package balancesynchronizer
 import (
 	stdlibtime "time"
 
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 )
 
 // Public API.
@@ -23,31 +23,31 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey = "balance-synchronizer"
-	requestDeadline    = 30 * stdlibtime.Second
+	applicationYamlKey       = "balance-synchronizer"
+	parentApplicationYamlKey = "tokenomics"
+	requestDeadline          = 30 * stdlibtime.Second
 )
 
 // .
 var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg struct {
-		messagebroker.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		Workers              int64                    `yaml:"workers"`
-		BatchSize            int64                    `yaml:"batchSize"`
+		tokenomics.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
+		Workers           int64                    `yaml:"workers"`
+		BatchSize         int64                    `yaml:"batchSize"`
 	}
 )
 
 type (
 	user struct {
-		tokenomics.UserIDField
-		tokenomics.MiningBlockchainAccountAddressField
-		tokenomics.DeserializedUsersKey
-		tokenomics.BalanceTotalStandardField
-		tokenomics.BalanceTotalPreStakingField
+		model.UserIDField
+		model.MiningBlockchainAccountAddressField
+		model.DeserializedUsersKey
+		model.BalanceTotalStandardField
+		model.BalanceTotalPreStakingField
 	}
 
 	balanceSynchronizer struct {
-		db storage.DB
 		mb messagebroker.Client
 	}
 )

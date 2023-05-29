@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -27,7 +28,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		return nil, errors.Wrapf(err, "failed to get cached global_rank for id:%v", id)
 	}
 	if rank == 0 {
-		if rank, err = r.db.ZRevRank(ctx, "top_miners", SerializedUsersKey(id)).Uint64(); err != nil {
+		if rank, err = r.db.ZRevRank(ctx, "top_miners", model.SerializedUsersKey(id)).Uint64(); err != nil {
 			if errors.Is(err, redis.Nil) {
 				return &RankingSummary{GlobalRank: 0}, nil
 			}
@@ -45,7 +46,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		}
 	}
 	if userID != requestingUserID(ctx) {
-		if usr, gErr := storage.Get[struct{ HideRankingField }](ctx, r.db, SerializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
+		if usr, gErr := storage.Get[struct{ model.HideRankingField }](ctx, r.db, model.SerializedUsersKey(id)); gErr != nil || (len(usr) == 1 && usr[0].HideRanking) {
 			if gErr == nil {
 				gErr = ErrGlobalRankHidden
 			}
@@ -87,14 +88,14 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		}
 	}
 	for ix, id := range ids {
-		ids[ix] = SerializedUsersKey(id)
+		ids[ix] = model.SerializedUsersKey(id)
 	}
 	resp, err := storage.Get[struct {
-		UserIDField
-		UsernameField
-		ProfilePictureNameField
-		BalanceTotalStandardField
-		BalanceTotalPreStakingField
+		model.UserIDField
+		model.UsernameField
+		model.ProfilePictureNameField
+		model.BalanceTotalStandardField
+		model.BalanceTotalPreStakingField
 	}](ctx, r.db, ids...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
@@ -122,27 +123,27 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 	}
 	now := time.Now()
 	ms, err := storage.Get[struct {
-		MiningSessionSoloLastStartedAtField
-		MiningSessionSoloStartedAtField
-		MiningSessionSoloEndedAtField
-		ExtraBonusStartedAtField
-		ExtraBonusLastClaimAvailableAtField
-		BalanceTotalStandardField
-		BalanceTotalPreStakingField
-		SlashingRateSoloField
-		SlashingRateT0Field
-		SlashingRateT1Field
-		SlashingRateT2Field
-		IDT0Field
-		ActiveT1ReferralsField
-		ActiveT2ReferralsField
-		ExtraBonusDaysClaimNotAvailableField
-		ExtraBonusField
-		NewsSeenField
-		PreStakingBonusField
-		PreStakingAllocationField
-		UTCOffsetField
-	}](ctx, r.db, SerializedUsersKey(id))
+		model.MiningSessionSoloLastStartedAtField
+		model.MiningSessionSoloStartedAtField
+		model.MiningSessionSoloEndedAtField
+		model.ExtraBonusStartedAtField
+		model.ExtraBonusLastClaimAvailableAtField
+		model.BalanceTotalStandardField
+		model.BalanceTotalPreStakingField
+		model.SlashingRateSoloField
+		model.SlashingRateT0Field
+		model.SlashingRateT1Field
+		model.SlashingRateT2Field
+		model.IDT0Field
+		model.ActiveT1ReferralsField
+		model.ActiveT2ReferralsField
+		model.ExtraBonusDaysClaimNotAvailableField
+		model.ExtraBonusField
+		model.NewsSeenField
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
+		model.UTCOffsetField
+	}](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil || len(ms) == 0 {
 		if err == nil {
 			err = errors.Wrapf(ErrRelationNotFound, "missing state for id:%v", id)
@@ -182,7 +183,9 @@ func (r *repository) isT0Online(ctx context.Context, idT0 int64, now *time.Time)
 	if idT0 < 0 {
 		idT0 *= -1
 	}
-	t0Ref, err := storage.Get[struct{ MiningSessionSoloEndedAtField }](ctx, r.db, SerializedUsersKey(idT0))
+	t0Ref, err := storage.Get[struct {
+		model.MiningSessionSoloEndedAtField
+	}](ctx, r.db, model.SerializedUsersKey(idT0))
 	if err == nil && len(t0Ref) == 1 && !t0Ref[0].MiningSessionSoloEndedAt.IsNil() && t0Ref[0].MiningSessionSoloEndedAt.After(*now.Time) {
 		return 1, nil
 	}
