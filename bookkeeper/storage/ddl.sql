@@ -164,4 +164,4 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      mining_blockchain_account_address String  DEFAULT '',
      blockchain_account_address String  DEFAULT '',
      user_id String  DEFAULT ''
-) ENGINE = Distributed('{cluster}', '', 'freezer_user_history', toDate(created_at));
+) ENGINE = Distributed('{cluster}', '', 'freezer_user_history', toUInt64(toDate(created_at)));
