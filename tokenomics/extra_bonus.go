@@ -102,15 +102,13 @@ func (r *repository) calculateExtraBonus(
 		miningStreakValues             = r.cfg.ExtraBonuses.MiningStreakValues
 		utcOffsetDuration              = stdlibtime.Duration(utcOffset) * r.cfg.ExtraBonuses.UTCOffsetDuration
 		location                       = stdlibtime.FixedZone(utcOffsetDuration.String(), int(utcOffsetDuration.Seconds()))
-		extraBonusIndex                = uint16(0)
 		bonusPercentageRemaining       = 100 + extraBonusDaysClaimNotAvailable
 		miningStreak                   = r.calculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt)
-		flatBonusValue                 = r.cfg.ExtraBonuses.FlatValues[extraBonusIndex]
+		flatBonusValue                 = uint16(0)
 	)
 	if !extraBonusLastClaimAvailableAt.IsNil() {
-		extraBonusIndex = uint16(extraBonusLastClaimAvailableAt.In(location).Sub(r.extraBonusStartDate.In(location)) / r.cfg.ExtraBonuses.Duration)
-	} else {
-		extraBonusLastClaimAvailableAt = time.New(now.Add(-r.cfg.ExtraBonuses.ClaimWindow))
+		extraBonusIndex := uint16(extraBonusLastClaimAvailableAt.In(location).Sub(r.extraBonusStartDate.In(location)) / r.cfg.ExtraBonuses.Duration)
+		flatBonusValue = r.cfg.ExtraBonuses.FlatValues[extraBonusIndex]
 	}
 	if flatBonusValue == 0 {
 		return 0

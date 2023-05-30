@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
 ) ENGINE=ReplicatedMergeTree('/clickhouse/tables/{cluster}/{shard_dark}/freezer_user_history', '{replica_dark}')
   PARTITION BY toDate(created_at)
   PRIMARY KEY (id, created_at);
-CREATE TABLE freezer_user_history
+CREATE TABLE IF NOT EXISTS freezer_user_history
 (
      mining_session_solo_last_started_at DateTime64(9,'UTC')  DEFAULT 0,
      mining_session_solo_started_at DateTime64(9,'UTC')  DEFAULT 0,
