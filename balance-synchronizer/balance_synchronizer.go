@@ -172,7 +172,7 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 }
 
 func shouldSendBalanceUpdatedMessage(ctx context.Context, iteration uint64, usr *user) *messagebroker.Message {
-	if iteration%(uint64(usr.ID)%10) != 0 {
+	if iteration%10 != 0 {
 		return nil
 	}
 	event := &BalanceUpdated{

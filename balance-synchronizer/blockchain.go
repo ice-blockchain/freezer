@@ -19,7 +19,7 @@ type (
 )
 
 func shouldSynchronizeBlockchainAccount(iteration uint64, usr *user) *blockchainMessage {
-	if usr.MiningBlockchainAccountAddress == "" || iteration%(uint64(usr.ID)%100) != 0 {
+	if usr.MiningBlockchainAccountAddress == "" || iteration%100 != 0 {
 		return nil
 	}
 	var standard, preStaking *coin.ICEFlake
