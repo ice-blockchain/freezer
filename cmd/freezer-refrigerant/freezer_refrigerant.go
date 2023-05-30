@@ -46,6 +46,7 @@ func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
 	s.tokenomicsProcessor = tokenomics.StartProcessor(ctx, cancel)
 	s.wg = new(sync.WaitGroup)
 	s.wg.Add(1 + 1 + 1)
+	ctx, s.stopX = context.WithCancel(ctx)
 	go func() {
 		defer s.wg.Done()
 		miner.MustStartMining(ctx)
@@ -61,6 +62,7 @@ func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
 }
 
 func (s *service) Close(ctx context.Context) error {
+	s.stopX()
 	s.wg.Wait()
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "could not close processor because context ended")

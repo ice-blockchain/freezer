@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ice-blockchain/freezer/tokenomics"
@@ -50,6 +51,7 @@ type (
 	service struct {
 		tokenomicsProcessor tokenomics.Processor
 		wg                  *sync.WaitGroup
+		stopX               context.CancelFunc
 	}
 	config struct {
 		Host    string `yaml:"host"`
