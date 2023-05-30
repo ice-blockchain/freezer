@@ -29,7 +29,7 @@ func MustStartMining(ctx context.Context) {
 	mi := &miner{
 		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
-	defer log.Panic(errors.Wrap(mi.Close(), "failed to stop miner"))
+	defer func() { log.Panic(errors.Wrap(mi.Close(), "failed to stop miner")) }()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(int(cfg.Workers))
@@ -86,7 +86,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 	)
 	resetVars := func(success bool) {
 		now = time.Now()
-		if success && len(userKeys) < int(batchSize) {
+		if success && len(userResults) < int(batchSize) {
 			batchNumber = 0
 		}
 		if batchNumber == 0 || currentAdoption == nil {
@@ -116,6 +116,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			delete(t2ReferralsThatStoppedMining, k)
 		}
 	}
+	resetVars(true)
 	for ctx.Err() == nil {
 		/******************************************************************************************************************************************************
 			1. Fetching a new batch of users.
@@ -218,7 +219,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		for _, message := range msgs {
 			m.mb.SendMessage(reqCtx, message, msgResponder)
 		}
-		for len(errs) < cap(errs) || len(msgResponder) > 0 {
+		for (len(msgs) > 0 && len(errs) < len(msgs)) || len(msgResponder) > 0 {
 			errs = append(errs, <-msgResponder)
 		}
 		if err := multierror.Append(reqCtx.Err(), errs...).ErrorOrNil(); err != nil {

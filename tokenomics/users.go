@@ -126,11 +126,11 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		}
 		toRemove, _ := s.usernameKeywords(usr.Username, "")
 		for _, usernameKeyword := range toRemove {
-			if err = pipeliner.SRem(ctx, "lookup:"+usernameKeyword, id).Err(); err != nil {
+			if err = pipeliner.SRem(ctx, "lookup:"+usernameKeyword, model.SerializedUsersKey(id)).Err(); err != nil {
 				return err
 			}
 		}
-		if err = pipeliner.ZRem(ctx, "top_miners", id).Err(); err != nil {
+		if err = pipeliner.ZRem(ctx, "top_miners", model.SerializedUsersKey(id)).Err(); err != nil {
 			return err
 		}
 		if err = pipeliner.Del(ctx, model.SerializedUsersKey(id), model.SerializedUsersKey(usr.ID)).Err(); err != nil {
@@ -209,7 +209,7 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 	idT0, err := s.getOrInitInternalID(ctx, referredBy)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for referredBy:%v", referredBy)
-	} else if oldIDT0 == idT0 {
+	} else if (oldIDT0 == idT0) || (oldIDT0*-1 == idT0) {
 		return nil
 	}
 	type (
@@ -252,12 +252,12 @@ func (s *usersTableSource) updateUsernameKeywords(
 	}
 	results, err := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
 		for _, keyword := range toAdd {
-			if cmdErr := pipeliner.SAdd(ctx, "lookup:"+keyword, id).Err(); cmdErr != nil {
+			if cmdErr := pipeliner.SAdd(ctx, "lookup:"+keyword, model.SerializedUsersKey(id)).Err(); cmdErr != nil {
 				return cmdErr
 			}
 		}
 		for _, keyword := range toRemove {
-			if cmdErr := pipeliner.SRem(ctx, "lookup:"+keyword, id).Err(); cmdErr != nil {
+			if cmdErr := pipeliner.SRem(ctx, "lookup:"+keyword, model.SerializedUsersKey(id)).Err(); cmdErr != nil {
 				return cmdErr
 			}
 		}
@@ -340,7 +340,7 @@ local hlen_reply = redis.call('HLEN', KEYS[1])
 if hlen_reply ~= 0 then
 	return redis.error_reply('race condition')
 end
-redis.call('HSETNX', KEYS[1], 'balance_total', 10.0)
+redis.call('HSETNX', KEYS[1], 'balance_total_standard', 10.0)
 redis.call('HSETNX', KEYS[1], 'balance_total_minted', 10.0)
 redis.call('HSETNX', KEYS[1], 'balance_solo', 10.0)
 redis.call('HSETNX', KEYS[1], 'user_id', ARGV[1])

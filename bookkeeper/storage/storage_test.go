@@ -4,6 +4,7 @@ package storage
 
 import (
 	"context"
+	"sort"
 	"testing"
 	stdlibtime "time"
 
@@ -105,6 +106,7 @@ func TestStorage(t *testing.T) {
 
 	h1, err := cl.SelectBalanceHistory(context.Background(), id1, []stdlibtime.Time{t1, t2})
 	require.NoError(t, err)
+	sort.SliceStable(h1, func(ii, jj int) bool { return h1[ii].CreatedAt.Before(*h1[jj].CreatedAt.Time) })
 	assert.EqualValues(t, []*BalanceHistory{{
 		CreatedAt:           time.New(t1),
 		BalanceTotalMinted:  3,
@@ -116,6 +118,7 @@ func TestStorage(t *testing.T) {
 	}}, h1)
 	h2, err := cl.SelectBalanceHistory(context.Background(), id2, []stdlibtime.Time{t1, t2})
 	require.NoError(t, err)
+	sort.SliceStable(h2, func(ii, jj int) bool { return h2[ii].CreatedAt.Before(*h2[jj].CreatedAt.Time) })
 	assert.EqualValues(t, []*BalanceHistory{{
 		CreatedAt:           time.New(t1),
 		BalanceTotalMinted:  33,

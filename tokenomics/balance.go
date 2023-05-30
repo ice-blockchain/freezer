@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	stdlibtime "time"
 
@@ -130,8 +131,10 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 				Balance: new(BalanceHistoryBalanceDiff),
 			}
 		}
-		parents[parentFormat].children[childFormat].reduceBalance(true, bal.BalanceTotalSlashed)
-		parents[parentFormat].children[childFormat].reduceBalance(false, bal.BalanceTotalMinted)
+		total := bal.BalanceTotalMinted - bal.BalanceTotalSlashed
+		parents[parentFormat].children[childFormat].Balance.amount = total
+		parents[parentFormat].children[childFormat].Balance.Negative = total < 0
+		parents[parentFormat].children[childFormat].Balance.Amount = fmt.Sprint(math.Abs(total))
 	}
 	history := make([]*BalanceHistoryEntry, 0, len(parents))
 	for _, parentVal := range parents {
@@ -139,12 +142,12 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		var baseMiningRate float64
 		for _, childVal := range parentVal.children {
 			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, adoptions)
-			parentVal.reduceBalance(childVal.Balance.Negative, childVal.Balance.amount)
-			childVal.Balance.Amount = fmt.Sprint(childVal.Balance.amount)
+			parentVal.Balance.amount += childVal.Balance.amount
 			parentVal.BalanceHistoryEntry.TimeSeries = append(parentVal.BalanceHistoryEntry.TimeSeries, childVal)
 		}
 		parentVal.setBalanceDiffBonus(baseMiningRate / (float64(len(parentVal.children))))
-		parentVal.Balance.Amount = fmt.Sprint(parentVal.Balance.amount)
+		parentVal.Balance.Negative = parentVal.Balance.amount < 0
+		parentVal.Balance.Amount = fmt.Sprint(math.Abs(parentVal.Balance.amount))
 		sort.SliceStable(parentVal.BalanceHistoryEntry.TimeSeries, func(i, j int) bool {
 			if startDateIsBeforeEndDate {
 				return parentVal.BalanceHistoryEntry.TimeSeries[i].Time.Before(parentVal.BalanceHistoryEntry.TimeSeries[j].Time)
@@ -163,22 +166,6 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 	})
 
 	return history
-}
-
-func (e *BalanceHistoryEntry) reduceBalance(negative bool, amount float64) { //nolint:revive // Not an issue here.
-	if negative != e.Balance.Negative {
-		if amount > e.Balance.amount { //nolint:gocritic // Nope.
-			e.Balance.Negative = negative
-			e.Balance.amount -= e.Balance.amount
-		} else if amount < e.Balance.amount {
-			e.Balance.amount -= amount
-		} else {
-			e.Balance.Negative = false
-			e.Balance.amount = 0.0
-		}
-	} else {
-		e.Balance.amount += amount
-	}
 }
 
 func (e *BalanceHistoryEntry) calculateBalanceDiffBonus(

@@ -55,6 +55,7 @@ func MustConnect(ctx context.Context, applicationYAMLKey string) Client {
 				ReadTimeout:      30 * stdlibtime.Second,
 				DialTimeout:      30 * stdlibtime.Second,
 				HandshakeTimeout: 30 * stdlibtime.Second,
+				Settings:         cl.settings,
 			},
 			MaxConnLifetime:   24 * stdlibtime.Hour,
 			MaxConnIdleTime:   30 * stdlibtime.Second,

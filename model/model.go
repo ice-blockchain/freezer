@@ -97,7 +97,7 @@ type (
 		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
 	}
 	UserIDField struct {
-		UserID string `redis:"user_id"`
+		UserID string `redis:"user_id,omitempty"`
 	}
 	ProfilePictureNameField struct {
 		ProfilePictureName string `redis:"profile_picture_name,omitempty"`

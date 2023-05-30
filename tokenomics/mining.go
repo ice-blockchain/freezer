@@ -87,9 +87,6 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 			return nil, errors.Wrapf(err, "failed to SScan for miners for keyword:%v,offset:%v,limit:%v", key, offset, limit)
 		}
 	}
-	for ix, id := range ids {
-		ids[ix] = model.SerializedUsersKey(id)
-	}
 	resp, err := storage.Get[struct {
 		model.UserIDField
 		model.UsernameField

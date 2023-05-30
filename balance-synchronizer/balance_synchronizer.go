@@ -27,7 +27,7 @@ func MustStartSynchronizingBalance(ctx context.Context) {
 	bs := &balanceSynchronizer{
 		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
-	defer log.Panic(errors.Wrap(bs.Close(), "failed to stop balanceSynchronizer"))
+	defer func() { log.Panic(errors.Wrap(bs.Close(), "failed to stop balanceSynchronizer")) }()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(int(cfg.Workers))
@@ -70,7 +70,7 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		blockchainMessages = make([]*blockchainMessage, 0, batchSize)
 	)
 	resetVars := func(success bool) {
-		if success && len(userKeys) < int(batchSize) {
+		if success && len(userResults) < int(batchSize) {
 			batchNumber = 0
 			iteration++
 		}
@@ -123,7 +123,7 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		for _, message := range msgs {
 			bs.mb.SendMessage(reqCtx, message, msgResponder)
 		}
-		for len(errs) < cap(errs) || len(msgResponder) > 0 {
+		for (len(msgs) > 0 && len(errs) < len(msgs)) || len(msgResponder) > 0 {
 			errs = append(errs, <-msgResponder)
 		}
 		if err := multierror.Append(reqCtx.Err(), errs...).ErrorOrNil(); err != nil {
@@ -139,15 +139,17 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 			4. Updating user scores in `top_miners` sorted set.
 		******************************************************************************************************************************************************/
 
-		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := db.ZAdd(reqCtx, "top_miners", updatedUsers...).Err(); err != nil {
-			log.Error(errors.Wrapf(err, "[balanceSynchronizer] failed to ZAdd top_miners for batchNumer:%v,workerNumber:%v", batchNumber, workerNumber))
-			reqCancel()
-			resetVars(false)
+		if len(updatedUsers) > 0 {
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			if err := db.ZAdd(reqCtx, "top_miners", updatedUsers...).Err(); err != nil {
+				log.Error(errors.Wrapf(err, "[balanceSynchronizer] failed to ZAdd top_miners for batchNumer:%v,workerNumber:%v", batchNumber, workerNumber))
+				reqCancel()
+				resetVars(false)
 
-			continue
+				continue
+			}
+			reqCancel()
 		}
-		reqCancel()
 
 		/******************************************************************************************************************************************************
 			5. Updating balances in the blockchain for that batch of users.

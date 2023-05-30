@@ -38,7 +38,7 @@ func MustStartNotifyingExtraBonusAvailability(ctx context.Context) {
 	ebs.mustGetExtraBonusIndicesDistribution(ctx, tmpDb)
 	log.Panic(tmpDb.Close())
 
-	defer log.Panic(errors.Wrap(ebs.Close(), "failed to stop extraBonusNotifier"))
+	defer func() { log.Panic(errors.Wrap(ebs.Close(), "failed to stop extraBonusNotifier")) }()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(int(cfg.Workers))
@@ -130,7 +130,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 	)
 	resetVars := func(success bool) {
 		now = time.Now()
-		if success && len(userKeys) < int(batchSize) {
+		if success && len(userResults) < int(batchSize) {
 			batchNumber = 0
 		}
 		userKeys = userKeys[:0]
@@ -176,7 +176,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		for _, message := range msgs {
 			ebn.mb.SendMessage(reqCtx, message, msgResponder)
 		}
-		for len(errs) < cap(errs) || len(msgResponder) > 0 {
+		for (len(msgs) > 0 && len(errs) < len(msgs)) || len(msgResponder) > 0 {
 			errs = append(errs, <-msgResponder)
 		}
 		if err := multierror.Append(reqCtx.Err(), errs...).ErrorOrNil(); err != nil {

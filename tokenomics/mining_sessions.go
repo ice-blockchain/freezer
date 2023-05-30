@@ -75,7 +75,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	newMS, extension := r.newStartOrExtendMiningSession(&old[0].StartOrExtendMiningSession, now)
 	newMS.ID = id
 	if shouldRollback != nil && *shouldRollback && old[0].ResurrectSoloUsedAt.IsNil() {
-		newMS.ResurrectSoloUsedAt = time.New(stdlibtime.Date(3000, 0, 0, 0, 0, 0, 0, nil)) //nolint:gomnd // .
+		newMS.ResurrectSoloUsedAt = time.New(stdlibtime.Date(3000, 0, 0, 0, 0, 0, 0, stdlibtime.UTC)) //nolint:gomnd // .
 	}
 	sess := &MiningSession{
 		LastNaturalMiningStartedAt: newMS.MiningSessionSoloLastStartedAt,

@@ -26,7 +26,7 @@ func init() {
 
 func MustStartBookkeeping(ctx context.Context) {
 	bk := &bookkeeper{}
-	defer log.Panic(errors.Wrap(bk.Close(), "failed to stop bookkeeper"))
+	defer func() { log.Panic(errors.Wrap(bk.Close(), "failed to stop bookkeeper")) }()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(int(cfg.Workers))
