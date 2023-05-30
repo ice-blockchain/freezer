@@ -31,6 +31,7 @@ type (
 	}
 	getCurrentMiningSession struct {
 		StartOrExtendMiningSession
+		model.UserIDField
 		model.SlashingRateSoloField
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
