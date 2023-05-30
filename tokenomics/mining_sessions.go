@@ -259,6 +259,7 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}
 	referees, err := storage.Get[struct {
+		model.UserIDField
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field

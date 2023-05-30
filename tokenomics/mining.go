@@ -125,6 +125,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		model.MiningSessionSoloEndedAtField
 		model.ExtraBonusStartedAtField
 		model.ExtraBonusLastClaimAvailableAtField
+		model.UserIDField
 		model.BalanceTotalStandardField
 		model.BalanceTotalPreStakingField
 		model.SlashingRateSoloField

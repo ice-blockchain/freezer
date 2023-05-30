@@ -29,6 +29,7 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
 	res, err := storage.Get[struct {
+		model.UserIDField
 		model.BalanceSoloField
 		model.BalanceT0Field
 		model.BalanceT1Field
