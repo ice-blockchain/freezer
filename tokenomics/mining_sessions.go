@@ -179,7 +179,7 @@ func (r *repository) newStartOrExtendMiningSession(old *StartOrExtendMiningSessi
 	resp.MiningSessionSoloPreviouslyEndedAt, resp.MiningSessionSoloStartedAt = nil, nil
 	var durationSinceLastFreeMiningSessionAwarded stdlibtime.Duration
 	if resp.MiningSessionSoloDayOffLastAwardedAt.IsNil() {
-		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloStartedAt.Time)
+		durationSinceLastFreeMiningSessionAwarded = now.Sub(*old.MiningSessionSoloStartedAt.Time)
 	} else {
 		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloDayOffLastAwardedAt.Time)
 	}
