@@ -227,7 +227,7 @@ func (s *miningSessionsTableSource) Process(ctx context.Context, msg *messagebro
 		return errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
 	ms := new(MiningSession)
-	if err := json.UnmarshalContext(ctx, msg.Value, ms); err != nil || ms.UserID == nil {
+	if err := json.UnmarshalContext(ctx, msg.Value, ms); err != nil || ms.UserID == nil || ms.StartedAt.IsNil() {
 		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), ms)
 	}
 
