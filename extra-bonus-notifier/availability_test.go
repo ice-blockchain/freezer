@@ -15,8 +15,8 @@ var (
 	testTime = time.New(stdlibtime.Date(2023, 1, 2, 3, 4, 5, 6, stdlibtime.UTC))
 )
 
-func newUser() *user {
-	u := new(user)
+func newUser() *User {
+	u := new(User)
 	u.UserID = "test_user_id"
 	u.ID = 111_111
 
@@ -50,13 +50,13 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.False(t, b)
-		require.EqualValues(t, 7, m.extraBonusIndex)
+		require.False(t, c)
+		require.EqualValues(t, 7, m.ExtraBonusIndex)
 	})
 
 	t.Run("Time is after 8pm and there is a bonus for that day", func(t *testing.T) {
@@ -64,13 +64,13 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.False(t, b)
-		require.EqualValues(t, 7, m.extraBonusIndex)
+		require.False(t, c)
+		require.EqualValues(t, 7, m.ExtraBonusIndex)
 	})
 
 	t.Run("Time is after 10am but before user's interval, and there is a bonus for that day", func(t *testing.T) {
@@ -78,13 +78,13 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.False(t, b)
-		require.EqualValues(t, 7, m.extraBonusIndex)
+		require.False(t, c)
+		require.EqualValues(t, 7, m.ExtraBonusIndex)
 	})
 
 	t.Run("Time is after 10am and after user's interval, and there is a bonus for that day", func(t *testing.T) {
@@ -92,14 +92,14 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.True(t, b)
+		require.True(t, c)
 
-		require.EqualValues(t, 8, m.extraBonusIndex)
+		require.EqualValues(t, 8, m.ExtraBonusIndex)
 		require.EqualValues(t, now, m.ExtraBonusLastClaimAvailableAt)
 	})
 	t.Run("Time is after 10am and after user's interval, but there's no bonus that day", func(t *testing.T) {
@@ -107,13 +107,13 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: false})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.False(t, b)
-		require.EqualValues(t, 7, m.extraBonusIndex)
+		require.False(t, c)
+		require.EqualValues(t, 7, m.ExtraBonusIndex)
 	})
 
 	t.Run("Time is after 10am and after user's interval, after user missed bonus for 2 days, and there is a bonus for that day, and there was bonus for day 8 and day 9", func(t *testing.T) {
@@ -122,14 +122,14 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: true, 9: true, 10: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.True(t, b)
+		require.True(t, c)
 
-		require.EqualValues(t, 10, m.extraBonusIndex)
+		require.EqualValues(t, 10, m.ExtraBonusIndex)
 		require.EqualValues(t, now, m.ExtraBonusLastClaimAvailableAt)
 	})
 
@@ -139,13 +139,13 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: false, 9: true, 10: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.True(t, b)
-		require.EqualValues(t, 10, m.extraBonusIndex)
+		require.True(t, c)
+		require.EqualValues(t, 10, m.ExtraBonusIndex)
 		require.EqualValues(t, now, m.ExtraBonusLastClaimAvailableAt)
 	})
 
@@ -155,14 +155,30 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: false, 9: true, 10: true})
 
 		m := newUser()
-		m.ExtraBonusStartedAt = ExtraBonusStartedAt
-		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 96))
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
-		m.extraBonusIndex = 7.
 
-		b := isExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
 		require.True(t, b)
-		require.EqualValues(t, 10, m.extraBonusIndex)
+		require.True(t, c)
+		require.EqualValues(t, 10, m.ExtraBonusIndex)
 		require.EqualValues(t, now, m.ExtraBonusLastClaimAvailableAt)
 	})
+
+	t.Run("available false, claimable true", func(t *testing.T) {
+		ts := testTime.Add(stdlibtime.Hour * 24 * 2)
+		now := time.New(stdlibtime.Date(ts.Year(), ts.Month(), ts.Day(), 8, 00, 00, 00, ts.Location()))
+		d := generateExtraBonusIndicesDistributionFromMap(1000, map[uint16]bool{8: false, 9: true, 10: true})
+
+		m := newUser()
+		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Second))
+		m.UTCOffset = 180
+
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, d, m)
+		require.False(t, b)
+		require.True(t, c)
+		require.EqualValues(t, 10, m.ExtraBonusIndex)
+		require.EqualValues(t, time.New(now.Add(-stdlibtime.Second)), m.ExtraBonusLastClaimAvailableAt)
+	})
+
 }

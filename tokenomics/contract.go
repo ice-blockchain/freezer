@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
@@ -217,13 +218,14 @@ type (
 	}
 
 	repository struct {
-		cfg                 *Config
-		extraBonusStartDate *time.Time
-		shutdown            func() error
-		db                  storage.DB
-		dwh                 dwh.Client
-		mb                  messagebroker.Client
-		pictureClient       picture.Client
+		cfg                           *Config
+		extraBonusStartDate           *time.Time
+		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
+		shutdown                      func() error
+		db                            storage.DB
+		dwh                           dwh.Client
+		mb                            messagebroker.Client
+		pictureClient                 picture.Client
 	}
 
 	processor struct {
@@ -231,7 +233,6 @@ type (
 	}
 
 	Config struct {
-		messagebroker.Config    `mapstructure:",squash"` //nolint:tagliatelle // Nope.
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
 				Users          uint64  `yaml:"users"`
@@ -240,18 +241,9 @@ type (
 			ConsecutiveDurationsRequired uint64              `yaml:"consecutiveDurationsRequired"`
 			Duration                     stdlibtime.Duration `yaml:"duration"`
 		} `yaml:"adoptionMilestoneSwitch"`
-		ExtraBonuses struct {
-			FlatValues                []uint16            `yaml:"flatValues"`
-			NewsSeenValues            []uint16            `yaml:"newsSeenValues"`
-			MiningStreakValues        []uint16            `yaml:"miningStreakValues"`
-			Duration                  stdlibtime.Duration `yaml:"duration"`
-			UTCOffsetDuration         stdlibtime.Duration `yaml:"utcOffsetDuration" mapstructure:"utcOffsetDuration"`
-			ClaimWindow               stdlibtime.Duration `yaml:"claimWindow"`
-			DelayedClaimPenaltyWindow stdlibtime.Duration `yaml:"delayedClaimPenaltyWindow"`
-			AvailabilityWindow        stdlibtime.Duration `yaml:"availabilityWindow"`
-			TimeToAvailabilityWindow  stdlibtime.Duration `yaml:"timeToAvailabilityWindow"`
-		} `yaml:"extraBonuses"`
-		RollbackNegativeMining struct {
+		messagebroker.Config                `mapstructure:",squash"`
+		extrabonusnotifier.ExtraBonusConfig `mapstructure:",squash"`
+		RollbackNegativeMining              struct {
 			Available struct {
 				After stdlibtime.Duration `yaml:"after"`
 				Until stdlibtime.Duration `yaml:"until"`

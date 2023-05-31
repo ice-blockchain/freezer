@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
@@ -16,7 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/freezer/model"
-	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -25,7 +25,8 @@ import (
 )
 
 func init() {
-	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.Config)
+	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.messagebrokerConfig)
+	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.ExtraBonusConfig)
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 }
 
@@ -34,8 +35,8 @@ func MustStartNotifyingExtraBonusAvailability(ctx context.Context) {
 		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
 	tmpDb := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
-	ebs.extraBonusStartDate = tokenomics.MustGetExtraBonusStartDate(ctx, tmpDb)
-	ebs.mustGetExtraBonusIndicesDistribution(ctx, tmpDb)
+	ebs.extraBonusStartDate = MustGetExtraBonusStartDate(ctx, tmpDb)
+	ebs.extraBonusIndicesDistribution = MustGetExtraBonusIndicesDistribution(ctx, tmpDb)
 	log.Panic(tmpDb.Close())
 
 	defer func() { log.Panic(errors.Wrap(ebs.Close(), "failed to stop extraBonusNotifier")) }()
@@ -52,15 +53,31 @@ func MustStartNotifyingExtraBonusAvailability(ctx context.Context) {
 	}
 }
 
-func (ebn *extraBonusNotifier) Close() error {
-	return multierror.Append(
-		errors.Wrap(ebn.mb.Close(), "failed to close mb"),
-	).ErrorOrNil()
+func MustGetExtraBonusStartDate(ctx context.Context, db storage.DB) (extraBonusStartDate *time.Time) {
+	extraBonusStartDateString, err := db.Get(ctx, "extra_bonus_start_date").Result()
+	if err != nil && errors.Is(err, redis.Nil) {
+		err = nil
+	}
+	log.Panic(errors.Wrap(err, "failed to get extra_bonus_start_date"))
+	if extraBonusStartDateString != "" {
+		extraBonusStartDate = new(time.Time)
+		log.Panic(errors.Wrapf(extraBonusStartDate.UnmarshalText([]byte(extraBonusStartDateString)), "failed to parse extra_bonus_start_date `%v`", extraBonusStartDateString)) //nolint:lll // .
+
+		return
+	}
+	extraBonusStartDate = time.New(stdlibtime.Now().Truncate(24 * stdlibtime.Hour))
+	set, sErr := db.SetNX(ctx, "extra_bonus_start_date", extraBonusStartDate, 0).Result()
+	log.Panic(errors.Wrap(sErr, "failed to set extra_bonus_start_date"))
+	if !set {
+		return MustGetExtraBonusStartDate(ctx, db)
+	}
+
+	return extraBonusStartDate
 }
 
-func (ebn *extraBonusNotifier) mustGetExtraBonusIndicesDistribution(ctx context.Context, db storage.DB) {
+func MustGetExtraBonusIndicesDistribution(ctx context.Context, db storage.DB) map[uint16]map[uint16]uint16 {
 	totalChunkNumber, totalExtraBonusDays := cfg.Chunks, uint16(len(cfg.ExtraBonuses.FlatValues))
-	ebn.extraBonusIndicesDistribution = make(map[uint16]map[uint16]uint16, totalChunkNumber)
+	extraBonusIndicesDistribution := make(map[uint16]map[uint16]uint16, totalChunkNumber)
 	flatResult, err := db.Get(ctx, "extra_bonus_distribution").Result()
 	if err != nil && errors.Is(err, redis.Nil) {
 		err = nil
@@ -75,13 +92,13 @@ func (ebn *extraBonusNotifier) mustGetExtraBonusIndicesDistribution(ctx context.
 			log.Panic(cErr)
 			k, cErr := strconv.Atoi(parts[2])
 			log.Panic(cErr)
-			if _, found := ebn.extraBonusIndicesDistribution[uint16(i)]; !found {
-				ebn.extraBonusIndicesDistribution[uint16(i)] = make(map[uint16]uint16, totalExtraBonusDays)
+			if _, found := extraBonusIndicesDistribution[uint16(i)]; !found {
+				extraBonusIndicesDistribution[uint16(i)] = make(map[uint16]uint16, totalExtraBonusDays)
 			}
-			ebn.extraBonusIndicesDistribution[uint16(i)][uint16(j)] = uint16(k)
+			extraBonusIndicesDistribution[uint16(i)][uint16(j)] = uint16(k)
 		}
 
-		return
+		return extraBonusIndicesDistribution
 	}
 	value := make([]string, 0, totalChunkNumber)
 	for j := uint16(1); j <= totalExtraBonusDays; j++ {
@@ -93,18 +110,26 @@ func (ebn *extraBonusNotifier) mustGetExtraBonusIndicesDistribution(ctx context.
 			offsets[i], offsets[jj] = offsets[jj], offsets[i]
 		})
 		for i := uint16(0); i < totalChunkNumber; i++ {
-			if _, found := ebn.extraBonusIndicesDistribution[i]; !found {
-				ebn.extraBonusIndicesDistribution[i] = make(map[uint16]uint16, totalExtraBonusDays)
+			if _, found := extraBonusIndicesDistribution[i]; !found {
+				extraBonusIndicesDistribution[i] = make(map[uint16]uint16, totalExtraBonusDays)
 			}
-			ebn.extraBonusIndicesDistribution[i][j] = offsets[i]
+			extraBonusIndicesDistribution[i][j] = offsets[i]
 			value = append(value, fmt.Sprintf("%v:%v:%v", i, j, offsets[i]))
 		}
 	}
 	set, err := db.SetNX(ctx, "extra_bonus_distribution", strings.Join(value, ","), 0).Result()
 	log.Panic(errors.Wrap(err, "failed to set extra_bonus_distribution"))
 	if !set {
-		ebn.mustGetExtraBonusIndicesDistribution(ctx, db)
+		return MustGetExtraBonusIndicesDistribution(ctx, db)
 	}
+
+	return extraBonusIndicesDistribution
+}
+
+func (ebn *extraBonusNotifier) Close() error {
+	return multierror.Append(
+		errors.Wrap(ebn.mb.Close(), "failed to close mb"),
+	).ErrorOrNil()
 }
 
 func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Context, workerNumber int64) {
@@ -122,7 +147,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		workers      = cfg.Workers
 		batchSize    = cfg.BatchSize
 		userKeys     = make([]string, 0, batchSize)
-		userResults  = make([]*user, 0, batchSize)
+		userResults  = make([]*User, 0, batchSize)
 		msgResponder = make(chan error, batchSize)
 		msgs         = make([]*messagebroker.Message, 0, batchSize)
 		errs         = make([]error, 0, batchSize)
@@ -148,7 +173,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 			}
 		}
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
+		if err := storage.Bind[User](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[extraBonusNotifier] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 
@@ -161,8 +186,8 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
-			if isExtraBonusAvailable(now, ebn.extraBonusStartDate, ebn.extraBonusIndicesDistribution, usr) {
-				eba := &ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: usr.extraBonusIndex}
+			if isAvailable, _ := IsExtraBonusAvailable(now, ebn.extraBonusStartDate, ebn.extraBonusIndicesDistribution, usr); isAvailable {
+				eba := &ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: usr.ExtraBonusIndex}
 				updatedUsers = append(updatedUsers, &usr.UpdatedUser)
 				msgs = append(msgs, extraBonusAvailableMessage(ctx, eba))
 			}

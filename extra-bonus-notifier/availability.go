@@ -8,11 +8,11 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func isExtraBonusAvailable(
+func IsExtraBonusAvailable(
 	currentTime, extraBonusStartDate *time.Time,
 	extraBonusIndicesDistribution map[uint16]map[uint16]uint16,
-	usr *user,
-) bool {
+	usr *User,
+) (available, claimable bool) {
 	const notifyHourStart, notifyHourEnd = 10, 20
 	var (
 		utcOffset                       = stdlibtime.Duration(usr.UTCOffset) * cfg.ExtraBonuses.UTCOffsetDuration
@@ -25,22 +25,25 @@ func isExtraBonusAvailable(
 	)
 
 	if !usr.ExtraBonusLastClaimAvailableAt.IsNil() {
-		usr.extraBonusIndex = 1 + uint16(usr.ExtraBonusLastClaimAvailableAt.In(location).Sub(extraBonusStartDateWithLocation)/cfg.ExtraBonuses.Duration)
+		usr.ExtraBonusIndex = 1 + uint16(usr.ExtraBonusLastClaimAvailableAt.In(location).Sub(extraBonusStartDateWithLocation)/cfg.ExtraBonuses.Duration)
 	}
 
 	if !dayHasExtraBonus ||
-		usr.extraBonusIndex >= currentExtraBonusIndex ||
+		usr.ExtraBonusIndex >= currentExtraBonusIndex ||
 		now.Hour() < notifyHourStart || now.Hour() > notifyHourEnd ||
 		(!usr.ExtraBonusStartedAt.IsNil() && currentTime.Before(usr.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
 		(!usr.ExtraBonusLastClaimAvailableAt.IsNil() && currentTime.Before(usr.ExtraBonusLastClaimAvailableAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
 		now.Before(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourStart, 0, 0, 0, location).
 			Add(stdlibtime.Duration(chunkNumber)*(cfg.ExtraBonuses.AvailabilityWindow-cfg.ExtraBonuses.ClaimWindow)/stdlibtime.Duration(len(extraBonusIndicesDistribution)))) || //nolint:lll // .
 		now.After(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourEnd, 0, 0, 0, location)) {
-		return false
+		return false, dayHasExtraBonus &&
+			(usr.ExtraBonusIndex == currentExtraBonusIndex) &&
+			(now.Hour() >= notifyHourStart && now.Hour() <= notifyHourEnd) &&
+			(usr.ExtraBonusLastClaimAvailableAt.Before(*currentTime.Time) && usr.ExtraBonusLastClaimAvailableAt.Add(cfg.ExtraBonuses.ClaimWindow).After(*currentTime.Time))
 	}
 	usr.ExtraBonusLastClaimAvailableAt = currentTime
-	usr.ExtraBonusDaysClaimNotAvailable = currentExtraBonusIndex - usr.extraBonusIndex - 1
-	usr.extraBonusIndex = currentExtraBonusIndex
+	usr.ExtraBonusDaysClaimNotAvailable = currentExtraBonusIndex - usr.ExtraBonusIndex - 1
+	usr.ExtraBonusIndex = currentExtraBonusIndex
 
-	return true
+	return true, true
 }

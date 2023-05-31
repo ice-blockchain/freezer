@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -30,7 +31,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 
 	return &repository{
 		cfg:                 &cfg,
-		extraBonusStartDate: MustGetExtraBonusStartDate(ctx, db),
+		extraBonusStartDate: extrabonusnotifier.MustGetExtraBonusStartDate(ctx, db),
 		shutdown: func() error {
 			return multierror.Append(db.Close(), dwhClient.Close()).ErrorOrNil()
 		},
@@ -61,7 +62,8 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 
 	prc.mustInitAdoptions(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
-	prc.extraBonusStartDate = MustGetExtraBonusStartDate(ctx, prc.db)
+	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
+	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
 
 	return prc
 }

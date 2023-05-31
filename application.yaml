@@ -155,14 +155,15 @@ tokenomics: &tokenomics
 miner:
   bookkeeper/storage: *bookkeeperStorage
   development: true
-  workers: 10
+  workers: 1
   batchSize: 100
 extra-bonus-notifier:
-  workers: 10
+  workers: 1
+  miningSessionDuration: 1m
   batchSize: 100
   chunks: 1000
 balance-synchronizer:
-  workers: 10
+  workers: 1
   batchSize: 100
 tokenomics_test:
   <<: *tokenomics
