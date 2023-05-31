@@ -30,8 +30,9 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 	dwhClient := dwh.MustConnect(ctx, applicationYamlKey)
 
 	return &repository{
-		cfg:                 &cfg,
-		extraBonusStartDate: extrabonusnotifier.MustGetExtraBonusStartDate(ctx, db),
+		cfg:                           &cfg,
+		extraBonusStartDate:           extrabonusnotifier.MustGetExtraBonusStartDate(ctx, db),
+		extraBonusIndicesDistribution: extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, db),
 		shutdown: func() error {
 			return multierror.Append(db.Close(), dwhClient.Close()).ErrorOrNil()
 		},
