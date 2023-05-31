@@ -78,13 +78,20 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if shouldRollback != nil && *shouldRollback && old[0].ResurrectSoloUsedAt.IsNil() {
 		newMS.ResurrectSoloUsedAt = time.New(stdlibtime.Date(3000, 0, 0, 0, 0, 0, 0, stdlibtime.UTC)) //nolint:gomnd // .
 	}
+	startedAt, previouslyEndedAt := newMS.MiningSessionSoloStartedAt, newMS.MiningSessionSoloPreviouslyEndedAt
+	if startedAt.IsNil() {
+		startedAt = old[0].MiningSessionSoloStartedAt
+	}
+	if previouslyEndedAt.IsNil() {
+		previouslyEndedAt = old[0].MiningSessionSoloEndedAt
+	}
 	sess := &MiningSession{
 		LastNaturalMiningStartedAt: newMS.MiningSessionSoloLastStartedAt,
-		StartedAt:                  newMS.MiningSessionSoloStartedAt,
+		StartedAt:                  startedAt,
 		EndedAt:                    newMS.MiningSessionSoloEndedAt,
-		PreviouslyEndedAt:          newMS.MiningSessionSoloPreviouslyEndedAt,
+		PreviouslyEndedAt:          previouslyEndedAt,
 		Extension:                  extension,
-		MiningStreak:               r.calculateMiningStreak(now, newMS.MiningSessionSoloStartedAt, newMS.MiningSessionSoloEndedAt),
+		MiningStreak:               r.calculateMiningStreak(now, startedAt, newMS.MiningSessionSoloEndedAt),
 		UserID:                     &userID,
 	}
 	if err = r.sendMiningSessionMessage(ctx, sess); err != nil {
