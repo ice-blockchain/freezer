@@ -65,12 +65,11 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 	if usr.MiningSessionSoloEndedAt.After(*now.Time) {
 		usr.SlashingRateSolo, usr.SlashingRateT0, usr.SlashingRateT1, usr.SlashingRateT2 = 0, 0, 0, 0
 	}
-
-	if usr.SlashingRateForT0 > 0 && t0Ref != nil && !t0Ref.MiningSessionSoloEndedAt.IsNil() && t0Ref.MiningSessionSoloEndedAt.After(*now.Time) {
+	if usr.SlashingRateForT0 > 0 && (t0Ref == nil || t0Ref.MiningSessionSoloEndedAt.IsNil() || t0Ref.MiningSessionSoloEndedAt.After(*now.Time)) {
 		usr.SlashingRateForT0 = 0
 	}
 
-	if usr.SlashingRateForTMinus1 > 0 && tMinus1Ref != nil && !tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) { //nolint:lll // .
+	if usr.SlashingRateForTMinus1 > 0 && (tMinus1Ref == nil || tMinus1Ref.MiningSessionSoloEndedAt.IsNil() || tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time)) { //nolint:lll // .
 		usr.SlashingRateForTMinus1 = 0
 	}
 }

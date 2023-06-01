@@ -62,10 +62,11 @@ func MustGetExtraBonusStartDate(ctx context.Context, db storage.DB) (extraBonusS
 	if extraBonusStartDateString != "" {
 		extraBonusStartDate = new(time.Time)
 		log.Panic(errors.Wrapf(extraBonusStartDate.UnmarshalText([]byte(extraBonusStartDateString)), "failed to parse extra_bonus_start_date `%v`", extraBonusStartDateString)) //nolint:lll // .
+		extraBonusStartDate = time.New(extraBonusStartDate.UTC())
 
 		return
 	}
-	extraBonusStartDate = time.New(stdlibtime.Now().Truncate(24 * stdlibtime.Hour))
+	extraBonusStartDate = time.New(time.Now().Truncate(24 * stdlibtime.Hour))
 	set, sErr := db.SetNX(ctx, "extra_bonus_start_date", extraBonusStartDate, 0).Result()
 	log.Panic(errors.Wrap(sErr, "failed to set extra_bonus_start_date"))
 	if !set {

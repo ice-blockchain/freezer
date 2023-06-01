@@ -188,10 +188,10 @@ func (r *repository) newStartOrExtendMiningSession(old *StartOrExtendMiningSessi
 	}
 	resp.MiningSessionSoloPreviouslyEndedAt, resp.MiningSessionSoloStartedAt = nil, nil
 	var durationSinceLastFreeMiningSessionAwarded stdlibtime.Duration
-	if resp.MiningSessionSoloDayOffLastAwardedAt.IsNil() {
+	if old.MiningSessionSoloDayOffLastAwardedAt.IsNil() {
 		durationSinceLastFreeMiningSessionAwarded = now.Sub(*old.MiningSessionSoloStartedAt.Time)
 	} else {
-		durationSinceLastFreeMiningSessionAwarded = now.Sub(*resp.MiningSessionSoloDayOffLastAwardedAt.Time)
+		durationSinceLastFreeMiningSessionAwarded = now.Sub(*old.MiningSessionSoloDayOffLastAwardedAt.Time)
 	}
 	freeMiningSession := uint64(0)
 	minimumDurationForAwardingFreeMiningSession := stdlibtime.Duration(r.cfg.ConsecutiveNaturalMiningSessionsRequiredFor1ExtraFreeArtificialMiningSession.Max) * r.cfg.MiningSessionDuration.Max //nolint:lll // .

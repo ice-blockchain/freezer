@@ -677,7 +677,7 @@ func Test_MinerWithHistory(t *testing.T) {
 	require.NotNil(t, m)
 	require.True(t, h)
 
-	require.EqualValues(t, float64(testMiningBase)*2, m.BalanceSolo)
+	require.EqualValues(t, float64(testMiningBase), m.BalanceSolo)
 
 	t.Logf("new:     %p", m)
 }

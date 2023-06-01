@@ -15,18 +15,12 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser = &clonedUser1
 	resurrect(now, updatedUser, t0Ref, tMinus1Ref)
 	changeT0AndTMinus1Referrals(updatedUser)
-	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) &&
-		updatedUser.BalanceSolo == 0 &&
-		updatedUser.BalanceT0 == 0 &&
-		updatedUser.BalanceT1 == 0 &&
-		updatedUser.BalanceT2 == 0 &&
-		updatedUser.BalanceSoloPending-updatedUser.BalanceSoloPendingApplied == 0 &&
-		updatedUser.BalanceForT0 == 0 &&
-		updatedUser.BalanceForTMinus1 == 0 {
+	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
 			updatedUser.BalanceT2Pending-updatedUser.BalanceT2PendingApplied != 0 {
 			updatedUser.BalanceT1PendingApplied = updatedUser.BalanceT1Pending
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
+			updatedUser.BalanceLastUpdatedAt = now
 
 			return updatedUser, false
 		}
@@ -36,13 +30,18 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 
 	if updatedUser.BalanceLastUpdatedAt.IsNil() {
 		updatedUser.BalanceLastUpdatedAt = updatedUser.MiningSessionSoloStartedAt
-	} else if updatedUser.BalanceLastUpdatedAt.Year() != now.Year() ||
-		updatedUser.BalanceLastUpdatedAt.YearDay() != now.YearDay() ||
-		updatedUser.BalanceLastUpdatedAt.Hour() != now.Hour() ||
-		(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute()) {
-		shouldGenerateHistory = true
-		updatedUser.BalanceTotalSlashed = 0
-		updatedUser.BalanceTotalMinted = 0
+	} else {
+		if updatedUser.BalanceLastUpdatedAt.Year() != now.Year() ||
+			updatedUser.BalanceLastUpdatedAt.YearDay() != now.YearDay() ||
+			updatedUser.BalanceLastUpdatedAt.Hour() != now.Hour() ||
+			(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute()) {
+			shouldGenerateHistory = true
+			updatedUser.BalanceTotalSlashed = 0
+			updatedUser.BalanceTotalMinted = 0
+		}
+		if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) && updatedUser.isAbsoluteZero() {
+			updatedUser.BalanceLastUpdatedAt = updatedUser.MiningSessionSoloStartedAt
+		}
 	}
 
 	var (
@@ -191,4 +190,14 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceLastUpdatedAt = now
 
 	return updatedUser, shouldGenerateHistory
+}
+
+func (u *user) isAbsoluteZero() bool {
+	return u.BalanceSolo == 0 &&
+		u.BalanceT0 == 0 &&
+		u.BalanceT1 == 0 &&
+		u.BalanceT2 == 0 &&
+		u.BalanceSoloPending-u.BalanceSoloPendingApplied == 0 &&
+		u.BalanceForT0 == 0 &&
+		u.BalanceForTMinus1 == 0
 }
