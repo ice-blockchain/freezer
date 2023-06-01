@@ -158,7 +158,10 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 			now.Sub(*miningSessionSoloEndedAt.Time) > r.cfg.RollbackNegativeMining.Available.Until) {
 		return nil, nil //nolint:nilnil // Nope.
 	}
-	amountLost := (slashingRateSolo + slashingRateT0 + slashingRateT1 + slashingRateT2) * now.Sub(*miningSessionSoloEndedAt.Time).Seconds()
+	rateUnit := r.cfg.GlobalAggregationInterval.Child
+	slashingDuration := now.Sub(*miningSessionSoloEndedAt.Time)
+	delta := float64(slashingDuration/rateUnit) + float64(slashingDuration%rateUnit)/float64(rateUnit)
+	amountLost := (slashingRateSolo + slashingRateT0 + slashingRateT1 + slashingRateT2) * delta
 	amountLost = ((amountLost * float64(100-preStakingAllocation)) / 100) + ((amountLost * float64(preStakingAllocation*(preStakingBonus+100))) / (100 * 100))
 	if amountLost == 0.0 {
 		return nil, nil //nolint:nilnil // Nope.
@@ -166,7 +169,7 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 	if rollbackNegativeMiningProgress == nil {
 		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
 			"amount":                fmt.Sprint(amountLost),
-			"duringTheLastXSeconds": uint64(now.Sub(*miningSessionSoloEndedAt.Time).Seconds()),
+			"duringTheLastXSeconds": uint64(slashingDuration.Seconds()),
 		})
 	}
 
