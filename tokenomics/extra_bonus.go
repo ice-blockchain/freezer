@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/ice-blockchain/wintr/log"
 	"strings"
 	stdlibtime "time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
