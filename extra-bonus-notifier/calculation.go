@@ -19,7 +19,7 @@ func CalculateExtraBonus(
 		flatBonusValue                 = cfg.ExtraBonuses.FlatValues[extraBonusIndex]
 		firstDelayedClaimPenaltyWindow = int64(float64(cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkDelayDelta)
 	)
-	if flatBonusValue == 0 {
+	if flatBonusValue == 0 || extraBonusLastClaimAvailableAt.IsNil() {
 		return 0
 	}
 	if delay := now.Sub(*extraBonusLastClaimAvailableAt.Time); delay.Nanoseconds() > firstDelayedClaimPenaltyWindow {

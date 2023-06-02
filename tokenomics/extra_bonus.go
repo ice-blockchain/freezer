@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"github.com/ice-blockchain/wintr/log"
 	"strings"
 	stdlibtime "time"
 
@@ -105,6 +106,10 @@ func (r *repository) getAvailableExtraBonus(
 		now.Before(ebUsr.ExtraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow)) {
 		return nil, ErrDuplicate
 	}
+	log.Info(fmt.Sprintf("getAvailableExtraBonus:before:%#v,newsSeen:%v", ebUsr, newsSeenField.NewsSeen))
+	defer func() {
+		log.Info(fmt.Sprintf("getAvailableExtraBonus:after:%#v,extraBonus:%v", ebUsr, calculateExtraBonus()))
+	}()
 	if bonusAvailable, bonusClaimable := extrabonusnotifier.IsExtraBonusAvailable(now, r.extraBonusStartDate, r.extraBonusIndicesDistribution, ebUsr); bonusAvailable {
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
