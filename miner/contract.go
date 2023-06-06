@@ -108,6 +108,8 @@ type (
 	}
 
 	miner struct {
-		mb messagebroker.Client
+		mb                            messagebroker.Client
+		extraBonusStartDate           *time.Time
+		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 	}
 )
