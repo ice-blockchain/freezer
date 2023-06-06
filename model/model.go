@@ -210,8 +210,11 @@ type (
 	NewsSeenField struct {
 		NewsSeen uint16 `redis:"news_seen"`
 	}
-	ExtraBonusDaysClaimNotAvailableField struct {
+	ExtraBonusDaysClaimNotAvailableResettableField struct {
 		ExtraBonusDaysClaimNotAvailable uint16 `redis:"extra_bonus_days_claim_not_available"`
+	}
+	ExtraBonusDaysClaimNotAvailableField struct {
+		ExtraBonusDaysClaimNotAvailable uint16 `redis:"extra_bonus_days_claim_not_available,omitempty"`
 	}
 	UTCOffsetField struct {
 		UTCOffset int16 `redis:"utc_offset"`

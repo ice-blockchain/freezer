@@ -103,11 +103,10 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
-			updatedUsers = append(updatedUsers, redis.Z{
-				Score:  usr.BalanceTotalStandard + usr.BalanceTotalPreStaking,
-				Member: model.SerializedUsersKey(usr.ID),
-			})
-			if msg := shouldSendBalanceUpdatedMessage(ctx, iteration, usr); msg != nil {
+			if updatedGlobalRank := ShouldUpdateGlobalRank(0, usr.ID, usr.BalanceTotalStandard+usr.BalanceTotalPreStaking); updatedGlobalRank != nil {
+				updatedUsers = append(updatedUsers, *updatedGlobalRank)
+			}
+			if msg := ShouldSendBalanceUpdatedMessage(ctx, iteration, usr.UserID, usr.BalanceTotalStandard, usr.BalanceTotalPreStaking); msg != nil {
 				msgs = append(msgs, msg)
 			}
 			if msg := shouldSynchronizeBlockchainAccount(iteration, usr); msg != nil {
@@ -171,14 +170,27 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 
 }
 
-func shouldSendBalanceUpdatedMessage(ctx context.Context, iteration uint64, usr *user) *messagebroker.Message {
-	if iteration%10 != 0 {
+func ShouldUpdateGlobalRank(iteration uint64, id int64, totalBalance float64) *redis.Z {
+	if iteration%100 != 0 {
+		return nil
+	}
+
+	return &redis.Z{
+		Score:  totalBalance,
+		Member: model.SerializedUsersKey(id),
+	}
+}
+
+func ShouldSendBalanceUpdatedMessage(
+	ctx context.Context, iteration uint64, userID string, totalStandardBalance, totalPreStakingBalance float64,
+) *messagebroker.Message {
+	if iteration%100 != 0 {
 		return nil
 	}
 	event := &BalanceUpdated{
-		UserID:     usr.UserID,
-		Standard:   usr.BalanceTotalStandard,
-		PreStaking: usr.BalanceTotalPreStaking,
+		UserID:     userID,
+		Standard:   totalStandardBalance,
+		PreStaking: totalPreStakingBalance,
 	}
 	valueBytes, err := json.MarshalContext(ctx, event)
 	log.Panic(errors.Wrapf(err, "failed to marshal %#v", event))

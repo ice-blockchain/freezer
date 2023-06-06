@@ -187,10 +187,11 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
-			if isAvailable, _ := IsExtraBonusAvailable(now, ebn.extraBonusStartDate, ebn.extraBonusIndicesDistribution, usr); isAvailable {
-				eba := &ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: usr.ExtraBonusIndex}
+			var extraBonusIndex uint16
+			if isAvailable, _ := IsExtraBonusAvailable(now, ebn.extraBonusStartDate, usr.ExtraBonusStartedAt, ebn.extraBonusIndicesDistribution, usr.ID, usr.UTCOffset, &extraBonusIndex, &usr.ExtraBonusDaysClaimNotAvailable, &usr.ExtraBonusLastClaimAvailableAt); isAvailable {
+				eba := &ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: extraBonusIndex}
 				updatedUsers = append(updatedUsers, &usr.UpdatedUser)
-				msgs = append(msgs, extraBonusAvailableMessage(ctx, eba))
+				msgs = append(msgs, ExtraBonusAvailableMessage(ctx, eba))
 			}
 		}
 
@@ -233,7 +234,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 	}
 }
 
-func extraBonusAvailableMessage(ctx context.Context, event *ExtraBonusAvailable) *messagebroker.Message {
+func ExtraBonusAvailableMessage(ctx context.Context, event *ExtraBonusAvailable) *messagebroker.Message {
 	valueBytes, err := json.MarshalContext(ctx, event)
 	log.Panic(errors.Wrapf(err, "failed to marshal %#v", event))
 

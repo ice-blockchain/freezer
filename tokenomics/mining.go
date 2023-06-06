@@ -135,7 +135,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		model.IDT0Field
 		model.ActiveT1ReferralsField
 		model.ActiveT2ReferralsField
-		model.ExtraBonusDaysClaimNotAvailableField
+		model.ExtraBonusDaysClaimNotAvailableResettableField
 		model.ExtraBonusField
 		model.NewsSeenField
 		model.PreStakingBonusField
@@ -163,7 +163,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 	}
 	negativeMiningRate := ms[0].SlashingRateSolo + ms[0].SlashingRateT0 + ms[0].SlashingRateT1 + ms[0].SlashingRateT2
 	var availableExtraBonusVal uint16
-	if avb, gErr := r.getAvailableExtraBonus(now, id, ms[0].ExtraBonusStartedAtField, ms[0].ExtraBonusLastClaimAvailableAtField, ms[0].MiningSessionSoloStartedAtField, ms[0].MiningSessionSoloEndedAtField, ms[0].ExtraBonusDaysClaimNotAvailableField, ms[0].UTCOffsetField, ms[0].NewsSeenField); gErr == nil { //nolint:lll // .
+	if avb, gErr := r.getAvailableExtraBonus(now, id, ms[0].ExtraBonusStartedAtField, ms[0].ExtraBonusLastClaimAvailableAtField, ms[0].MiningSessionSoloStartedAtField, ms[0].MiningSessionSoloEndedAtField, ms[0].ExtraBonusDaysClaimNotAvailableResettableField, ms[0].UTCOffsetField, ms[0].NewsSeenField); gErr == nil { //nolint:lll // .
 		availableExtraBonusVal = avb.ExtraBonus
 	}
 

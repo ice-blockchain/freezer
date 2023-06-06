@@ -22,7 +22,7 @@ type (
 	UpdatedUser struct {
 		model.ExtraBonusLastClaimAvailableAtField
 		model.DeserializedUsersKey
-		model.ExtraBonusDaysClaimNotAvailableField
+		model.ExtraBonusDaysClaimNotAvailableResettableField
 		ExtraBonusIndex uint16 `redis:"-"`
 	}
 	ExtraBonusAvailable struct {

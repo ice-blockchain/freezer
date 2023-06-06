@@ -9,47 +9,49 @@ import (
 )
 
 func IsExtraBonusAvailable(
-	currentTime, extraBonusStartDate *time.Time,
+	currentTime, extraBonusStartDate, extraBonusStartedAt *time.Time,
 	extraBonusIndicesDistribution map[uint16]map[uint16]uint16,
-	usr *User,
+	id int64, utcOffsetFactor int16,
+	extraBonusIndex, extraBonusDaysClaimNotAvailable *uint16,
+	extraBonusLastClaimAvailableAt **time.Time,
 ) (available, claimable bool) {
 	const notifyHourStart, notifyHourEnd = 10, 20
 	var (
-		utcOffset                       = stdlibtime.Duration(usr.UTCOffset) * cfg.ExtraBonuses.UTCOffsetDuration
+		utcOffset                       = stdlibtime.Duration(utcOffsetFactor) * cfg.ExtraBonuses.UTCOffsetDuration
 		location                        = stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
 		now                             = currentTime.In(location)
 		extraBonusStartDateWithLocation = extraBonusStartDate.In(location)
 		currentExtraBonusIndex          = 1 + uint16(now.Sub(extraBonusStartDateWithLocation)/cfg.ExtraBonuses.Duration)
-		chunkNumber                     = uint16(usr.ID % int64(len(extraBonusIndicesDistribution)))
+		chunkNumber                     = uint16(id % int64(len(extraBonusIndicesDistribution)))
 		bonusValue, dayHasExtraBonus    = extraBonusIndicesDistribution[chunkNumber][currentExtraBonusIndex]
 	)
 
-	if !usr.ExtraBonusLastClaimAvailableAt.IsNil() {
-		usr.ExtraBonusIndex = 1 + uint16(usr.ExtraBonusLastClaimAvailableAt.In(location).Sub(extraBonusStartDateWithLocation)/cfg.ExtraBonuses.Duration)
+	if !(*extraBonusLastClaimAvailableAt).IsNil() {
+		*extraBonusIndex = 1 + uint16((*extraBonusLastClaimAvailableAt).In(location).Sub(extraBonusStartDateWithLocation)/cfg.ExtraBonuses.Duration)
 	}
 
 	if !dayHasExtraBonus ||
 		bonusValue == 0 ||
-		usr.ExtraBonusIndex >= currentExtraBonusIndex ||
+		*extraBonusIndex >= currentExtraBonusIndex ||
 		now.Hour() < notifyHourStart || now.Hour() > notifyHourEnd ||
-		(!usr.ExtraBonusStartedAt.IsNil() && currentTime.Before(usr.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
-		(!usr.ExtraBonusLastClaimAvailableAt.IsNil() && currentTime.Before(usr.ExtraBonusLastClaimAvailableAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
+		(!extraBonusStartedAt.IsNil() && currentTime.Before(extraBonusStartedAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
+		(!(*extraBonusLastClaimAvailableAt).IsNil() && currentTime.Before((*extraBonusLastClaimAvailableAt).Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
 		now.Before(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourStart, 0, 0, 0, location).
 			Add(stdlibtime.Duration(chunkNumber)*(cfg.ExtraBonuses.AvailabilityWindow-cfg.ExtraBonuses.ClaimWindow)/stdlibtime.Duration(len(extraBonusIndicesDistribution)))) || //nolint:lll // .
 		now.After(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourEnd, 0, 0, 0, location)) {
 		return false, dayHasExtraBonus && bonusValue > 0 &&
-			(usr.ExtraBonusIndex == currentExtraBonusIndex) &&
+			(*extraBonusIndex == currentExtraBonusIndex) &&
 			(now.Hour() >= notifyHourStart && now.Hour() <= notifyHourEnd) &&
-			(usr.ExtraBonusLastClaimAvailableAt.Before(*currentTime.Time) && usr.ExtraBonusLastClaimAvailableAt.Add(cfg.ExtraBonuses.ClaimWindow).After(*currentTime.Time))
+			((*extraBonusLastClaimAvailableAt).Before(*currentTime.Time) && (*extraBonusLastClaimAvailableAt).Add(cfg.ExtraBonuses.ClaimWindow).After(*currentTime.Time))
 	}
-	usr.ExtraBonusLastClaimAvailableAt = currentTime
-	usr.ExtraBonusDaysClaimNotAvailable = currentExtraBonusIndex - usr.ExtraBonusIndex - 1
-	for ix := usr.ExtraBonusIndex + 1; ix < currentExtraBonusIndex && usr.ExtraBonusDaysClaimNotAvailable > 0; ix++ {
-		if pastBonusValue, pastDayHasExtraBonus := extraBonusIndicesDistribution[chunkNumber][ix]; (!pastDayHasExtraBonus || pastBonusValue == 0) && usr.ExtraBonusDaysClaimNotAvailable > 0 { //nolint:lll // .
-			usr.ExtraBonusDaysClaimNotAvailable--
+	*extraBonusLastClaimAvailableAt = currentTime
+	*extraBonusDaysClaimNotAvailable = currentExtraBonusIndex - *extraBonusIndex - 1
+	for ix := *extraBonusIndex + 1; ix < currentExtraBonusIndex && *extraBonusDaysClaimNotAvailable > 0; ix++ {
+		if pastBonusValue, pastDayHasExtraBonus := extraBonusIndicesDistribution[chunkNumber][ix]; (!pastDayHasExtraBonus || pastBonusValue == 0) && *extraBonusDaysClaimNotAvailable > 0 { //nolint:lll // .
+			*extraBonusDaysClaimNotAvailable--
 		}
 	}
-	usr.ExtraBonusIndex = currentExtraBonusIndex
+	*extraBonusIndex = currentExtraBonusIndex
 
 	return true, true
 }

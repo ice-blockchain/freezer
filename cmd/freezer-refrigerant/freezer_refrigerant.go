@@ -9,9 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	balancesynchronizer "github.com/ice-blockchain/freezer/balance-synchronizer"
 	"github.com/ice-blockchain/freezer/cmd/freezer-refrigerant/api"
-	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
 	"github.com/ice-blockchain/freezer/miner"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
@@ -45,19 +43,11 @@ func (s *service) RegisterRoutes(router *server.Router) {
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
 	s.tokenomicsProcessor = tokenomics.StartProcessor(ctx, cancel)
 	s.wg = new(sync.WaitGroup)
-	s.wg.Add(1 + 1 + 1)
+	s.wg.Add(1)
 	ctx, s.stopX = context.WithCancel(ctx)
 	go func() {
 		defer s.wg.Done()
 		miner.MustStartMining(ctx)
-	}()
-	go func() {
-		defer s.wg.Done()
-		balancesynchronizer.MustStartSynchronizingBalance(ctx)
-	}()
-	go func() {
-		defer s.wg.Done()
-		extrabonusnotifier.MustStartNotifyingExtraBonusAvailability(ctx)
 	}()
 }
 

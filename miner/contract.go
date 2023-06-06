@@ -60,9 +60,11 @@ type (
 		model.PreStakingBonusField
 		model.PreStakingAllocationField
 		model.ExtraBonusField
+		model.UTCOffsetField
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
+		model.ExtraBonusLastClaimAvailableAtField
 		model.BalanceLastUpdatedAtField
 		model.ResurrectSoloUsedAtField
 		model.ResurrectT0UsedAtField
@@ -89,6 +91,7 @@ type (
 		model.SlashingRateT2Field
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
+		model.ExtraBonusDaysClaimNotAvailableField
 	}
 
 	referral struct {

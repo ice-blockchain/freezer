@@ -10,7 +10,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	balancesynchronizer "github.com/ice-blockchain/freezer/balance-synchronizer"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
@@ -29,6 +31,10 @@ func MustStartMining(ctx context.Context) {
 	mi := &miner{
 		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 	}
+	tmpDb := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
+	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, tmpDb)
+	mi.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, tmpDb)
+	log.Panic(tmpDb.Close())
 	defer func() { log.Panic(errors.Wrap(mi.Close(), "failed to stop miner")) }()
 
 	wg := new(sync.WaitGroup)
@@ -68,6 +74,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 	}()
 	var (
 		batchNumber                                                int64
+		iteration                                                  uint64
 		now                                                        = time.Now()
 		currentAdoption                                            *tokenomics.Adoption[float64]
 		workers                                                    = cfg.Workers
@@ -77,16 +84,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		t0Referrals, tMinus1Referrals                              = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
 		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
 		referralsThatStoppedMining                                 = make([]*referralThatStoppedMining, 0, batchSize)
-		msgResponder                                               = make(chan error, batchSize)
-		msgs                                                       = make([]*messagebroker.Message, 0, batchSize)
-		errs                                                       = make([]error, 0, batchSize)
+		msgResponder                                               = make(chan error, 3*batchSize)
+		msgs                                                       = make([]*messagebroker.Message, 0, 3*batchSize)
+		errs                                                       = make([]error, 0, 3*batchSize)
 		updatedUsers                                               = make([]*UpdatedUser, 0, batchSize)
+		extraBonusOnlyUpdatedUsers                                 = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
 		histories                                                  = make([]*model.User, 0, batchSize)
+		userGlobalRanks                                            = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
 	)
 	resetVars := func(success bool) {
 		now = time.Now()
 		if success && len(userResults) < int(batchSize) {
+			iteration++
 			batchNumber = 0
 		}
 		if batchNumber == 0 || currentAdoption == nil {
@@ -101,7 +111,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		userResults, referralResults = userResults[:0], referralResults[:0]
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
+		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
 		histories = histories[:0]
+		userGlobalRanks = userGlobalRanks[:0]
 		referralsThatStoppedMining = referralsThatStoppedMining[:0]
 		for k := range t0Referrals {
 			delete(t0Referrals, k)
@@ -198,7 +210,26 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			updatedUser, shouldGenerateHistory := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if updatedUser != nil {
+				var extraBonusIndex uint16
+				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, updatedUser.UTCOffset, &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
+					eba := &extrabonusnotifier.ExtraBonusAvailable{UserID: updatedUser.UserID, ExtraBonusIndex: extraBonusIndex}
+					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
+				} else {
+					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
+					updatedUser.ExtraBonusLastClaimAvailableAt = nil
+				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
+			} else {
+				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
+					ExtraBonusLastClaimAvailableAtField:            usr.ExtraBonusLastClaimAvailableAtField,
+					DeserializedUsersKey:                           usr.DeserializedUsersKey,
+					ExtraBonusDaysClaimNotAvailableResettableField: model.ExtraBonusDaysClaimNotAvailableResettableField{ExtraBonusDaysClaimNotAvailable: usr.ExtraBonusDaysClaimNotAvailable},
+				}
+				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, usr.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, usr.ID, usr.UTCOffset, &extraBonusOnlyUpdatedUsr.ExtraBonusIndex, &extraBonusOnlyUpdatedUsr.ExtraBonusDaysClaimNotAvailable, &extraBonusOnlyUpdatedUsr.ExtraBonusLastClaimAvailableAt); isAvailable {
+					eba := &extrabonusnotifier.ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: extraBonusOnlyUpdatedUsr.ExtraBonusIndex}
+					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
+					extraBonusOnlyUpdatedUsers = append(extraBonusOnlyUpdatedUsers, &extraBonusOnlyUpdatedUsr)
+				}
 			}
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
@@ -208,6 +239,17 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 				msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
+			}
+			totalStandardBalance, totalPreStakingBalance := usr.BalanceTotalStandard, usr.BalanceTotalPreStaking
+			if updatedUser != nil {
+				totalStandardBalance, totalPreStakingBalance = updatedUser.BalanceTotalStandard, updatedUser.BalanceTotalPreStaking
+			}
+			totalBalance := totalStandardBalance + totalPreStakingBalance
+			if updatedGlobalRank := balancesynchronizer.ShouldUpdateGlobalRank(iteration, usr.ID, totalBalance); updatedGlobalRank != nil {
+				userGlobalRanks = append(userGlobalRanks, *updatedGlobalRank)
+			}
+			if msg := balancesynchronizer.ShouldSendBalanceUpdatedMessage(reqCtx, iteration, usr.UserID, totalStandardBalance, totalPreStakingBalance); msg != nil {
+				msgs = append(msgs, msg)
 			}
 		}
 
@@ -293,6 +335,16 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			for _, value := range updatedUsers {
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
+					return err
+				}
+			}
+			for _, value := range extraBonusOnlyUpdatedUsers {
+				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
+					return err
+				}
+			}
+			if len(userGlobalRanks) > 0 {
+				if err := pipeliner.ZAdd(reqCtx, "top_miners", userGlobalRanks...).Err(); err != nil {
 					return err
 				}
 			}
