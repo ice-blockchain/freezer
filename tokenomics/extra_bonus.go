@@ -107,13 +107,12 @@ func (r *repository) getAvailableExtraBonus(
 		return nil, ErrDuplicate
 	}
 	log.Info(fmt.Sprintf("getAvailableExtraBonus:before:%#v,newsSeen:%v", ebUsr, newsSeenField.NewsSeen))
-	defer func() {
-		log.Info(fmt.Sprintf("getAvailableExtraBonus:after:%#v,extraBonus:%v", ebUsr, calculateExtraBonus()))
-	}()
 	if bonusAvailable, bonusClaimable := extrabonusnotifier.IsExtraBonusAvailable(now, r.extraBonusStartDate, r.extraBonusIndicesDistribution, ebUsr); bonusAvailable {
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
+			log.Info(fmt.Sprintf("getAvailableExtraBonus[1]:after:%#v,extraBonus:%v", ebUsr, extraBonus))
+
 			return &availableExtraBonus{
 				ExtraBonusLastClaimAvailableAtField: ebUsr.ExtraBonusLastClaimAvailableAtField,
 				ExtraBonusStartedAtField:            model.ExtraBonusStartedAtField{ExtraBonusStartedAt: now},
@@ -127,6 +126,7 @@ func (r *repository) getAvailableExtraBonus(
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
+			log.Info(fmt.Sprintf("getAvailableExtraBonus[2]:after:%#v,extraBonus:%v", ebUsr, extraBonus))
 			ebUsr.ExtraBonusLastClaimAvailableAt = nil
 		}
 	}
