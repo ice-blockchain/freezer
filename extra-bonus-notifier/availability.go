@@ -44,13 +44,15 @@ func IsExtraBonusAvailable(
 			(now.Hour() >= notifyHourStart && now.Hour() <= notifyHourEnd) &&
 			((*extraBonusLastClaimAvailableAt).Before(*currentTime.Time) && (*extraBonusLastClaimAvailableAt).Add(cfg.ExtraBonuses.ClaimWindow).After(*currentTime.Time))
 	}
-	*extraBonusLastClaimAvailableAt = currentTime
-	*extraBonusDaysClaimNotAvailable = currentExtraBonusIndex - *extraBonusIndex - 1
-	for ix := *extraBonusIndex + 1; ix < currentExtraBonusIndex && *extraBonusDaysClaimNotAvailable > 0; ix++ {
-		if pastBonusValue, pastDayHasExtraBonus := extraBonusIndicesDistribution[chunkNumber][ix]; (!pastDayHasExtraBonus || pastBonusValue == 0) && *extraBonusDaysClaimNotAvailable > 0 { //nolint:lll // .
-			*extraBonusDaysClaimNotAvailable--
+	if !(*extraBonusLastClaimAvailableAt).IsNil() {
+		*extraBonusDaysClaimNotAvailable = currentExtraBonusIndex - *extraBonusIndex - 1
+		for ix := *extraBonusIndex + 1; ix < currentExtraBonusIndex && *extraBonusDaysClaimNotAvailable > 0; ix++ {
+			if pastBonusValue, pastDayHasExtraBonus := extraBonusIndicesDistribution[chunkNumber][ix]; (!pastDayHasExtraBonus || pastBonusValue == 0) && *extraBonusDaysClaimNotAvailable > 0 { //nolint:lll // .
+				*extraBonusDaysClaimNotAvailable--
+			}
 		}
 	}
+	*extraBonusLastClaimAvailableAt = currentTime
 	*extraBonusIndex = currentExtraBonusIndex
 
 	return true, true

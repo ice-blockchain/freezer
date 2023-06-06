@@ -16,7 +16,6 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
-	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -98,31 +97,10 @@ func (r *repository) getAvailableExtraBonus(
 		now.Before(extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow)) {
 		return nil, ErrDuplicate
 	}
-	log.Debug(fmt.Sprintf("getAvailableExtraBonus:before:id:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
-		id,
-		extraBonusStartedAtField,
-		extraBonusLastClaimAvailableAtField,
-		miningSessionSoloStartedAtField,
-		miningSessionSoloEndedAtField,
-		extraBonusDaysClaimNotAvailableField,
-		utcOffsetField,
-		newsSeenField))
 	if bonusAvailable, bonusClaimable := extrabonusnotifier.IsExtraBonusAvailable(now, r.extraBonusStartDate, extraBonusStartedAtField.ExtraBonusStartedAt, r.extraBonusIndicesDistribution, id, utcOffsetField.UTCOffset, &extraBonusIndex, &extraBonusDaysClaimNotAvailableField.ExtraBonusDaysClaimNotAvailable, &extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt); bonusAvailable { //nolint:lll // .
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
-			log.Debug(fmt.Sprintf("getAvailableExtraBonus[1]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
-				id,
-				extraBonus,
-				extraBonusIndex,
-				extraBonusStartedAtField,
-				extraBonusLastClaimAvailableAtField,
-				miningSessionSoloStartedAtField,
-				miningSessionSoloEndedAtField,
-				extraBonusDaysClaimNotAvailableField,
-				utcOffsetField,
-				newsSeenField))
-
 			return &availableExtraBonus{
 				ExtraBonusLastClaimAvailableAtField: extraBonusLastClaimAvailableAtField,
 				ExtraBonusStartedAtField:            model.ExtraBonusStartedAtField{ExtraBonusStartedAt: now},
@@ -136,17 +114,6 @@ func (r *repository) getAvailableExtraBonus(
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
-			log.Debug(fmt.Sprintf("getAvailableExtraBonus[2]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
-				id,
-				extraBonus,
-				extraBonusIndex,
-				extraBonusStartedAtField,
-				extraBonusLastClaimAvailableAtField,
-				miningSessionSoloStartedAtField,
-				miningSessionSoloEndedAtField,
-				extraBonusDaysClaimNotAvailableField,
-				utcOffsetField,
-				newsSeenField))
 			extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt = nil
 		}
 	}

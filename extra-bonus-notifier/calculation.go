@@ -14,7 +14,7 @@ func CalculateExtraBonus(
 	var (
 		newsSeenBonusValues            = cfg.ExtraBonuses.NewsSeenValues
 		miningStreakValues             = cfg.ExtraBonuses.MiningStreakValues
-		bonusPercentageRemaining       = 100 + extraBonusDaysClaimNotAvailable
+		bonusPercentageRemaining       = 100 * (1 + extraBonusDaysClaimNotAvailable)
 		miningStreak                   = calculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt)
 		flatBonusValue                 = cfg.ExtraBonuses.FlatValues[extraBonusIndex]
 		firstDelayedClaimPenaltyWindow = int64(float64(cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkDelayDelta)
