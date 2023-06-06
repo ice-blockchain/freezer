@@ -98,7 +98,7 @@ func (r *repository) getAvailableExtraBonus(
 		now.Before(extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow)) {
 		return nil, ErrDuplicate
 	}
-	log.Info(fmt.Sprintf("getAvailableExtraBonus:before:id:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
+	log.Debug(fmt.Sprintf("getAvailableExtraBonus:before:id:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
 		id,
 		extraBonusStartedAtField,
 		extraBonusLastClaimAvailableAtField,
@@ -111,7 +111,7 @@ func (r *repository) getAvailableExtraBonus(
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
-			log.Info(fmt.Sprintf("getAvailableExtraBonus[1]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
+			log.Debug(fmt.Sprintf("getAvailableExtraBonus[1]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
 				id,
 				extraBonus,
 				extraBonusIndex,
@@ -136,7 +136,7 @@ func (r *repository) getAvailableExtraBonus(
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
-			log.Info(fmt.Sprintf("getAvailableExtraBonus[2]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
+			log.Debug(fmt.Sprintf("getAvailableExtraBonus[2]:before:id:%v,extraBonus:%v,extraBonusIndex:%v,%#v,%#v,%#v,%#v,%#v,%#v,%#v",
 				id,
 				extraBonus,
 				extraBonusIndex,
