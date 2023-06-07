@@ -13,7 +13,7 @@ func Test_didReferralJustStopMining(t *testing.T) {
 	t.Parallel()
 
 	t.Run("EmptyData", func(t *testing.T) {
-		x := didReferralJustStopMining(testTime, nil, nil)
+		x := didReferralJustStopMining(testTime, nil, nil, nil)
 		require.Nil(t, x)
 	})
 
@@ -21,9 +21,8 @@ func Test_didReferralJustStopMining(t *testing.T) {
 		before := newUser()
 		before.BalanceLastUpdatedAt = timeDelta(-time.Hour * 2)
 		before.MiningSessionSoloEndedAt = timeDelta(-time.Hour)
-		after := newUser()
 
-		x := didReferralJustStopMining(testTime, before, after)
+		x := didReferralJustStopMining(testTime, before, nil, nil)
 		require.NotNil(t, x)
 		require.NotNil(t, x.StoppedMiningAt.Time)
 	})

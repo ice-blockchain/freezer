@@ -218,6 +218,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
 					updatedUser.ExtraBonusLastClaimAvailableAt = nil
 				}
+				if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
+					referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
+				}
+				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
+					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
+				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
 				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
@@ -233,12 +239,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
-			}
-			if userStoppedMining := didReferralJustStopMining(now, usr, updatedUser); userStoppedMining != nil {
-				referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
-			}
-			if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
-				msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
 			}
 			totalStandardBalance, totalPreStakingBalance := usr.BalanceTotalStandard, usr.BalanceTotalPreStaking
 			if updatedUser != nil {
@@ -315,7 +315,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 
 		var pipeliner redis.Pipeliner
-		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining) > 0 {
+		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(userGlobalRanks) > 0 {
 			pipeliner = db.TxPipeline()
 		} else {
 			pipeliner = db.Pipeline()

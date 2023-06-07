@@ -21,20 +21,26 @@ func changeT0AndTMinus1Referrals(usr *user) {
 	}
 }
 
-func didReferralJustStopMining(now *time.Time, before, after *user) *referralThatStoppedMining {
+func didReferralJustStopMining(now *time.Time, before *user, t0Ref, tMinus1Ref *referral) *referralThatStoppedMining {
 	if before == nil ||
-		after == nil ||
 		before.MiningSessionSoloEndedAt.IsNil() ||
 		before.BalanceLastUpdatedAt.IsNil() ||
 		before.MiningSessionSoloEndedAt.After(*now.Time) ||
 		before.BalanceLastUpdatedAt.After(*before.MiningSessionSoloEndedAt.Time) {
 		return nil
 	}
+	var idT0, idTminus1 int64
+	if t0Ref != nil {
+		idT0 = t0Ref.ID
+	}
+	if tMinus1Ref != nil {
+		idTminus1 = tMinus1Ref.ID
+	}
 
 	return &referralThatStoppedMining{
 		ID:              before.ID,
-		IDT0:            after.IDT0,
-		IDTMinus1:       after.IDTMinus1,
+		IDT0:            idT0,
+		IDTMinus1:       idTminus1,
 		StoppedMiningAt: before.MiningSessionSoloEndedAt,
 	}
 }
