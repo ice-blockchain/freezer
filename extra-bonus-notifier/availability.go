@@ -33,7 +33,7 @@ func IsExtraBonusAvailable(
 	if !dayHasExtraBonus ||
 		bonusValue == 0 ||
 		*extraBonusIndex >= currentExtraBonusIndex ||
-		now.Hour() < notifyHourStart || now.Hour() > notifyHourEnd ||
+		now.Hour() < notifyHourStart || now.Hour() >= notifyHourEnd ||
 		(!extraBonusStartedAt.IsNil() && currentTime.Before(extraBonusStartedAt.Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
 		(!(*extraBonusLastClaimAvailableAt).IsNil() && currentTime.Before((*extraBonusLastClaimAvailableAt).Add(cfg.ExtraBonuses.Duration-cfg.ExtraBonuses.AvailabilityWindow))) ||
 		now.Before(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourStart, 0, 0, 0, location).

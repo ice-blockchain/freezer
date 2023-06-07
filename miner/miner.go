@@ -142,6 +142,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
+			now = time.Now()
 
 			continue
 		}

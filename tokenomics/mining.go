@@ -15,7 +15,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/freezer/model"
-	"github.com/ice-blockchain/wintr/coin"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -362,7 +361,9 @@ func roundFloat64AndTruncate(val float64) uint64 {
 }
 
 func roundFloat64(val float64) float64 {
-	return math.Round(val*coin.Denomination) / coin.Denomination
+	const precision = 100
+
+	return math.Round(val*precision) / precision
 }
 
 func (r *repository) calculateMintedStandardCoins(

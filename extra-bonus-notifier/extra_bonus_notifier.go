@@ -177,6 +177,7 @@ func (ebn *extraBonusNotifier) notifyingExtraBonusAvailability(ctx context.Conte
 		if err := storage.Bind[User](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[extraBonusNotifier] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
+			now = time.Now()
 
 			continue
 		}
