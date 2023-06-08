@@ -3,8 +3,10 @@
 package extrabonusnotifier
 
 import (
+	"fmt"
 	stdlibtime "time"
 
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -39,6 +41,8 @@ func IsExtraBonusAvailable(
 		now.Before(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourStart, 0, 0, 0, location).
 			Add(stdlibtime.Duration(chunkNumber)*(cfg.ExtraBonuses.AvailabilityWindow-cfg.ExtraBonuses.ClaimWindow)/stdlibtime.Duration(len(extraBonusIndicesDistribution)))) || //nolint:lll // .
 		now.After(stdlibtime.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), notifyHourEnd, 0, 0, 0, location)) {
+		log.Info(fmt.Sprintf("extraBonusAvailable:dayHasExtraBonus:%#v,bonusValue:%#v,extraBonusIndex:%#v,currentExtraBonusIndex:%#v,hour:%#v,extraBonusStartedAt:%#v,extraBonusLastClaimAvailableAt:%#v,now:%#v,currentTime:%#v,location:%#v,chunkNumber:%#v",
+			dayHasExtraBonus, bonusValue, *extraBonusIndex, currentExtraBonusIndex, now.Hour(), extraBonusStartedAt, extraBonusLastClaimAvailableAt, now, currentTime, location, chunkNumber))
 		return false, dayHasExtraBonus && bonusValue > 0 &&
 			(*extraBonusIndex == currentExtraBonusIndex) &&
 			(now.Hour() >= notifyHourStart && now.Hour() <= notifyHourEnd) &&

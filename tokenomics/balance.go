@@ -143,6 +143,7 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		var baseMiningRate float64
 		for _, childVal := range parentVal.children {
 			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, adoptions)
+			childVal.setBalanceDiffBonus(baseMiningRate)
 			parentVal.Balance.amount += childVal.Balance.amount
 			parentVal.BalanceHistoryEntry.TimeSeries = append(parentVal.BalanceHistoryEntry.TimeSeries, childVal)
 		}
@@ -197,18 +198,15 @@ func (e *BalanceHistoryEntry) calculateBalanceDiffBonus(
 			endDate = achievedAt
 		}
 	}
-	e.setBalanceDiffBonus(baseMiningRate)
 
 	return baseMiningRate
 }
 
 func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate float64) {
-	if e.Balance.Negative { //nolint:gocritic // Wrong.
-		e.Balance.Bonus = int64((-100 * (baseMiningRate + e.Balance.amount)) / baseMiningRate)
-	} else if e.Balance.amount <= baseMiningRate {
-		e.Balance.Bonus = int64((-100 * (baseMiningRate - e.Balance.amount)) / baseMiningRate)
+	if e.Balance.amount < 0 { //nolint:gocritic // Wrong.
+		e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(e.Balance.amount*-100/baseMiningRate))
 	} else {
-		e.Balance.Bonus = int64((100 * (e.Balance.amount - baseMiningRate)) / baseMiningRate)
+		e.Balance.Bonus = int64(roundFloat64AndTruncate(e.Balance.amount * 100 / baseMiningRate))
 	}
 }
 

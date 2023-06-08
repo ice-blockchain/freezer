@@ -38,6 +38,9 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			shouldGenerateHistory = true
 			updatedUser.BalanceTotalSlashed = 0
 			updatedUser.BalanceTotalMinted = 0
+			if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) && updatedUser.isAbsoluteZero() {
+				usr.BalanceLastUpdatedAt = updatedUser.MiningSessionSoloStartedAt
+			}
 		}
 		if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) && updatedUser.isAbsoluteZero() {
 			updatedUser.BalanceLastUpdatedAt = updatedUser.MiningSessionSoloStartedAt

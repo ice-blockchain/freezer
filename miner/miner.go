@@ -210,6 +210,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
 			updatedUser, shouldGenerateHistory := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
+			if shouldGenerateHistory {
+				userHistoryKeys = append(userHistoryKeys, usr.Key())
+			}
 			if updatedUser != nil {
 				var extraBonusIndex uint16
 				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, updatedUser.UTCOffset, &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
@@ -237,9 +240,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
 					extraBonusOnlyUpdatedUsers = append(extraBonusOnlyUpdatedUsers, &extraBonusOnlyUpdatedUsr)
 				}
-			}
-			if shouldGenerateHistory {
-				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			totalStandardBalance, totalPreStakingBalance := usr.BalanceTotalStandard, usr.BalanceTotalPreStaking
 			if updatedUser != nil {
