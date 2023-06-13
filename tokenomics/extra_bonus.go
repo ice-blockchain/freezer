@@ -34,7 +34,7 @@ func (r *repository) ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "unexpected deadline")
 	}
-	id, err := r.getOrInitInternalID(ctx, ebs.UserID)
+	id, err := GetOrInitInternalID(ctx, r.db, ebs.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", ebs.UserID)
 	}
@@ -145,7 +145,7 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	if err != nil {
 		return errors.Wrapf(err, "invalid timezone:%#v", &dm)
 	}
-	id, err := s.getOrInitInternalID(ctx, dm.UserID)
+	id, err := GetOrInitInternalID(ctx, s.db, dm.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &dm)
 	}
@@ -189,7 +189,7 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 			).ErrorOrNil()
 		}
 	}()
-	id, err := s.getOrInitInternalID(ctx, vn.UserID)
+	id, err := GetOrInitInternalID(ctx, s.db, vn.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &vn)
 	}

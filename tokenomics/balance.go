@@ -24,7 +24,7 @@ import (
 func (r *repository) GetBalanceSummary( //nolint:lll // .
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {
-	id, err := r.getOrInitInternalID(ctx, userID)
+	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
@@ -83,7 +83,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
 		dates = append(dates, start.Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
 	}
-	id, gErr := r.getOrInitInternalID(ctx, userID)
+	id, gErr := GetOrInitInternalID(ctx, r.db, userID)
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
 	}
@@ -245,7 +245,7 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 	if err != nil {
 		return errors.Wrap(err, "failed to getCurrentAdoption")
 	}
-	id, err := s.getOrInitInternalID(ctx, val.UserID)
+	id, err := GetOrInitInternalID(ctx, s.db, val.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", val.UserID)
 	}

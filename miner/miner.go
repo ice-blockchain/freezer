@@ -6,6 +6,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
@@ -27,32 +28,76 @@ func init() {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 }
 
-func MustStartMining(ctx context.Context) {
+func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi := &miner{
-		mb: messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
+		mb:        messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
+		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, 1),
+		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
+		wg:        new(sync.WaitGroup),
+		telemetry: new(telemetry).mustInit(),
 	}
-	tmpDb := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
-	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, tmpDb)
-	mi.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, tmpDb)
-	log.Panic(tmpDb.Close())
-	defer func() { log.Panic(errors.Wrap(mi.Close(), "failed to stop miner")) }()
-
-	wg := new(sync.WaitGroup)
-	wg.Add(int(cfg.Workers))
-	defer wg.Wait()
+	mi.wg.Add(int(cfg.Workers))
+	mi.cancel = cancel
+	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, mi.db)
+	mi.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, mi.db)
 
 	for workerNumber := int64(0); workerNumber < cfg.Workers; workerNumber++ {
 		go func(wn int64) {
-			defer wg.Done()
+			defer mi.wg.Done()
 			mi.mine(ctx, wn)
 		}(workerNumber)
 	}
+
+	return mi
 }
 
 func (m *miner) Close() error {
+	m.cancel()
+	m.wg.Wait()
+
 	return multierror.Append(
 		errors.Wrap(m.mb.Close(), "failed to close mb"),
+		errors.Wrap(m.db.Close(), "failed to close db"),
+		errors.Wrap(m.dwhClient.Close(), "failed to close dwh"),
 	).ErrorOrNil()
+}
+
+func (m *miner) CheckHealth(ctx context.Context) error {
+	if err := m.dwhClient.Ping(ctx); err != nil {
+		return err
+	}
+	if err := m.pingDB(ctx); err != nil {
+		return err
+	}
+	type ts struct {
+		TS *time.Time `json:"ts"`
+	}
+	now := ts{TS: time.Now()}
+	bytes, err := json.MarshalContext(ctx, now)
+	if err != nil {
+		return errors.Wrapf(err, "[health-check] failed to marshal %#v", now)
+	}
+	responder := make(chan error, 1)
+	m.mb.SendMessage(ctx, &messagebroker.Message{
+		Headers: map[string]string{"producer": "freezer"},
+		Key:     cfg.MessageBroker.Topics[0].Name,
+		Topic:   cfg.MessageBroker.Topics[0].Name,
+		Value:   bytes,
+	}, responder)
+
+	return errors.Wrapf(<-responder, "[health-check] failed to send health check message to broker")
+}
+
+func (m *miner) pingDB(ctx context.Context) error {
+	if resp := m.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
+		if resp.Err() == nil {
+			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
+		}
+
+		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
+	}
+
+	return nil
 }
 
 func (m *miner) mine(ctx context.Context, workerNumber int64) {
@@ -75,8 +120,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 	var (
 		batchNumber                                                int64
 		iteration                                                  uint64
-		now                                                        = time.Now()
-		currentAdoption                                            *tokenomics.Adoption[float64]
+		now, lastIterationStartedAt                                = time.Now(), time.Now()
+		currentAdoption                                            = m.getAdoption(ctx, db, workerNumber)
 		workers                                                    = cfg.Workers
 		batchSize                                                  = cfg.BatchSize
 		userKeys, userHistoryKeys, referralKeys                    = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
@@ -94,18 +139,17 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
 	)
 	resetVars := func(success bool) {
-		now = time.Now()
-		if success && len(userResults) < int(batchSize) {
+		if success && len(userKeys) == int(batchSize) && len(userResults) == 0 {
+			go m.telemetry.collectElapsed(0, *lastIterationStartedAt.Time)
+			lastIterationStartedAt = time.Now()
 			iteration++
 			batchNumber = 0
+		} else if success {
+			go m.telemetry.collectElapsed(1, *now.Time)
 		}
+		now = time.Now()
 		if batchNumber == 0 || currentAdoption == nil {
-			for err := errors.New("init"); ctx.Err() == nil && err != nil; {
-				reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-				currentAdoption, err = tokenomics.GetCurrentAdoption(reqCtx, db)
-				reqCancel()
-				log.Error(errors.Wrapf(err, "[miner] failed to GetCurrentAdoption for workerNumber:%v", workerNumber))
-			}
+			currentAdoption = m.getAdoption(ctx, db, workerNumber)
 		}
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
@@ -128,7 +172,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			delete(t2ReferralsThatStoppedMining, k)
 		}
 	}
-	resetVars(true)
 	for ctx.Err() == nil {
 		/******************************************************************************************************************************************************
 			1. Fetching a new batch of users.
@@ -138,6 +181,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				userKeys = append(userKeys, model.SerializedUsersKey((workers*ix)+workerNumber))
 			}
 		}
+		before := time.Now()
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
 		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
@@ -147,6 +191,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+		if len(userKeys) > 0 {
+			go m.telemetry.collectElapsed(2, *before.Time)
+		}
 
 		/******************************************************************************************************************************************************
 			2. Fetching T0 & T-1 referrals of the fetched users.
@@ -173,6 +220,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			referralKeys = append(referralKeys, model.SerializedUsersKey(idTMinus1))
 		}
 
+		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if err := storage.Bind[referral](reqCtx, db, referralKeys, &referralResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get referrees for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
@@ -182,6 +230,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+		if len(referralKeys) > 0 {
+			go m.telemetry.collectElapsed(3, *before.Time)
+		}
 
 		/******************************************************************************************************************************************************
 			3. Mining for the users.
@@ -258,6 +309,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			4. Sending messages to the broker.
 		******************************************************************************************************************************************************/
 
+		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		for _, message := range msgs {
 			m.mb.SendMessage(reqCtx, message, msgResponder)
@@ -273,11 +325,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+		if len(msgs) > 0 {
+			go m.telemetry.collectElapsed(4, *before.Time)
+		}
 
 		/******************************************************************************************************************************************************
 			5. Fetching all relevant fields that will be added to the history/bookkeeping.
 		******************************************************************************************************************************************************/
 
+		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if err := storage.Bind[model.User](reqCtx, db, userHistoryKeys, &histories); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
@@ -287,11 +343,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+		if len(userHistoryKeys) > 0 {
+			go m.telemetry.collectElapsed(5, *before.Time)
+		}
 
 		/******************************************************************************************************************************************************
 			6. Inserting history/bookkeeping data.
 		******************************************************************************************************************************************************/
 
+		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if err := dwhClient.Insert(reqCtx, historyColumns, historyInsertMetadata, histories); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to insert histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
@@ -301,6 +361,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+		if len(histories) > 0 {
+			go m.telemetry.collectElapsed(6, *before.Time)
+		}
 
 		/******************************************************************************************************************************************************
 			7. Persisting the mining progress for the users.
@@ -322,6 +385,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			pipeliner = db.Pipeline()
 		}
 
+		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if responses, err := pipeliner.Pipelined(reqCtx, func(pipeliner redis.Pipeliner) error {
 			for id, value := range t1ReferralsThatStoppedMining {
@@ -374,10 +438,24 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				continue
 			}
 		}
+		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(updatedUsers)+len(extraBonusOnlyUpdatedUsers)+len(userGlobalRanks) > 0 {
+			go m.telemetry.collectElapsed(7, *before.Time)
+		}
 
 		batchNumber++
 		reqCancel()
 		resetVars(true)
 	}
 
+}
+
+func (m *miner) getAdoption(ctx context.Context, db storage.DB, workerNumber int64) (currentAdoption *tokenomics.Adoption[float64]) {
+	for err := errors.New("init"); ctx.Err() == nil && err != nil; {
+		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
+		currentAdoption, err = tokenomics.GetCurrentAdoption(reqCtx, db)
+		reqCancel()
+		log.Error(errors.Wrapf(err, "[miner] failed to GetCurrentAdoption for workerNumber:%v", workerNumber))
+	}
+
+	return currentAdoption
 }

@@ -5,12 +5,10 @@ package main
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/cmd/freezer-refrigerant/api"
-	"github.com/ice-blockchain/freezer/miner"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/log"
@@ -42,18 +40,9 @@ func (s *service) RegisterRoutes(router *server.Router) {
 
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
 	s.tokenomicsProcessor = tokenomics.StartProcessor(ctx, cancel)
-	s.wg = new(sync.WaitGroup)
-	s.wg.Add(1)
-	ctx, s.stopX = context.WithCancel(ctx)
-	go func() {
-		defer s.wg.Done()
-		miner.MustStartMining(ctx)
-	}()
 }
 
 func (s *service) Close(ctx context.Context) error {
-	s.stopX()
-	s.wg.Wait()
 	if ctx.Err() != nil {
 		return errors.Wrap(ctx.Err(), "could not close processor because context ended")
 	}

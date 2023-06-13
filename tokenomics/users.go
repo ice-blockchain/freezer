@@ -48,7 +48,7 @@ func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Messa
 }
 
 func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .
-	id, err := s.getInternalID(ctx, usr.ID)
+	id, err := GetOrInitInternalID(ctx, s.db, usr.ID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getInternalID for user:%#v", usr)
 	}
@@ -153,7 +153,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 }
 
 func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .
-	internalID, err := s.getOrInitInternalID(ctx, usr.ID)
+	internalID, err := GetOrInitInternalID(ctx, s.db, usr.ID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for user:%#v", usr)
 	}
@@ -206,7 +206,7 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 		referredBy == "icenetwork" {
 		return nil
 	}
-	idT0, err := s.getOrInitInternalID(ctx, referredBy)
+	idT0, err := GetOrInitInternalID(ctx, s.db, referredBy)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for referredBy:%v", referredBy)
 	} else if (oldIDT0 == idT0) || (oldIDT0*-1 == idT0) {
@@ -348,30 +348,30 @@ redis.call('ZADD', 'top_miners', 'NX', 10.0, KEYS[1])
 `)
 )
 
-func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (int64, error) {
+func GetOrInitInternalID(ctx context.Context, db storage.DB, userID string) (int64, error) {
 	if ctx.Err() != nil {
 		return 0, errors.Wrapf(ctx.Err(), "context expired")
 	}
-	id, err := r.getInternalID(ctx, userID)
+	id, err := GetInternalID(ctx, db, userID)
 	if err != nil && errors.Is(err, ErrNotFound) {
 		accessibleKeys := append(make([]string, 0, 1+1), "users_serial", model.SerializedUsersKey(userID))
-		id, err = initInternalIDScript.EvalSha(ctx, r.db, accessibleKeys).Int64()
+		id, err = initInternalIDScript.EvalSha(ctx, db, accessibleKeys).Int64()
 		if err != nil && redis.HasErrorPrefix(err, "NOSCRIPT") {
-			log.Error(errors.Wrap(initInternalIDScript.Load(ctx, r.db).Err(), "failed to load initInternalIDScript"))
+			log.Error(errors.Wrap(initInternalIDScript.Load(ctx, db).Err(), "failed to load initInternalIDScript"))
 
-			return r.getOrInitInternalID(ctx, userID)
+			return GetOrInitInternalID(ctx, db, userID)
 		}
 		if err == nil {
 			accessibleKeys = append(make([]string, 0, 1), model.SerializedUsersKey(id))
-			for ctx.Err() == nil {
-				if err = initUserScript.EvalSha(ctx, r.db, accessibleKeys, userID).Err(); err == nil || errors.Is(err, redis.Nil) || strings.Contains(err.Error(), "race condition") {
+			for err = errors.New("init"); ctx.Err() == nil && err != nil; {
+				if err = initUserScript.EvalSha(ctx, db, accessibleKeys, userID).Err(); err == nil || errors.Is(err, redis.Nil) || strings.Contains(err.Error(), "race condition") {
 					if err != nil && strings.Contains(err.Error(), "race condition") {
 						log.Error(errors.Wrapf(err, "race condition while evaling initUserScript for userID:%v", userID))
 					}
 					err = nil
 					break
 				} else if err != nil && redis.HasErrorPrefix(err, "NOSCRIPT") {
-					log.Error(errors.Wrap(initUserScript.Load(ctx, r.db).Err(), "failed to load initUserScript"))
+					log.Error(errors.Wrap(initUserScript.Load(ctx, db).Err(), "failed to load initUserScript"))
 				}
 			}
 		}
@@ -380,14 +380,14 @@ func (r *repository) getOrInitInternalID(ctx context.Context, userID string) (in
 	if err != nil {
 		log.Error(err)
 
-		return r.getOrInitInternalID(ctx, userID)
+		return GetOrInitInternalID(ctx, db, userID)
 	}
 
 	return id, errors.Wrapf(err, "failed to getInternalID for userID:%#v", userID)
 }
 
-func (r *repository) getInternalID(ctx context.Context, userID string) (int64, error) {
-	idAsString, err := r.db.Get(ctx, model.SerializedUsersKey(userID)).Result()
+func GetInternalID(ctx context.Context, db storage.DB, userID string) (int64, error) {
+	idAsString, err := db.Get(ctx, model.SerializedUsersKey(userID)).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return 0, errors.Wrapf(err, "failed to get internal id for external userID:%v", userID)
 	}

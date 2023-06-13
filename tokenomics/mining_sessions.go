@@ -47,7 +47,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool,
 ) error {
 	userID := *ms.MiningSession.UserID
-	id, err := r.getOrInitInternalID(ctx, userID)
+	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
@@ -265,7 +265,7 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 			).ErrorOrNil()
 		}
 	}()
-	id, err := s.getOrInitInternalID(ctx, *ms.UserID)
+	id, err := GetOrInitInternalID(ctx, s.db, *ms.UserID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}

@@ -3,17 +3,26 @@
 package miner
 
 import (
+	"context"
+	"io"
+	"sync"
 	stdlibtime "time"
 
+	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
 
 // Public API.
 
 type (
+	Client interface {
+		io.Closer
+		CheckHealth(context.Context) error
+	}
 	DayOffStarted struct {
 		StartedAt                   *time.Time `json:"startedAt,omitempty"`
 		EndedAt                     *time.Time `json:"endedAt,omitempty"`
@@ -109,6 +118,11 @@ type (
 
 	miner struct {
 		mb                            messagebroker.Client
+		db                            storage.DB
+		dwhClient                     dwh.Client
+		cancel                        context.CancelFunc
+		telemetry                     *telemetry
+		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 	}

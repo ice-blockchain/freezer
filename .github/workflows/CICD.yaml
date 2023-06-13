@@ -175,7 +175,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant", "cmd/freezer-miner"]
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
     runs-on: ubuntu-latest
     #    runs-on: self-hosted-ubuntu-latest-x64
@@ -226,7 +226,7 @@ jobs:
     name: Benchmark
     strategy:
       matrix:
-        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant"]
+        package: [ "miner", "extra-bonus-notifier", "tokenomics", "cmd/freezer", "cmd/freezer-refrigerant", "cmd/freezer-miner"]
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
     runs-on: ubuntu-latest
     #    runs-on: self-hosted-ubuntu-latest-x64
@@ -276,7 +276,7 @@ jobs:
     name: Verify Dockerfile
     strategy:
       matrix:
-        service: [ "freezer", "freezer-refrigerant"]
+        service: [ "freezer", "freezer-refrigerant", "freezer-miner"]
         #those are not supported by golang docker image: linux/riscv64
         #platforms: linux/s390x,linux/arm64,linux/amd64,linux/ppc64le
         #commented because build takes too damn much with the other 3 platforms (~10 mins for each!!!) and we don`t need them atm
@@ -422,7 +422,7 @@ jobs:
     name: Push Docker
     strategy:
       matrix:
-        service: [ "freezer", "freezer-refrigerant"]
+        service: [ "freezer", "freezer-refrigerant", "freezer-miner"]
         #those are not supported by golang docker image: linux/riscv64
         #platforms: linux/s390x,linux/arm64,linux/amd64,linux/ppc64le
         #commented because build takes too damn much with the other 3 platforms (~10 mins for each!!!) and we don`t need them atm
@@ -522,6 +522,12 @@ jobs:
           cmd: |
             cd secret-infrastructure
             yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer-refrigerant/staging/common-values.yaml
+      - name: Update [staging] application tag version in helm/freezer-miner/staging/common-values.yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            cd secret-infrastructure
+            yq e -i '.generic-service-chart.applicationImage.tag = strenv(APP_TAG)' helm/freezer-miner/staging/common-values.yaml
       - name: Commit and Push Changes to Application Tag Version
         run: |
           cd secret-infrastructure
@@ -529,7 +535,8 @@ jobs:
           git config user.email ice-cicd-bot@ice.vip
           git add helm/freezer/staging/common-values.yaml 
           git add helm/freezer-refrigerant/staging/common-values.yaml 
-          git commit -m "Updated 'freezer' & 'freezer-refrigerant' tag version (${{env.APP_TAG}}) in application helm chart deployment manifests"
+          git add helm/freezer-miner/staging/common-values.yaml 
+          git commit -m "Updated 'freezer' & 'freezer-refrigerant' & 'freezer-miner' tag version (${{env.APP_TAG}}) in application helm chart deployment manifests"
           git push --set-upstream origin master
       - name: Slack Notification For Success
         if: ${{ success() }}

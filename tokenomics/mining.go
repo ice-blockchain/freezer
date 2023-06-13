@@ -20,7 +20,7 @@ import (
 )
 
 func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*RankingSummary, error) { //nolint:funlen // .
-	id, err := r.getOrInitInternalID(ctx, userID)
+	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
@@ -119,7 +119,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 
 //nolint:funlen // .
 func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*MiningSummary, error) {
-	id, err := r.getOrInitInternalID(ctx, userID)
+	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}

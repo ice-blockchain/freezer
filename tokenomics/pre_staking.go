@@ -35,7 +35,7 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 }
 
 func (r *repository) getPreStaking(ctx context.Context, userID string) (*preStaking, int64, error) {
-	id, err := r.getOrInitInternalID(ctx, userID)
+	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
