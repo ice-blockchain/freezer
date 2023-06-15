@@ -142,6 +142,7 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		parentVal.BalanceHistoryEntry.TimeSeries = make([]*BalanceHistoryEntry, 0, len(parentVal.children))
 		var baseMiningRate float64
 		for _, childVal := range parentVal.children {
+			childVal.TimeSeries = make([]*BalanceHistoryEntry, 0, 0)
 			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, adoptions)
 			childVal.setBalanceDiffBonus(baseMiningRate)
 			parentVal.Balance.amount += childVal.Balance.amount
