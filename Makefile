@@ -7,7 +7,7 @@ REQUIRED_COVERAGE_PERCENT := 0
 COVERAGE_FILE             := cover.out
 REPOSITORY                := $(shell basename `pwd`)
 
-CGO_ENABLED := 1
+CGO_ENABLED ?= 1
 GOOS         ?=
 GOARCH       ?=
 SERVICE_NAME ?=
