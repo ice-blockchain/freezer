@@ -39,6 +39,7 @@ func MustConnect(ctx context.Context, applicationYAMLKey string) Client {
 	}.Build()
 	log.Panic(err)
 	cl := new(db)
+	cl.cfg = &cfg
 	cl.settings = append(make([]ch.Setting, 0, 3),
 		ch.SettingInt("async_insert", 1),
 		ch.SettingInt("wait_for_async_insert", 1))
@@ -112,6 +113,13 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 	for _, column := range input {
 		column.Data.(proto.Resettable).Reset()
 	}
+
+	now := time.Now()
+	truncateDuration := stdlibtime.Minute
+	if !db.cfg.Development {
+		truncateDuration = stdlibtime.Hour
+	}
+
 	for _, usr := range usrs {
 		if usr.MiningSessionSoloLastStartedAt.IsNil() {
 			columns.miningSessionSoloLastStartedAt.Append(stdlibtime.Time{})
@@ -163,7 +171,7 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		} else {
 			columns.extraBonusLastClaimAvailableAt.Append(*usr.ExtraBonusLastClaimAvailableAt.Time)
 		}
-		columns.createdAt.Append(usr.BalanceLastUpdatedAt.Truncate(stdlibtime.Minute))
+		columns.createdAt.Append(now.Truncate(truncateDuration))
 		columns.profilePictureName.Append(usr.ProfilePictureName)
 		columns.username.Append(usr.Username)
 		columns.miningBlockchainAccountAddress.Append(usr.MiningBlockchainAccountAddress)

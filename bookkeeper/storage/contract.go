@@ -98,6 +98,7 @@ var (
 
 type (
 	db struct {
+		cfg          *config
 		pools        []*chpool.Pool
 		settings     []ch.Setting
 		currentIndex uint64
@@ -113,5 +114,6 @@ type (
 			PoolSize int32    `yaml:"poolSize" mapstructure:"poolSize"`
 			RunDDL   bool     `yaml:"runDDL" mapstructure:"runDDL"`
 		} `yaml:"bookkeeper/storage" mapstructure:"bookkeeper/storage"`
+		Development bool `yaml:"development" mapstructure:"development"`
 	}
 )

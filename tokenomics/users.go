@@ -331,14 +331,14 @@ if type(set_nx_reply) == "table" and set_nx_reply['err'] ~= nil then
 	return set_nx_reply
 elseif set_nx_reply == 0 then
 	redis.call('DECR', KEYS[1])
-	return redis.error_reply('race condition')
+	return redis.error_reply('[1]race condition')
 end
 return new_id
 `)
 	initUserScript = redis.NewScript(`
 local hlen_reply = redis.call('HLEN', KEYS[1])
 if hlen_reply ~= 0 then
-	return redis.error_reply('race condition')
+	return redis.error_reply('[2]race condition')
 end
 redis.call('HSETNX', KEYS[1], 'balance_total_standard', 10.0)
 redis.call('HSETNX', KEYS[1], 'balance_total_minted', 10.0)
@@ -366,7 +366,7 @@ func GetOrInitInternalID(ctx context.Context, db storage.DB, userID string) (int
 			for err = errors.New("init"); ctx.Err() == nil && err != nil; {
 				if err = initUserScript.EvalSha(ctx, db, accessibleKeys, userID).Err(); err == nil || errors.Is(err, redis.Nil) || strings.Contains(err.Error(), "race condition") {
 					if err != nil && strings.Contains(err.Error(), "race condition") {
-						log.Error(errors.Wrapf(err, "race condition while evaling initUserScript for userID:%v", userID))
+						log.Error(errors.Wrapf(err, "[2]race condition while evaling initUserScript for userID:%v", userID))
 					}
 					err = nil
 					break
