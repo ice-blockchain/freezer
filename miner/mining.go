@@ -93,15 +93,27 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	} else {
 		if updatedUser.SlashingRateSolo == 0 {
 			updatedUser.SlashingRateSolo = updatedUser.BalanceSolo / 60. / miningSessionRatio
+		} else {
+			if updatedUser.BalanceSoloPending != updatedUser.BalanceSoloPendingApplied {
+				updatedUser.SlashingRateSolo += (updatedUser.BalanceSoloPending - updatedUser.BalanceSoloPendingApplied) / 60. / miningSessionRatio
+			}
 		}
 		if updatedUser.SlashingRateT0 == 0 {
 			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 60. / miningSessionRatio
 		}
 		if updatedUser.SlashingRateT1 == 0 {
 			updatedUser.SlashingRateT1 = updatedUser.BalanceT1 / 60. / miningSessionRatio
+		} else {
+			if updatedUser.BalanceT1Pending != updatedUser.BalanceT1PendingApplied {
+				updatedUser.SlashingRateT1 += (updatedUser.BalanceT1Pending - updatedUser.BalanceT1PendingApplied) / 60. / miningSessionRatio
+			}
 		}
 		if updatedUser.SlashingRateT2 == 0 {
 			updatedUser.SlashingRateT2 = updatedUser.BalanceT2 / 60. / miningSessionRatio
+		} else {
+			if updatedUser.BalanceT2Pending != updatedUser.BalanceT2PendingApplied {
+				updatedUser.SlashingRateT2 += (updatedUser.BalanceT2Pending - updatedUser.BalanceT2PendingApplied) / 60. / miningSessionRatio
+			}
 		}
 	}
 
