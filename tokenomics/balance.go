@@ -180,7 +180,7 @@ func (e *BalanceHistoryEntry) calculateBalanceDiffBonus(
 	}
 
 	for ix := len(adoptions) - 1; ix >= 0; ix-- {
-		if adoptions[ix].AchievedAt == nil {
+		if adoptions[ix].AchievedAt.IsNil() {
 			continue
 		}
 		achievedAt := *adoptions[ix].AchievedAt.Time

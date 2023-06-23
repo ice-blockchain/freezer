@@ -426,7 +426,7 @@ func (r *repository) calculateMintedPreStakingCoins(
 }
 
 func (r *repository) calculateMiningStreak(now, start, end *time.Time) uint64 {
-	if start == nil || end == nil || now.After(*end.Time) || now.Before(*start.Time) {
+	if start.IsNil() || end.IsNil() || now.After(*end.Time) || now.Before(*start.Time) {
 		return 0
 	}
 
@@ -434,7 +434,7 @@ func (r *repository) calculateMiningStreak(now, start, end *time.Time) uint64 {
 }
 
 func (r *repository) calculateRemainingFreeMiningSessions(now, end *time.Time) uint64 {
-	if end == nil || now.After(*end.Time) {
+	if end.IsNil() || now.After(*end.Time) {
 		return 0
 	}
 

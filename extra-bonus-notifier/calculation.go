@@ -36,7 +36,7 @@ func CalculateExtraBonus(
 }
 
 func calculateMiningStreak(now, start, end *time.Time) uint64 {
-	if start == nil || end == nil || now.After(*end.Time) || now.Before(*start.Time) {
+	if start.IsNil() || end.IsNil() || now.After(*end.Time) || now.Before(*start.Time) {
 		return 0
 	}
 
