@@ -115,4 +115,28 @@ func TestDetectIncrTotalActiveUsersKeys(t *testing.T) {
 		repo.totalActiveUsersKey(now.Add(59 * cfg.AdoptionMilestoneSwitch.Duration)),
 		repo.totalActiveUsersKey(now.Add(60 * cfg.AdoptionMilestoneSwitch.Duration)),
 	}, actual)
+	offset := 80 * stdlibtime.Minute
+	ms = &MiningSession{
+		LastNaturalMiningStartedAt: time.New(now.Add(cfg.MiningSessionDuration.Min).Add(2*cfg.MiningSessionDuration.Max + 1).Add(offset)),
+		StartedAt:                  time.New(now.Add(cfg.MiningSessionDuration.Min).Add(cfg.MiningSessionDuration.Max + 1)),
+		EndedAt:                    time.New(now.Add(2 * cfg.MiningSessionDuration.Min).Add(2*cfg.MiningSessionDuration.Max + 1).Add(offset)),
+		PreviouslyEndedAt:          time.New(now.Add(cfg.MiningSessionDuration.Min).Add(cfg.MiningSessionDuration.Max)),
+		Extension:                  cfg.MiningSessionDuration.Min + offset,
+	}
+	actual = ms.detectIncrTotalActiveUsersKeys(repo)
+	assert.EqualValues(t, []string{
+		repo.totalActiveUsersKey(now.Add(61 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(62 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(63 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(64 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(65 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(66 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(67 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(68 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(69 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(70 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(71 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(72 * cfg.AdoptionMilestoneSwitch.Duration)),
+		repo.totalActiveUsersKey(now.Add(73 * cfg.AdoptionMilestoneSwitch.Duration)),
+	}, actual)
 }

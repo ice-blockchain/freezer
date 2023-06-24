@@ -95,11 +95,15 @@ func (ms *MiningSession) detectIncrTotalActiveUsersKeys(repo *repository) []stri
 			repo.totalActiveUsersKey(*ms.StartedAt.Time) == repo.totalActiveUsersKey(*ms.PreviouslyEndedAt.Time)) {
 		start = start.Add(repo.cfg.AdoptionMilestoneSwitch.Duration)
 	}
+	start = start.Truncate(repo.cfg.AdoptionMilestoneSwitch.Duration)
+	end = end.Truncate(repo.cfg.AdoptionMilestoneSwitch.Duration)
 	for start.Before(end) {
 		keys = append(keys, repo.totalActiveUsersKey(start))
 		start = start.Add(repo.cfg.AdoptionMilestoneSwitch.Duration)
 	}
-	keys = append(keys, repo.totalActiveUsersKey(end))
+	if ms.PreviouslyEndedAt.IsNil() || repo.totalActiveUsersKey(end) != repo.totalActiveUsersKey(*ms.PreviouslyEndedAt.Time) {
+		keys = append(keys, repo.totalActiveUsersKey(end))
+	}
 
 	return keys
 }
