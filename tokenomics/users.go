@@ -379,6 +379,7 @@ func GetOrInitInternalID(ctx context.Context, db storage.DB, userID string) (int
 	}
 	if err != nil {
 		log.Error(err)
+		stdlibtime.Sleep(2 * stdlibtime.Second)
 
 		return GetOrInitInternalID(ctx, db, userID)
 	}
