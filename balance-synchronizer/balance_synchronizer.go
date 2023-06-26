@@ -103,10 +103,10 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
-			if updatedGlobalRank := ShouldUpdateGlobalRank(0, usr.ID, usr.BalanceTotalStandard+usr.BalanceTotalPreStaking); updatedGlobalRank != nil {
+			if updatedGlobalRank := ShouldUpdateGlobalRank(func() bool { panic("not implemented") }, usr.ID, usr.BalanceTotalStandard+usr.BalanceTotalPreStaking); updatedGlobalRank != nil {
 				updatedUsers = append(updatedUsers, *updatedGlobalRank)
 			}
-			if msg := ShouldSendBalanceUpdatedMessage(ctx, iteration, usr.UserID, usr.BalanceTotalStandard, usr.BalanceTotalPreStaking); msg != nil {
+			if msg := ShouldSendBalanceUpdatedMessage(ctx, func() bool { panic("not implemented") }, usr.UserID, usr.BalanceTotalStandard, usr.BalanceTotalPreStaking); msg != nil {
 				msgs = append(msgs, msg)
 			}
 			if msg := shouldSynchronizeBlockchainAccount(iteration, usr); msg != nil {
@@ -170,8 +170,8 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 
 }
 
-func ShouldUpdateGlobalRank(iteration uint64, id int64, totalBalance float64) *redis.Z {
-	if iteration%100 != 0 {
+func ShouldUpdateGlobalRank(should func() bool, id int64, totalBalance float64) *redis.Z {
+	if !should() {
 		return nil
 	}
 
@@ -182,9 +182,9 @@ func ShouldUpdateGlobalRank(iteration uint64, id int64, totalBalance float64) *r
 }
 
 func ShouldSendBalanceUpdatedMessage(
-	ctx context.Context, iteration uint64, userID string, totalStandardBalance, totalPreStakingBalance float64,
+	ctx context.Context, should func() bool, userID string, totalStandardBalance, totalPreStakingBalance float64,
 ) *messagebroker.Message {
-	if iteration%100 != 0 {
+	if !should() {
 		return nil
 	}
 	event := &BalanceUpdated{

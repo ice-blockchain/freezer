@@ -138,6 +138,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		userGlobalRanks                                            = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
 	)
+	shouldSynchronizeBalance := func() bool {
+		return iteration%100 == 0
+	}
 	resetVars := func(success bool) {
 		if success && len(userKeys) == int(batchSize) && len(userResults) == 0 {
 			go m.telemetry.collectElapsed(0, *lastIterationStartedAt.Time)
@@ -297,10 +300,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				totalStandardBalance, totalPreStakingBalance = updatedUser.BalanceTotalStandard, updatedUser.BalanceTotalPreStaking
 			}
 			totalBalance := totalStandardBalance + totalPreStakingBalance
-			if updatedGlobalRank := balancesynchronizer.ShouldUpdateGlobalRank(iteration, usr.ID, totalBalance); updatedGlobalRank != nil {
+			if updatedGlobalRank := balancesynchronizer.ShouldUpdateGlobalRank(shouldSynchronizeBalance, usr.ID, totalBalance); updatedGlobalRank != nil {
 				userGlobalRanks = append(userGlobalRanks, *updatedGlobalRank)
 			}
-			if msg := balancesynchronizer.ShouldSendBalanceUpdatedMessage(reqCtx, iteration, usr.UserID, totalStandardBalance, totalPreStakingBalance); msg != nil {
+			if msg := balancesynchronizer.ShouldSendBalanceUpdatedMessage(reqCtx, shouldSynchronizeBalance, usr.UserID, totalStandardBalance, totalPreStakingBalance); msg != nil {
 				msgs = append(msgs, msg)
 			}
 		}
