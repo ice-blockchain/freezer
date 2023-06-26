@@ -106,7 +106,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 			continue
 		}
 		topMiners = append(topMiners, &Miner{
-			Balance:           fmt.Sprintf("%f", topMiner.BalanceTotalStandard+topMiner.BalanceTotalPreStaking),
+			Balance:           fmt.Sprintf(floatToStringFormatter, topMiner.BalanceTotalStandard+topMiner.BalanceTotalPreStaking),
 			balance:           topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking,
 			UserID:            topMiner.UserID,
 			Username:          topMiner.Username,
@@ -250,7 +250,7 @@ func (r *repository) calculateMiningRateSummaries(
 		positiveTotalNoPreStakingBonusVal = ((positiveTotalNoPreStakingBonus - baseMiningRate) * 100) / baseMiningRate
 	}
 	miningRates.PositiveTotalNoPreStakingBonus = &MiningRateSummary[string]{
-		Amount: fmt.Sprint(roundFloat64(positiveTotalNoPreStakingBonus)),
+		Amount: fmt.Sprintf(floatToStringFormatter, roundFloat64(positiveTotalNoPreStakingBonus)),
 		Bonuses: &MiningRateBonuses{
 			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
 			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),
@@ -270,7 +270,7 @@ func (r *repository) calculateMiningRateSummaries(
 		miningRates.Type = NegativeMiningRateType
 	}
 	miningRates.Base = &MiningRateSummary[string]{
-		Amount: fmt.Sprint(baseMiningRate),
+		Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 	}
 	if preStakingAllocation != 100 {
 		var localTotalBonus float64
@@ -285,7 +285,7 @@ func (r *repository) calculateMiningRateSummaries(
 		case NoneMiningRateType:
 		}
 		miningRates.Standard = &MiningRateSummary[string]{
-			Amount: fmt.Sprint(roundFloat64(standardMiningRate)),
+			Amount: fmt.Sprintf(floatToStringFormatter, roundFloat64(standardMiningRate)),
 			Bonuses: &MiningRateBonuses{
 				T1:    roundFloat64AndTruncate(float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1))*uint64(100-preStakingAllocation)) / 100),
 				T2:    roundFloat64AndTruncate(float64(uint32(t2)*r.cfg.ReferralBonusMiningRates.T2*uint32(100-preStakingAllocation)) / 100),
@@ -311,7 +311,7 @@ func (r *repository) calculateMiningRateSummaries(
 		extraBonusVal := float64(extraBonus*preStakingAllocation) / 100
 		preStakingBonusVal = (float64(preStakingAllocation) * float64(preStakingBonus)) / 100
 		miningRates.PreStaking = &MiningRateSummary[string]{
-			Amount: fmt.Sprint(roundFloat64(preStakingMiningRate)),
+			Amount: fmt.Sprintf(floatToStringFormatter, roundFloat64(preStakingMiningRate)),
 			Bonuses: &MiningRateBonuses{
 				T1:         roundFloat64AndTruncate(t1Bonus),
 				T2:         roundFloat64AndTruncate(t2Bonus),
@@ -333,7 +333,7 @@ func (r *repository) calculateMiningRateSummaries(
 	case NoneMiningRateType:
 	}
 	miningRates.Total = &MiningRateSummary[string]{
-		Amount: fmt.Sprint(roundFloat64(standardMiningRate + preStakingMiningRate)),
+		Amount: fmt.Sprintf(floatToStringFormatter, roundFloat64(standardMiningRate+preStakingMiningRate)),
 		Bonuses: &MiningRateBonuses{
 			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
 			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),
@@ -343,7 +343,7 @@ func (r *repository) calculateMiningRateSummaries(
 		},
 	}
 	miningRates.TotalNoPreStakingBonus = &MiningRateSummary[string]{
-		Amount: fmt.Sprint(roundFloat64(totalNoPreStakingBonusRate)),
+		Amount: fmt.Sprintf(floatToStringFormatter, roundFloat64(totalNoPreStakingBonusRate)),
 		Bonuses: &MiningRateBonuses{
 			T1:         uint64(t0*r.cfg.ReferralBonusMiningRates.T0) + uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1),
 			T2:         uint64(uint32(t2) * r.cfg.ReferralBonusMiningRates.T2),

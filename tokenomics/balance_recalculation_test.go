@@ -49,10 +49,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Intended.
 		Type: PositiveMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		Standard: &MiningRateSummary[string]{
-			Amount: "42",
+			Amount: "42.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         137,
 				T2:         25,
@@ -62,7 +62,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PreStaking: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         137,
 				T2:         25,
@@ -72,7 +72,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "126",
+			Amount: "126.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -82,7 +82,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -92,7 +92,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -108,10 +108,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Intended.
 		Type: PositiveMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		Standard: &MiningRateSummary[string]{
-			Amount: "75.6",
+			Amount: "75.60",
 			Bonuses: &MiningRateBonuses{
 				T1:         247,
 				T2:         45,
@@ -121,7 +121,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PreStaking: &MiningRateSummary[string]{
-			Amount: "50.4",
+			Amount: "50.40",
 			Bonuses: &MiningRateBonuses{
 				T1:         27,
 				T2:         5,
@@ -131,7 +131,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "126",
+			Amount: "126.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -141,7 +141,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -151,7 +151,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -167,10 +167,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Wrong.
 		Type: PositiveMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		PreStaking: &MiningRateSummary[string]{
-			Amount: "168",
+			Amount: "168.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -180,7 +180,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "168",
+			Amount: "168.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -190,7 +190,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -200,7 +200,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -216,10 +216,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Wrong.
 		Type: PositiveMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		Standard: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -229,7 +229,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -239,7 +239,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -249,7 +249,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -267,10 +267,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Wrong.
 		Type: NoneMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		Standard: &MiningRateSummary[string]{
-			Amount: "0",
+			Amount: "0.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         247,
 				T2:         45,
@@ -280,7 +280,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PreStaking: &MiningRateSummary[string]{
-			Amount: "0",
+			Amount: "0.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         27,
 				T2:         5,
@@ -290,7 +290,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "0",
+			Amount: "0.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -300,7 +300,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "0",
+			Amount: "0.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -310,7 +310,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,
@@ -325,10 +325,10 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 	assert.EqualValues(t, &MiningRates[*MiningRateSummary[string]]{ //nolint:dupl // Wrong.
 		Type: NegativeMiningRateType,
 		Base: &MiningRateSummary[string]{
-			Amount: fmt.Sprint(baseMiningRate),
+			Amount: fmt.Sprintf(floatToStringFormatter, baseMiningRate),
 		},
 		Standard: &MiningRateSummary[string]{
-			Amount: "900",
+			Amount: "900.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         0,
 				T2:         0,
@@ -338,7 +338,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PreStaking: &MiningRateSummary[string]{
-			Amount: "600",
+			Amount: "600.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         0,
 				T2:         0,
@@ -348,7 +348,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		Total: &MiningRateSummary[string]{
-			Amount: "1500",
+			Amount: "1500.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         0,
 				T2:         0,
@@ -358,7 +358,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		TotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "1000",
+			Amount: "1000.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         0,
 				T2:         0,
@@ -368,7 +368,7 @@ func TestRepository_CalculateMiningRateSummaries(t *testing.T) { //nolint:funlen
 			},
 		},
 		PositiveTotalNoPreStakingBonus: &MiningRateSummary[string]{
-			Amount: "84",
+			Amount: "84.00",
 			Bonuses: &MiningRateBonuses{
 				T1:         275,
 				T2:         50,

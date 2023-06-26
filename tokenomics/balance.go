@@ -50,13 +50,13 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 
 	return &BalanceSummary{
 		Balances: Balances[string]{
-			Total:                  fmt.Sprintf("%f", soloStandard+soloPreStaking+t1Standard+t1PreStaking+t2Standard+t2PreStaking),
-			TotalNoPreStakingBonus: fmt.Sprintf("%f", res[0].BalanceSolo+res[0].BalanceT0+res[0].BalanceT1+res[0].BalanceT2),
-			Standard:               fmt.Sprintf("%f", soloStandard+t1Standard+t2Standard),
-			PreStaking:             fmt.Sprintf("%f", soloPreStaking+t1PreStaking+t2PreStaking),
-			T1:                     fmt.Sprintf("%f", t1Standard+t1PreStaking),
-			T2:                     fmt.Sprintf("%f", t2Standard+t2PreStaking),
-			TotalReferrals:         fmt.Sprintf("%f", t1Standard+t1PreStaking+t2Standard+t2PreStaking),
+			Total:                  fmt.Sprintf(floatToStringFormatter, soloStandard+soloPreStaking+t1Standard+t1PreStaking+t2Standard+t2PreStaking),
+			TotalNoPreStakingBonus: fmt.Sprintf(floatToStringFormatter, res[0].BalanceSolo+res[0].BalanceT0+res[0].BalanceT1+res[0].BalanceT2),
+			Standard:               fmt.Sprintf(floatToStringFormatter, soloStandard+t1Standard+t2Standard),
+			PreStaking:             fmt.Sprintf(floatToStringFormatter, soloPreStaking+t1PreStaking+t2PreStaking),
+			T1:                     fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking),
+			T2:                     fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
+			TotalReferrals:         fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
 		},
 	}, nil
 }
@@ -144,7 +144,7 @@ func (r *repository) processBalanceHistory(
 		total := bal.BalanceTotalMinted - bal.BalanceTotalSlashed
 		parents[parentFormat].children[childFormat].Balance.amount = total
 		parents[parentFormat].children[childFormat].Balance.Negative = total < 0
-		parents[parentFormat].children[childFormat].Balance.Amount = fmt.Sprintf("%f", math.Abs(total))
+		parents[parentFormat].children[childFormat].Balance.Amount = fmt.Sprintf(floatToStringFormatter, math.Abs(total))
 	}
 	sort.Strings(parentKeys)
 	history := make([]*BalanceHistoryEntry, 0, len(parents))
@@ -178,7 +178,7 @@ func (r *repository) processBalanceHistory(
 			parents[pKey].setBalanceDiffBonus(prevParent.Balance.amount)
 		}
 		parents[pKey].Balance.Negative = parents[pKey].Balance.amount < 0
-		parents[pKey].Balance.Amount = fmt.Sprintf("%f", math.Abs(parents[pKey].Balance.amount))
+		parents[pKey].Balance.Amount = fmt.Sprintf(floatToStringFormatter, math.Abs(parents[pKey].Balance.amount))
 		if !startDateIsBeforeEndDate {
 			sort.SliceStable(parents[pKey].BalanceHistoryEntry.TimeSeries, func(i, j int) bool {
 				return parents[pKey].BalanceHistoryEntry.TimeSeries[i].Time.After(parents[pKey].BalanceHistoryEntry.TimeSeries[j].Time)
