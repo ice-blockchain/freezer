@@ -106,7 +106,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 			continue
 		}
 		topMiners = append(topMiners, &Miner{
-			Balance:           fmt.Sprint(topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking),
+			Balance:           fmt.Sprintf("%f", topMiner.BalanceTotalStandard+topMiner.BalanceTotalPreStaking),
 			balance:           topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking,
 			UserID:            topMiner.UserID,
 			Username:          topMiner.Username,
