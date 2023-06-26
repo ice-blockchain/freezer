@@ -320,5 +320,5 @@ func SessionNumber(date *time.Time, miningSessionResetDeadline stdlibtime.Durati
 }
 
 func (ms *MiningSession) duplGuardKey(repo *repository, guardType string) string {
-	return fmt.Sprintf("mining_session_dupl_guards:%v~%v~%v", guardType, ms.UserID, repo.sessionNumber(ms.StartedAt))
+	return fmt.Sprintf("mining_session_dupl_guards:%v~%v~%v", guardType, *ms.UserID, repo.sessionNumber(ms.LastNaturalMiningStartedAt))
 }
