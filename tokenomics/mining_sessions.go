@@ -168,7 +168,7 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 	}
 	if rollbackNegativeMiningProgress == nil {
 		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
-			"amount":                fmt.Sprint(amountLost),
+			"amount":                fmt.Sprintf(floatToStringFormatter, amountLost),
 			"duringTheLastXSeconds": uint64(slashingDuration.Seconds()),
 		})
 	}

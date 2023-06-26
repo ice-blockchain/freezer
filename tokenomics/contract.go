@@ -194,6 +194,8 @@ const (
 	requestingUserIDCtxValueKey         = "requestingUserIDCtxValueKey"
 	userHashCodeCtxValueKey             = "userHashCodeCtxValueKey"
 	requestDeadline                     = 25 * stdlibtime.Second
+
+	floatToStringFormatter = "%.2f"
 )
 
 type (
