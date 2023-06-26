@@ -77,7 +77,14 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	const (
 		hoursInADay = 24
 	)
-	mappedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
+	calculatedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
+	var limitPadding uint64
+	if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+		limitPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Hour))).Hour()) + 1
+	} else {
+		limitPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Minute))).Minute()) + 1
+	}
+	mappedLimit := calculatedLimit + limitPadding
 	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
 	dates := make([]stdlibtime.Time, 0, mappedLimit)
 	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
@@ -87,44 +94,46 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	adoptions, gErr := getAllAdoptions[float64](ctx, r.db)
-	if gErr != nil {
-		return nil, errors.Wrap(gErr, "failed to getAllAdoptions")
-	}
 	balanceHistory, gErr := r.dwh.SelectBalanceHistory(ctx, id, dates)
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to SelectBalanceHistory for id:%v,createdAts:%#v", id, dates)
 	}
+	var notBeforeTime *time.Time
+	if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Hour))))
+	} else {
+		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Minute))))
+	}
 
-	return r.processBalanceHistory(balanceHistory, factor > 0, adoptions), nil
+	return r.processBalanceHistory(balanceHistory, factor > 0, notBeforeTime), nil
 }
 
-func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
+func (r *repository) processBalanceHistory(
 	res []*dwh.BalanceHistory,
 	startDateIsBeforeEndDate bool,
-	adoptions []*Adoption[float64],
-) []*BalanceHistoryEntry {
+	notBeforeTime *time.Time,
+) []*BalanceHistoryEntry { //nolint:funlen,gocognit,revive // .
 	childDateLayout := r.cfg.globalAggregationIntervalChildDateFormat()
 	parentDateLayout := r.cfg.globalAggregationIntervalParentDateFormat()
-	parents := make(map[string]*struct {
+	type parentType struct {
 		*BalanceHistoryEntry
 		children map[string]*BalanceHistoryEntry
-	}, 1+1)
+	}
+	parents := make(map[string]*parentType, 1+1)
+	parentKeys := make([]string, 0, len(parents))
 	for _, bal := range res {
 		childFormat, parentFormat := bal.CreatedAt.Format(childDateLayout), bal.CreatedAt.Format(parentDateLayout)
 		if _, found := parents[parentFormat]; !found {
 			parent, pErr := stdlibtime.ParseInLocation(parentDateLayout, parentFormat, stdlibtime.UTC)
 			log.Panic(pErr) //nolint:revive // Intended.
-			parents[parentFormat] = &struct {
-				*BalanceHistoryEntry
-				children map[string]*BalanceHistoryEntry
-			}{
+			parents[parentFormat] = &parentType{
 				BalanceHistoryEntry: &BalanceHistoryEntry{
 					Time:    parent,
 					Balance: new(BalanceHistoryBalanceDiff),
 				},
 				children: make(map[string]*BalanceHistoryEntry, int(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)),
 			}
+			parentKeys = append(parentKeys, parentFormat)
 		}
 		if _, found := parents[parentFormat].children[childFormat]; !found {
 			parents[parentFormat].children[childFormat] = &BalanceHistoryEntry{
@@ -137,78 +146,60 @@ func (r *repository) processBalanceHistory( //nolint:funlen,gocognit,revive // .
 		parents[parentFormat].children[childFormat].Balance.Negative = total < 0
 		parents[parentFormat].children[childFormat].Balance.Amount = fmt.Sprint(math.Abs(total))
 	}
+	sort.Strings(parentKeys)
 	history := make([]*BalanceHistoryEntry, 0, len(parents))
-	for _, parentVal := range parents {
-		parentVal.BalanceHistoryEntry.TimeSeries = make([]*BalanceHistoryEntry, 0, len(parentVal.children))
-		var baseMiningRate float64
-		for _, childVal := range parentVal.children {
-			childVal.TimeSeries = make([]*BalanceHistoryEntry, 0, 0)
-			baseMiningRate += childVal.calculateBalanceDiffBonus(r.cfg.GlobalAggregationInterval.Child, adoptions)
-			childVal.setBalanceDiffBonus(baseMiningRate)
-			parentVal.Balance.amount += childVal.Balance.amount
-			parentVal.BalanceHistoryEntry.TimeSeries = append(parentVal.BalanceHistoryEntry.TimeSeries, childVal)
+
+	var prevParent *parentType
+	for _, pKey := range parentKeys {
+		parents[pKey].BalanceHistoryEntry.TimeSeries = make([]*BalanceHistoryEntry, 0, len(parents[pKey].children))
+		var prevChild *BalanceHistoryEntry
+		childrenKeys := make([]string, 0)
+		for cKey := range parents[pKey].children {
+			childrenKeys = append(childrenKeys, cKey)
 		}
-		parentVal.setBalanceDiffBonus(baseMiningRate / (float64(len(parentVal.children))))
-		parentVal.Balance.Negative = parentVal.Balance.amount < 0
-		parentVal.Balance.Amount = fmt.Sprint(math.Abs(parentVal.Balance.amount))
-		sort.SliceStable(parentVal.BalanceHistoryEntry.TimeSeries, func(i, j int) bool {
-			if startDateIsBeforeEndDate {
-				return parentVal.BalanceHistoryEntry.TimeSeries[i].Time.Before(parentVal.BalanceHistoryEntry.TimeSeries[j].Time)
+		sort.Strings(childrenKeys)
+		for _, cKey := range childrenKeys {
+			parents[pKey].children[cKey].TimeSeries = make([]*BalanceHistoryEntry, 0, 0)
+			if prevChild == nil {
+				parents[pKey].children[cKey].Balance.Bonus = 0
+			} else {
+				parents[pKey].children[cKey].setBalanceDiffBonus(prevChild.Balance.amount)
 			}
-
-			return parentVal.BalanceHistoryEntry.TimeSeries[i].Time.After(parentVal.BalanceHistoryEntry.TimeSeries[j].Time)
-		})
-		history = append(history, parentVal.BalanceHistoryEntry)
-	}
-	sort.SliceStable(history, func(i, j int) bool {
-		if startDateIsBeforeEndDate {
-			return history[i].Time.Before(history[j].Time)
+			parents[pKey].Balance.amount += parents[pKey].children[cKey].Balance.amount
+			if time.New(parents[pKey].children[cKey].Time).UnixNano() >= notBeforeTime.UnixNano() {
+				parents[pKey].BalanceHistoryEntry.TimeSeries = append(parents[pKey].BalanceHistoryEntry.TimeSeries, parents[pKey].children[cKey])
+				prevChild = parents[pKey].children[cKey]
+			}
+			childrenKeys = append(childrenKeys, cKey)
+		}
+		if prevParent == nil {
+			parents[pKey].Balance.Bonus = 0
+		} else {
+			parents[pKey].setBalanceDiffBonus(prevParent.Balance.amount)
+		}
+		parents[pKey].Balance.Negative = parents[pKey].Balance.amount < 0
+		parents[pKey].Balance.Amount = fmt.Sprint(math.Abs(parents[pKey].Balance.amount))
+		if !startDateIsBeforeEndDate {
+			sort.SliceStable(parents[pKey].BalanceHistoryEntry.TimeSeries, func(i, j int) bool {
+				return parents[pKey].BalanceHistoryEntry.TimeSeries[i].Time.After(parents[pKey].BalanceHistoryEntry.TimeSeries[j].Time)
+			})
 		}
 
-		return history[i].Time.After(history[j].Time)
-	})
+		history = append(history, parents[pKey].BalanceHistoryEntry)
+		prevParent = parents[pKey]
+	}
+	if !startDateIsBeforeEndDate {
+		sort.SliceStable(history, func(i, j int) bool {
+			return history[i].Time.After(history[j].Time)
+		})
+	}
 
 	return history
 }
 
-func (e *BalanceHistoryEntry) calculateBalanceDiffBonus(
-	delta stdlibtime.Duration, adoptions []*Adoption[float64],
-) (baseMiningRate float64) {
-	endDate := e.Time.Add(delta)
-	calculateProportionalBaseMiningRate := func(currentBaseMiningRate float64, startDate stdlibtime.Time) float64 {
-		return (currentBaseMiningRate * float64(endDate.Sub(startDate))) / float64(delta)
-	}
-
-	for ix := len(adoptions) - 1; ix >= 0; ix-- {
-		if adoptions[ix].AchievedAt.IsNil() {
-			continue
-		}
-		achievedAt := *adoptions[ix].AchievedAt.Time
-		currentBaseMiningRate := adoptions[ix].BaseMiningRate
-		if achievedAt.Before(e.Time.Add(stdlibtime.Nanosecond)) {
-			if baseMiningRate == 0 {
-				baseMiningRate = currentBaseMiningRate
-			} else {
-				baseMiningRate += calculateProportionalBaseMiningRate(currentBaseMiningRate, e.Time)
-			}
-
-			break
-		}
-		if achievedAt.Before(endDate) && achievedAt.After(e.Time.Add(-stdlibtime.Nanosecond)) {
-			baseMiningRate += calculateProportionalBaseMiningRate(currentBaseMiningRate, achievedAt)
-			endDate = achievedAt
-		}
-	}
-
-	return baseMiningRate
-}
-
-func (e *BalanceHistoryEntry) setBalanceDiffBonus(baseMiningRate float64) {
-	if e.Balance.amount < 0 { //nolint:gocritic // Wrong.
-		e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(e.Balance.amount*-100/baseMiningRate))
-	} else {
-		e.Balance.Bonus = int64(roundFloat64AndTruncate(e.Balance.amount * 100 / baseMiningRate))
-	}
+func (e *BalanceHistoryEntry) setBalanceDiffBonus(from float64) {
+	to := e.Balance.amount
+	e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
 }
 
 //nolint:funlen // .
