@@ -157,7 +157,7 @@ type (
 		AvailableExtraBonus uint16 `json:"availableExtraBonus,omitempty" example:"2"`
 	}
 	RankingSummary struct {
-		GlobalRank uint64 `json:"globalRank,omitempty" example:"12333"`
+		GlobalRank uint64 `json:"globalRank" example:"12333"`
 	}
 	ReadRepository interface {
 		GetBalanceSummary(ctx context.Context, userID string) (*BalanceSummary, error)

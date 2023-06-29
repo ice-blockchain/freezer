@@ -344,7 +344,6 @@ redis.call('HSETNX', KEYS[1], 'balance_total_standard', 10.0)
 redis.call('HSETNX', KEYS[1], 'balance_total_minted', 10.0)
 redis.call('HSETNX', KEYS[1], 'balance_solo', 10.0)
 redis.call('HSETNX', KEYS[1], 'user_id', ARGV[1])
-redis.call('ZADD', 'top_miners', 'NX', 10.0, KEYS[1])
 `)
 )
 

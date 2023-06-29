@@ -103,12 +103,8 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
-			if updatedGlobalRank := ShouldUpdateGlobalRank(func() bool { panic("not implemented") }, usr.ID, usr.BalanceTotalStandard+usr.BalanceTotalPreStaking); updatedGlobalRank != nil {
-				updatedUsers = append(updatedUsers, *updatedGlobalRank)
-			}
-			if msg := ShouldSendBalanceUpdatedMessage(ctx, func() bool { panic("not implemented") }, usr.UserID, usr.BalanceTotalStandard, usr.BalanceTotalPreStaking); msg != nil {
-				msgs = append(msgs, msg)
-			}
+			updatedUsers = append(updatedUsers, GlobalRank(usr.ID, usr.BalanceTotalStandard+usr.BalanceTotalPreStaking))
+			msgs = append(msgs, BalanceUpdatedMessage(ctx, usr.UserID, usr.BalanceTotalStandard, usr.BalanceTotalPreStaking))
 			if msg := shouldSynchronizeBlockchainAccount(iteration, usr); msg != nil {
 				blockchainMessages = append(blockchainMessages, msg)
 			}
@@ -170,23 +166,16 @@ func (bs *balanceSynchronizer) synchronize(ctx context.Context, workerNumber int
 
 }
 
-func ShouldUpdateGlobalRank(should func() bool, id int64, totalBalance float64) *redis.Z {
-	if !should() {
-		return nil
-	}
-
-	return &redis.Z{
+func GlobalRank(id int64, totalBalance float64) redis.Z {
+	return redis.Z{
 		Score:  totalBalance,
 		Member: model.SerializedUsersKey(id),
 	}
 }
 
-func ShouldSendBalanceUpdatedMessage(
-	ctx context.Context, should func() bool, userID string, totalStandardBalance, totalPreStakingBalance float64,
+func BalanceUpdatedMessage(
+	ctx context.Context, userID string, totalStandardBalance, totalPreStakingBalance float64,
 ) *messagebroker.Message {
-	if !should() {
-		return nil
-	}
 	event := &BalanceUpdated{
 		UserID:     userID,
 		Standard:   totalStandardBalance,

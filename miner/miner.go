@@ -4,6 +4,7 @@ package miner
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/goccy/go-json"
@@ -119,6 +120,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 	}()
 	var (
 		batchNumber                                                int64
+		totalBatches                                               uint64
 		iteration                                                  uint64
 		now, lastIterationStartedAt                                = time.Now(), time.Now()
 		currentAdoption                                            = m.getAdoption(ctx, db, workerNumber)
@@ -137,15 +139,20 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		histories                                                  = make([]*model.User, 0, batchSize)
 		userGlobalRanks                                            = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
+		shouldSynchronizeBalanceFunc                               = func(batchNumberArg uint64) bool { return false }
 	)
-	shouldSynchronizeBalance := func() bool {
-		return iteration%100 == 0
-	}
 	resetVars := func(success bool) {
 		if success && len(userKeys) == int(batchSize) && len(userResults) == 0 {
 			go m.telemetry.collectElapsed(0, *lastIterationStartedAt.Time)
 			lastIterationStartedAt = time.Now()
 			iteration++
+			if batchNumber < 1 {
+				panic("unexpected batch number: " + fmt.Sprint(batchNumber))
+			}
+			totalBatches = uint64(batchNumber - 1)
+			if totalBatches != 0 && iteration > 2 {
+				shouldSynchronizeBalanceFunc = m.telemetry.shouldSynchronizeBalanceFunc(uint64(workerNumber), totalBatches, iteration)
+			}
 			batchNumber = 0
 		} else if success {
 			go m.telemetry.collectElapsed(1, *now.Time)
@@ -249,6 +256,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				t0Referrals[ref.ID] = ref
 			}
 		}
+
+		shouldSynchronizeBalance := shouldSynchronizeBalanceFunc(uint64(batchNumber))
 		for _, usr := range userResults {
 			var t0Ref, tMinus1Ref *referral
 			if usr.IDT0 > 0 {
@@ -300,11 +309,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				totalStandardBalance, totalPreStakingBalance = updatedUser.BalanceTotalStandard, updatedUser.BalanceTotalPreStaking
 			}
 			totalBalance := totalStandardBalance + totalPreStakingBalance
-			if updatedGlobalRank := balancesynchronizer.ShouldUpdateGlobalRank(shouldSynchronizeBalance, usr.ID, totalBalance); updatedGlobalRank != nil {
-				userGlobalRanks = append(userGlobalRanks, *updatedGlobalRank)
-			}
-			if msg := balancesynchronizer.ShouldSendBalanceUpdatedMessage(reqCtx, shouldSynchronizeBalance, usr.UserID, totalStandardBalance, totalPreStakingBalance); msg != nil {
-				msgs = append(msgs, msg)
+			if shouldSynchronizeBalance {
+				userGlobalRanks = append(userGlobalRanks, balancesynchronizer.GlobalRank(usr.ID, totalBalance))
+				msgs = append(msgs, balancesynchronizer.BalanceUpdatedMessage(reqCtx, usr.UserID, totalStandardBalance, totalPreStakingBalance))
 			}
 		}
 

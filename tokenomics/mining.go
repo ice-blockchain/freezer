@@ -31,7 +31,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 	if rank == 0 {
 		if rank, err = r.db.ZRevRank(ctx, "top_miners", model.SerializedUsersKey(id)).Uint64(); err != nil {
 			if errors.Is(err, redis.Nil) {
-				return &RankingSummary{GlobalRank: 0}, nil
+				return &RankingSummary{GlobalRank: rank}, nil
 			}
 
 			return nil, errors.Wrapf(err, "failed to ZRevRank top_miners for userID:%v", userID)
@@ -42,6 +42,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		} else {
 			expiration = 5 * stdlibtime.Second
 		}
+		rank++
 		if err = r.db.SetEx(ctx, fmt.Sprintf("global_rank:%v", id), rank, expiration).Err(); err != nil {
 			return nil, errors.Wrapf(err, "failed to set cached global_rank for id:%v", id)
 		}
@@ -56,7 +57,7 @@ func (r *repository) GetRankingSummary(ctx context.Context, userID string) (*Ran
 		}
 	}
 
-	return &RankingSummary{GlobalRank: rank + 1}, nil
+	return &RankingSummary{GlobalRank: rank}, nil
 }
 
 const (
