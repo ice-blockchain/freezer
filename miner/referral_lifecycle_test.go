@@ -26,4 +26,20 @@ func Test_didReferralJustStopMining(t *testing.T) {
 		require.NotNil(t, x)
 		require.NotNil(t, x.StoppedMiningAt.Time)
 	})
+
+	t.Run("Full parameters list", func(t *testing.T) {
+		before := newUser()
+		before.BalanceLastUpdatedAt = timeDelta(-time.Hour * 2)
+		before.MiningSessionSoloEndedAt = timeDelta(-time.Hour)
+
+		t0Ref := newRef()
+		tMinus1Ref := newRef()
+
+		x := didReferralJustStopMining(testTime, before, t0Ref, tMinus1Ref)
+		require.NotNil(t, x)
+		require.NotNil(t, x.StoppedMiningAt.Time)
+		require.Equal(t, before.ID, x.ID)
+		require.Equal(t, t0Ref.ID, x.IDT0)
+		require.Equal(t, tMinus1Ref.ID, x.IDTMinus1)
+	})
 }
