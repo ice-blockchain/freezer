@@ -74,6 +74,20 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	} else {
 		factor = 1
 	}
+	dates, notBeforeTime := r.calculateDates(limit, offset, start, factor)
+	id, gErr := GetOrInitInternalID(ctx, r.db, userID)
+	if gErr != nil {
+		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
+	}
+	balanceHistory, gErr := r.dwh.SelectBalanceHistory(ctx, id, dates)
+	if gErr != nil {
+		return nil, errors.Wrapf(gErr, "failed to SelectBalanceHistory for id:%v,createdAts:%#v", id, dates)
+	}
+
+	return r.processBalanceHistory(balanceHistory, factor > 0, notBeforeTime), nil
+}
+
+func (r *repository) calculateDates(limit, offset uint64, start *time.Time, factor stdlibtime.Duration) (dates []stdlibtime.Time, notBeforeTime *time.Time) {
 	const (
 		hoursInADay = 24
 	)
@@ -86,26 +100,17 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	}
 	mappedLimit := calculatedLimit + limitPadding
 	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
-	dates := make([]stdlibtime.Time, 0, mappedLimit)
+	dates = make([]stdlibtime.Time, 0, mappedLimit)
 	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
 		dates = append(dates, start.Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
 	}
-	id, gErr := GetOrInitInternalID(ctx, r.db, userID)
-	if gErr != nil {
-		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
-	}
-	balanceHistory, gErr := r.dwh.SelectBalanceHistory(ctx, id, dates)
-	if gErr != nil {
-		return nil, errors.Wrapf(gErr, "failed to SelectBalanceHistory for id:%v,createdAts:%#v", id, dates)
-	}
-	var notBeforeTime *time.Time
 	if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
-		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Hour))))
+		notBeforeTime = time.New(start.Add(stdlibtime.Duration((-calculatedLimit - mappedOffset) * uint64(stdlibtime.Hour))))
 	} else {
-		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Minute))))
+		notBeforeTime = time.New(start.Add(stdlibtime.Duration((-calculatedLimit - mappedOffset) * uint64(stdlibtime.Minute))))
 	}
 
-	return r.processBalanceHistory(balanceHistory, factor > 0, notBeforeTime), nil
+	return
 }
 
 func (r *repository) processBalanceHistory(
@@ -199,7 +204,11 @@ func (r *repository) processBalanceHistory(
 
 func (e *BalanceHistoryEntry) setBalanceDiffBonus(from float64) {
 	to := e.Balance.amount
-	e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
+	if from < 0 && to > 0 {
+		e.Balance.Bonus = int64(roundFloat64AndTruncate(((from - to) / from) * 100))
+	} else {
+		e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
+	}
 }
 
 //nolint:funlen // .
