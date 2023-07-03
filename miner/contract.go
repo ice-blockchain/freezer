@@ -104,6 +104,7 @@ type (
 	}
 
 	referral struct {
+		model.UserIDField
 		model.MiningSessionSoloStartedAtField
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
