@@ -123,6 +123,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/tokenomics.Miner"
                             }
+                        },
+                        "headers": {
+                            "X-Next-Offset": {
+                                "type": "integer",
+                                "description": "if this value is 0, pagination stops, if not, use it in the ` + "`" + `offset` + "`" + ` query param for the next call. "
+                            }
                         }
                     },
                     "400": {

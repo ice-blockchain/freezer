@@ -162,7 +162,7 @@ type (
 	ReadRepository interface {
 		GetBalanceSummary(ctx context.Context, userID string) (*BalanceSummary, error)
 		GetRankingSummary(ctx context.Context, userID string) (*RankingSummary, error)
-		GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) ([]*Miner, error)
+		GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, nextOffset uint64, err error)
 		GetMiningSummary(ctx context.Context, userID string) (*MiningSummary, error)
 		GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error)
 		GetBalanceHistory(ctx context.Context, userID string, start, end *time.Time, utcOffset stdlibtime.Duration, limit, offset uint64) ([]*BalanceHistoryEntry, error) //nolint:lll // .

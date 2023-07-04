@@ -280,6 +280,11 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            X-Next-Offset:
+              description: 'if this value is 0, pagination stops, if not, use it in
+                the `offset` query param for the next call. '
+              type: integer
           schema:
             items:
               $ref: '#/definitions/tokenomics.Miner'

@@ -68,7 +68,8 @@ var (
 	everythingNotAllowedInUsernamePattern = regexp.MustCompile(everythingNotAllowedInUsernameRegex)
 )
 
-func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, err error) { //nolint:funlen // .
+//nolint:funlen // .
+func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, nextOffset uint64, err error) {
 	var (
 		ids           []string
 		sortTopMiners func(int, int) bool
@@ -77,17 +78,31 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].balance < topMiners[jj].balance }
 		rangeBy := &redis.ZRangeBy{Min: "0", Max: "+inf", Offset: int64(offset), Count: int64(limit)}
 		if ids, err = r.db.ZRevRangeByScore(ctx, "top_miners", rangeBy).Result(); err != nil {
-			return nil, errors.Wrapf(err, "failed to ZRevRangeByScore for miners for offset:%v,limit:%v", offset, limit)
+			return nil, 0, errors.Wrapf(err, "failed to ZRevRangeByScore for miners for offset:%v,limit:%v", offset, limit)
+		}
+		if len(ids) > 0 {
+			nextOffset = offset + limit
 		}
 	} else { //nolint:revive // Nope.
 		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].Username < topMiners[jj].Username }
 		key := string(everythingNotAllowedInUsernamePattern.ReplaceAll([]byte(strings.ToLower(keyword)), []byte("")))
 		if key == "" || !strings.EqualFold(key, keyword) {
-			return nil, nil
+			return make([]*Miner, 0, 0), 0, nil
 		}
-		if ids, _, err = r.db.SScan(ctx, "lookup:"+key, offset, "", int64(limit)).Result(); err != nil {
-			return nil, errors.Wrapf(err, "failed to SScan for miners for keyword:%v,offset:%v,limit:%v", key, offset, limit)
+		if ids, nextOffset, err = r.db.SScan(ctx, "lookup:"+key, offset, "", int64(limit)).Result(); err != nil {
+			return nil, 0, errors.Wrapf(err, "failed to SScan for miners for keyword:%v,offset:%v,limit:%v", key, offset, limit)
 		}
+	}
+	dedupl := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		dedupl[id] = struct{}{}
+	}
+	ids = ids[:0]
+	for id := range dedupl {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return make([]*Miner, 0, 0), nextOffset, nil
 	}
 	resp, err := storage.Get[struct {
 		model.UserIDField
@@ -98,7 +113,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		model.HideRankingField
 	}](ctx, r.db, ids...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
+		return nil, 0, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
 	}
 	topMiners = make([]*Miner, 0, len(resp))
 	defer sort.SliceStable(topMiners, sortTopMiners)
@@ -115,7 +130,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		})
 	}
 
-	return topMiners, nil
+	return topMiners, nextOffset, nil
 }
 
 //nolint:funlen // .

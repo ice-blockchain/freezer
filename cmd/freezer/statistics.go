@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -35,6 +37,7 @@ func (s *service) setupStatisticsRoutes(router *server.Router) {
 //	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
 //	@Failure		500				{object}	server.ErrorResponse
 //	@Failure		504				{object}	server.ErrorResponse	"if request times out"
+//	@Header			200				{integer}	X-Next-Offset			"if this value is 0, pagination stops, if not, use it in the `offset` query param for the next call. "
 //	@Router			/tokenomics-statistics/top-miners [GET].
 func (s *service) GetTopMiners( //nolint:gocritic // False negative.
 	ctx context.Context,
@@ -47,12 +50,16 @@ func (s *service) GetTopMiners( //nolint:gocritic // False negative.
 	if req.Data.Limit > maxLimit {
 		req.Data.Limit = maxLimit
 	}
-	resp, err := s.tokenomicsRepository.GetTopMiners(ctx, req.Data.Keyword, req.Data.Limit, req.Data.Offset)
+	resp, nextOffset, err := s.tokenomicsRepository.GetTopMiners(ctx, req.Data.Keyword, req.Data.Limit, req.Data.Offset)
 	if err != nil {
 		return nil, server.Unexpected(errors.Wrapf(err, "failed to get top miners for userID:%v & req:%#v", req.AuthenticatedUser.UserID, req.Data))
 	}
 
-	return server.OK(&resp), nil
+	return &server.Response[[]*tokenomics.Miner]{
+		Code:    http.StatusOK,
+		Data:    &resp,
+		Headers: map[string]string{"X-Next-Offset": strconv.FormatUint(nextOffset, 10)},
+	}, nil
 }
 
 // GetAdoption godoc
