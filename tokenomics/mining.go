@@ -75,7 +75,7 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		sortTopMiners func(int, int) bool
 	)
 	if keyword == "" {
-		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].balance < topMiners[jj].balance }
+		sortTopMiners = func(ii, jj int) bool { return topMiners[ii].balance > topMiners[jj].balance }
 		rangeBy := &redis.ZRangeBy{Min: "0", Max: "+inf", Offset: int64(offset), Count: int64(limit)}
 		if ids, err = r.db.ZRevRangeByScore(ctx, "top_miners", rangeBy).Result(); err != nil {
 			return nil, 0, errors.Wrapf(err, "failed to ZRevRangeByScore for miners for offset:%v,limit:%v", offset, limit)
@@ -116,7 +116,9 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		return nil, 0, errors.Wrapf(err, "failed to get miners for ids:%#v", ids)
 	}
 	topMiners = make([]*Miner, 0, len(resp))
-	defer sort.SliceStable(topMiners, sortTopMiners)
+	defer func() {
+		sort.SliceStable(topMiners, sortTopMiners)
+	}()
 	for _, topMiner := range resp {
 		if topMiner.HideRanking {
 			continue
