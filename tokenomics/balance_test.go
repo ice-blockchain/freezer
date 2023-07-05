@@ -6,9 +6,10 @@ import (
 	"testing"
 	stdlibtime "time"
 
+	"github.com/stretchr/testify/assert"
+
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	"github.com/ice-blockchain/wintr/time"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCalculateDates_Limit24_Offset0_Factor1(t *testing.T) {
