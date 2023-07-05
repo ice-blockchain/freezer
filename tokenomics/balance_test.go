@@ -24,15 +24,13 @@ func TestCalculateDates_Limit24_Offset0_Factor1(t *testing.T) {
 		},
 	}}
 
-	/******************************************************************************************************************************************************
-		1. limit = 24, offset = 0, factor = 1
-	******************************************************************************************************************************************************/
 	limit := uint64(24)
 	offset := uint64(0)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC))
 	factor := stdlibtime.Duration(1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 48)
 
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
@@ -107,12 +105,13 @@ func TestCalculateDates_Limit12_Offset0_Factor1(t *testing.T) {
 	limit := uint64(12)
 	offset := uint64(0)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC))
 	factor := stdlibtime.Duration(1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 24)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
-	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime) // Cuz calculated limit is 0.
 
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
@@ -158,12 +157,14 @@ func TestCalculateDates_Limit36_Offset0_Factor1(t *testing.T) {
 	limit := uint64(36)
 	offset := uint64(0)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC))
 	factor := stdlibtime.Duration(1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 48)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 6, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
 		expectedStart.Add(-5 * repo.cfg.GlobalAggregationInterval.Child),
@@ -231,11 +232,14 @@ func TestCalculateDates_Limit48_Offset0_Factor1(t *testing.T) {
 	limit := uint64(48)
 	offset := uint64(0)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 6, 5, 15, 10, 1, stdlibtime.UTC))
+	factor := stdlibtime.Duration(1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, 1)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 72)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
-	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 6, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
 		expectedStart.Add(-5 * repo.cfg.GlobalAggregationInterval.Child),
@@ -327,9 +331,10 @@ func TestCalculateDates_Limit24_Offset0_FactorMinus1(t *testing.T) {
 	limit := uint64(24)
 	offset := uint64(0)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	var end *time.Time
 	factor := stdlibtime.Duration(-1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 30)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 4, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
 	assert.Equal(t, start, notAfterTime)
@@ -383,12 +388,15 @@ func TestCalculateDates_Limit24_Offset24_FactorMinus1(t *testing.T) {
 	limit := uint64(24)
 	offset := uint64(24)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	var end *time.Time
 	factor := stdlibtime.Duration(-1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 30)
+
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 3, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
-	assert.Equal(t, start, notAfterTime)
+	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 4, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
 		expectedStart.Add(-24 * repo.cfg.GlobalAggregationInterval.Child),
@@ -438,11 +446,12 @@ func TestCalculateDates_Limit24_Offset24_Factor1(t *testing.T) {
 	limit := uint64(24)
 	offset := uint64(24)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC))
 	factor := stdlibtime.Duration(1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 48)
-	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
+	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 6, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 7, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
@@ -512,12 +521,13 @@ func TestCalculateDates_Limit48_Offset48_FactorMinus1(t *testing.T) {
 	limit := uint64(48)
 	offset := uint64(48)
 	start := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
+	end := time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC))
 	factor := stdlibtime.Duration(-1)
 
-	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, factor)
+	dates, notBeforeTime, notAfterTime := repo.calculateDates(limit, offset, start, end, factor)
 	assert.Len(t, dates, 54)
 	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 1, 5, 15, 10, 1, stdlibtime.UTC)), notBeforeTime)
-	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 5, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
+	assert.Equal(t, time.New(stdlibtime.Date(2023, 6, 3, 5, 15, 10, 1, stdlibtime.UTC)), notAfterTime)
 	expectedStart := time.New(stdlibtime.Date(2023, 6, 5, 5, 0, 0, 0, stdlibtime.UTC))
 	expected := []stdlibtime.Time{
 		expectedStart.Add(-48 * repo.cfg.GlobalAggregationInterval.Child),
@@ -781,16 +791,6 @@ func TestProcessBalanceHistory_ChildIsHour(t *testing.T) {
 	entries := repo.processBalanceHistory(history, startDateIsBeforeEndDate, notBeforeTime, notAfterTime)
 	expected := []*BalanceHistoryEntry{
 		{
-			Time: stdlibtime.Date(2023, 6, 3, 0, 0, 0, 0, stdlibtime.UTC),
-			Balance: &BalanceHistoryBalanceDiff{
-				amount:   50.,
-				Amount:   "50.00",
-				Bonus:    int64(0),
-				Negative: false,
-			},
-			TimeSeries: []*BalanceHistoryEntry{},
-		},
-		{
 			Time: stdlibtime.Date(2023, 6, 4, 0, 0, 0, 0, stdlibtime.UTC),
 			Balance: &BalanceHistoryBalanceDiff{
 				amount:   145.,
@@ -925,26 +925,6 @@ func TestProcessBalanceHistory_ChildIsHour(t *testing.T) {
 	entries = repo.processBalanceHistory(history, startDateIsBeforeEndDate, notBeforeTime, notAfterTime)
 
 	expected = []*BalanceHistoryEntry{
-		{
-			Time: stdlibtime.Date(2023, 6, 3, 0, 0, 0, 0, stdlibtime.UTC),
-			Balance: &BalanceHistoryBalanceDiff{
-				amount:   50.,
-				Amount:   "50.00",
-				Bonus:    int64(0),
-				Negative: false,
-			},
-			TimeSeries: []*BalanceHistoryEntry{},
-		},
-		{
-			Time: stdlibtime.Date(2023, 6, 4, 0, 0, 0, 0, stdlibtime.UTC),
-			Balance: &BalanceHistoryBalanceDiff{
-				amount:   145.,
-				Amount:   "145.00",
-				Bonus:    int64(190),
-				Negative: false,
-			},
-			TimeSeries: []*BalanceHistoryEntry{},
-		},
 		{
 			Time: *time.New(stdlibtime.Date(2023, 6, 5, 0, 0, 0, 0, stdlibtime.UTC)).Time,
 			Balance: &BalanceHistoryBalanceDiff{
