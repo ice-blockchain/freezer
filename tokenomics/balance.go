@@ -74,22 +74,7 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	} else {
 		factor = 1
 	}
-	const (
-		hoursInADay = 24
-	)
-	calculatedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
-	var limitPadding uint64
-	if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
-		limitPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Hour))).Hour()) + 1
-	} else {
-		limitPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Minute))).Minute()) + 1
-	}
-	mappedLimit := calculatedLimit + limitPadding
-	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
-	dates := make([]stdlibtime.Time, 0, mappedLimit)
-	for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
-		dates = append(dates, start.Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
-	}
+	dates, notBeforeTime, notAfterTime := r.calculateDates(limit, offset, start, end, factor)
 	id, gErr := GetOrInitInternalID(ctx, r.db, userID)
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to getOrInitInternalID for userID:%v", userID)
@@ -98,20 +83,68 @@ func (r *repository) GetBalanceHistory( //nolint:funlen,gocognit,revive,gocyclo,
 	if gErr != nil {
 		return nil, errors.Wrapf(gErr, "failed to SelectBalanceHistory for id:%v,createdAts:%#v", id, dates)
 	}
-	var notBeforeTime *time.Time
-	if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
-		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Hour))))
+
+	return r.processBalanceHistory(balanceHistory, factor > 0, notBeforeTime, notAfterTime), nil
+}
+
+func (r *repository) calculateDates(limit, offset uint64, start, end *time.Time, factor stdlibtime.Duration) (dates []stdlibtime.Time, notBeforeTime, notAfterTime *time.Time) {
+	const (
+		hoursInADay = 24
+	)
+	calculatedLimit := (limit / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
+	var afterStartPadding, beforeStartPadding uint64
+	if factor > 0 {
+		if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+			afterStartPadding = 24 - uint64(start.Add(stdlibtime.Duration(calculatedLimit*uint64(stdlibtime.Hour))).Hour())
+			beforeStartPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Hour))).Hour())
+		} else {
+			afterStartPadding = 60 - uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Minute))).Minute())
+			beforeStartPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Minute))).Minute())
+		}
 	} else {
-		notBeforeTime = time.New(start.Add(stdlibtime.Duration(-calculatedLimit * uint64(stdlibtime.Minute))))
+		if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+			beforeStartPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Hour))).Hour()) + 1
+		} else {
+			beforeStartPadding = uint64(start.Add(stdlibtime.Duration(-calculatedLimit*uint64(stdlibtime.Minute))).Minute()) + 1
+		}
+	}
+	mappedLimit := calculatedLimit + beforeStartPadding + afterStartPadding
+	mappedOffset := (offset / hoursInADay) * uint64(r.cfg.GlobalAggregationInterval.Parent/r.cfg.GlobalAggregationInterval.Child)
+	dates = make([]stdlibtime.Time, 0, mappedLimit)
+	if factor > 0 {
+		for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
+			dates = append(dates, start.Add(-stdlibtime.Duration(beforeStartPadding)*r.cfg.GlobalAggregationInterval.Child).Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
+		}
+		if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+			notBeforeTime = time.New(start.Add(stdlibtime.Duration(mappedOffset * uint64(stdlibtime.Hour))))
+			notAfterTime = time.New(start.Add(stdlibtime.Duration((calculatedLimit + mappedOffset) * uint64(stdlibtime.Hour))))
+		} else {
+			notBeforeTime = time.New(start.Add(stdlibtime.Duration(mappedOffset * uint64(stdlibtime.Minute))))
+			notAfterTime = time.New(start.Add(stdlibtime.Duration((calculatedLimit + mappedOffset) * uint64(stdlibtime.Minute))))
+		}
+		if notAfterTime.UnixNano() > end.UnixNano() {
+			notAfterTime = end
+		}
+	} else {
+		for ix := stdlibtime.Duration(mappedOffset); ix < stdlibtime.Duration(mappedLimit+mappedOffset); ix++ {
+			dates = append(dates, start.Add(ix*factor*r.cfg.GlobalAggregationInterval.Child).Truncate(r.cfg.GlobalAggregationInterval.Child))
+		}
+		if r.cfg.GlobalAggregationInterval.Child == stdlibtime.Hour {
+			notBeforeTime = time.New(start.Add(stdlibtime.Duration((-calculatedLimit - mappedOffset) * uint64(stdlibtime.Hour))))
+			notAfterTime = time.New(start.Add(stdlibtime.Duration(-mappedOffset * uint64(stdlibtime.Hour))))
+		} else {
+			notBeforeTime = time.New(start.Add(stdlibtime.Duration((-calculatedLimit - mappedOffset) * uint64(stdlibtime.Minute))))
+			notAfterTime = time.New(start.Add(stdlibtime.Duration(-mappedOffset * uint64(stdlibtime.Minute))))
+		}
 	}
 
-	return r.processBalanceHistory(balanceHistory, factor > 0, notBeforeTime), nil
+	return
 }
 
 func (r *repository) processBalanceHistory(
 	res []*dwh.BalanceHistory,
 	startDateIsBeforeEndDate bool,
-	notBeforeTime *time.Time,
+	notBeforeTime, notAfterTime *time.Time,
 ) []*BalanceHistoryEntry { //nolint:funlen,gocognit,revive // .
 	childDateLayout := r.cfg.globalAggregationIntervalChildDateFormat()
 	parentDateLayout := r.cfg.globalAggregationIntervalParentDateFormat()
@@ -150,9 +183,9 @@ func (r *repository) processBalanceHistory(
 	history := make([]*BalanceHistoryEntry, 0, len(parents))
 
 	var prevParent *parentType
+	var prevChild *BalanceHistoryEntry
 	for _, pKey := range parentKeys {
 		parents[pKey].BalanceHistoryEntry.TimeSeries = make([]*BalanceHistoryEntry, 0, len(parents[pKey].children))
-		var prevChild *BalanceHistoryEntry
 		childrenKeys := make([]string, 0)
 		for cKey := range parents[pKey].children {
 			childrenKeys = append(childrenKeys, cKey)
@@ -166,7 +199,7 @@ func (r *repository) processBalanceHistory(
 				parents[pKey].children[cKey].setBalanceDiffBonus(prevChild.Balance.amount)
 			}
 			parents[pKey].Balance.amount += parents[pKey].children[cKey].Balance.amount
-			if time.New(parents[pKey].children[cKey].Time).UnixNano() >= notBeforeTime.UnixNano() {
+			if time.New(parents[pKey].children[cKey].Time).UnixNano() >= notBeforeTime.UnixNano() && time.New(parents[pKey].children[cKey].Time).UnixNano() <= notAfterTime.UnixNano() {
 				parents[pKey].BalanceHistoryEntry.TimeSeries = append(parents[pKey].BalanceHistoryEntry.TimeSeries, parents[pKey].children[cKey])
 				prevChild = parents[pKey].children[cKey]
 			}
@@ -184,8 +217,9 @@ func (r *repository) processBalanceHistory(
 				return parents[pKey].BalanceHistoryEntry.TimeSeries[i].Time.After(parents[pKey].BalanceHistoryEntry.TimeSeries[j].Time)
 			})
 		}
-
-		history = append(history, parents[pKey].BalanceHistoryEntry)
+		if len(parents[pKey].BalanceHistoryEntry.TimeSeries) > 0 {
+			history = append(history, parents[pKey].BalanceHistoryEntry)
+		}
 		prevParent = parents[pKey]
 	}
 	if !startDateIsBeforeEndDate {
@@ -199,7 +233,11 @@ func (r *repository) processBalanceHistory(
 
 func (e *BalanceHistoryEntry) setBalanceDiffBonus(from float64) {
 	to := e.Balance.amount
-	e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
+	if from < 0 && to > 0 {
+		e.Balance.Bonus = int64(roundFloat64AndTruncate(((from - to) / from) * 100))
+	} else {
+		e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
+	}
 }
 
 //nolint:funlen // .
