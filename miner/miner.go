@@ -210,6 +210,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		******************************************************************************************************************************************************/
 
 		for _, usr := range userResults {
+			if usr.UserID == "" {
+				continue
+			}
 			if usr.IDT0 > 0 {
 				t0Referrals[usr.IDT0] = nil
 			}
@@ -259,6 +262,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		shouldSynchronizeBalance := shouldSynchronizeBalanceFunc(uint64(batchNumber))
 		for _, usr := range userResults {
+			if usr.UserID == "" {
+				continue
+			}
 			var t0Ref, tMinus1Ref *referral
 			if usr.IDT0 > 0 {
 				t0Ref = t0Referrals[usr.IDT0]
