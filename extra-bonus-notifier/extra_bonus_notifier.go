@@ -96,7 +96,11 @@ func MustGetExtraBonusIndicesDistribution(ctx context.Context, db storage.DB) ma
 			if _, found := extraBonusIndicesDistribution[uint16(i)]; !found {
 				extraBonusIndicesDistribution[uint16(i)] = make(map[uint16]uint16, totalExtraBonusDays)
 			}
-			extraBonusIndicesDistribution[uint16(i)][uint16(j)] = uint16(k)
+			if int(j) > len(cfg.ExtraBonuses.FlatValues) || cfg.ExtraBonuses.FlatValues[j-1] == 0 {
+				extraBonusIndicesDistribution[uint16(i)][uint16(j)] = uint16(0)
+			} else {
+				extraBonusIndicesDistribution[uint16(i)][uint16(j)] = uint16(k)
+			}
 		}
 
 		return extraBonusIndicesDistribution
@@ -114,7 +118,12 @@ func MustGetExtraBonusIndicesDistribution(ctx context.Context, db storage.DB) ma
 			if _, found := extraBonusIndicesDistribution[i]; !found {
 				extraBonusIndicesDistribution[i] = make(map[uint16]uint16, totalExtraBonusDays)
 			}
-			extraBonusIndicesDistribution[i][j] = offsets[i]
+			if int(j) > len(cfg.ExtraBonuses.FlatValues) || cfg.ExtraBonuses.FlatValues[j-1] == 0 {
+				extraBonusIndicesDistribution[i][j] = 0
+			} else {
+				extraBonusIndicesDistribution[i][j] = offsets[i]
+			}
+
 			value = append(value, fmt.Sprintf("%v:%v:%v", i, j, offsets[i]))
 		}
 	}
