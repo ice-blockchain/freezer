@@ -83,6 +83,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		model.IDTMinus1Field
 		model.BalanceForT0Field
 		model.BalanceForTMinus1Field
+		model.ActiveT1ReferralsField
 	}](ctx, s.db, model.SerializedUsersKey(id))
 	if err != nil || len(dbUserAfterMiningStopped) == 0 {
 		if err == nil && len(dbUserAfterMiningStopped) == 0 {
@@ -107,6 +108,11 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 			if !dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.IsNil() &&
 				dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
 				if err = pipeliner.HIncrBy(ctx, idT0Key, "active_t1_referrals", -1).Err(); err != nil {
+					return err
+				}
+			}
+			if dbUserAfterMiningStopped[0].ActiveT1Referrals > 0 {
+				if err = pipeliner.HIncrBy(ctx, idT0Key, "active_t2_referrals", -int64(dbUserAfterMiningStopped[0].ActiveT1Referrals)).Err(); err != nil {
 					return err
 				}
 			}
@@ -218,6 +224,7 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 			model.DeserializedUsersKey
 			model.IDT0ResettableField
 			model.IDTMinus1ResettableField
+			model.MiningSessionSoloEndedAtField
 		}
 	)
 	newPartialState := &user{DeserializedUsersKey: model.DeserializedUsersKey{ID: id}}
@@ -233,6 +240,30 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
 			} else if len(tMinus1Referral) == 1 {
 				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
+			}
+			dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(id))
+			if err != nil || len(dbUser) == 0 {
+				return errors.Wrapf(err, "failed to get users entry for id:%v", id)
+			}
+			if dbUser[0].MiningSessionSoloEndedAt != nil && dbUser[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
+				idT0Val := newPartialState.IDT0
+				if idT0Val < 0 {
+					idT0Val *= -1
+				}
+				if idT0Key := model.SerializedUsersKey(idT0Val); idT0Key != "" {
+					if err = s.db.HIncrBy(ctx, idT0Key, "active_t1_referrals", 1).Err(); err != nil {
+						return err
+					}
+				}
+				idT0Minus1Val := newPartialState.IDTMinus1
+				if idT0Minus1Val < 0 {
+					idT0Minus1Val *= -1
+				}
+				if idTMinus1Key := model.SerializedUsersKey(idT0Minus1Val); idTMinus1Key != "" {
+					if err = s.db.HIncrBy(ctx, idTMinus1Key, "active_t2_referrals", 1).Err(); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
