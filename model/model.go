@@ -62,6 +62,7 @@ type (
 		ExtraBonusDaysClaimNotAvailableField
 		UTCOffsetField
 		HideRankingField
+		IDT0StateChangedAtField
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
@@ -221,6 +222,9 @@ type (
 	}
 	HideRankingField struct {
 		HideRanking bool `redis:"hide_ranking"`
+	}
+	IDT0StateChangedAtField struct {
+		IDT0StateChangedAt *time.Time `redis:"idt0_state_changed_at,omitempty"`
 	}
 )
 

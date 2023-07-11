@@ -110,6 +110,8 @@ type (
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ResurrectSoloUsedAtField
 		model.DeserializedUsersKey
+		model.IDT0StateChangedAtField
+		model.IDT0Field
 	}
 
 	referralThatStoppedMining struct {

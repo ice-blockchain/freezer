@@ -273,6 +273,21 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDTMinus1 < 0 {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
+			idT0Minus1NeedToBeUpdated := false
+			if t0Ref != nil && !t0Ref.IDT0StateChangedAt.IsNil() {
+				idTMinus1Val := usr.IDTMinus1
+				if usr.IDTMinus1 < 0 {
+					idTMinus1Val *= -1
+				}
+				t0RefIDT0 := t0Ref.IDT0
+				if t0Ref.IDT0 < 0 {
+					t0RefIDT0 *= -1
+				}
+				if idTMinus1Val != t0RefIDT0 {
+					usr.IDTMinus1 = t0Ref.IDT0
+					idT0Minus1NeedToBeUpdated = true
+				}
+			}
 			updatedUser, shouldGenerateHistory := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
@@ -291,6 +306,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
+				}
+				if idT0Minus1NeedToBeUpdated {
+					updatedUser.IDTMinus1 = t0Ref.IDT0
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
