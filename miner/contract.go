@@ -78,9 +78,12 @@ type (
 		model.ResurrectSoloUsedAtField
 		model.ResurrectT0UsedAtField
 		model.ResurrectTMinus1UsedAtField
+		model.IDTMinus1ForT2UpdateInitiatedAtField
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field
+		model.IDT0OldField
+		model.IDTMinus1OldField
 		model.BalanceTotalStandardField
 		model.BalanceTotalPreStakingField
 		model.BalanceTotalMintedField
@@ -109,14 +112,19 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ResurrectSoloUsedAtField
+		model.IDTMinus1ForT2UpdateInitiatedAtField
 		model.DeserializedUsersKey
-		model.IDT0StateChangedAtField
 		model.IDT0Field
 	}
 
 	referralThatStoppedMining struct {
 		StoppedMiningAt     *time.Time
 		ID, IDT0, IDTMinus1 int64
+	}
+
+	activeUserWithUpdatedReferredBy struct {
+		ID, oldIDT0, oldIDTMinus1, newIDT0, newIDTMinus1 int64
+		ActiveT1Count                                    int32
 	}
 
 	miner struct {

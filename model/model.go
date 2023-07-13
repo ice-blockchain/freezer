@@ -56,13 +56,14 @@ type (
 		ExtraBonusField
 		IDT0Field
 		IDTMinus1Field
+		IDT0OldField
+		IDTMinus1OldField
 		ActiveT1ReferralsField
 		ActiveT2ReferralsField
 		NewsSeenField
 		ExtraBonusDaysClaimNotAvailableField
 		UTCOffsetField
 		HideRankingField
-		IDT0StateChangedAtField
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
@@ -202,6 +203,12 @@ type (
 	IDTMinus1ResettableField struct {
 		IDTMinus1 int64 `redis:"id_tminus1"`
 	}
+	IDT0OldField struct {
+		IDT0Old int64 `redis:"id_t0_old,omitempty"`
+	}
+	IDTMinus1OldField struct {
+		IDTMinus1Old int64 `redis:"id_tminus1_old,omitempty"`
+	}
 	ActiveT1ReferralsField struct {
 		ActiveT1Referrals int32 `redis:"active_t1_referrals,omitempty"`
 	}
@@ -223,8 +230,8 @@ type (
 	HideRankingField struct {
 		HideRanking bool `redis:"hide_ranking"`
 	}
-	IDT0StateChangedAtField struct {
-		IDT0StateChangedAt *time.Time `redis:"idt0_state_changed_at,omitempty"`
+	IDTMinus1ForT2UpdateInitiatedAtField struct {
+		IDTMinus1ForT2UpdateInitiatedAt *time.Time `redis:"id_tminus1_for_t2_update_initiated_at,omitempty"`
 	}
 )
 

@@ -218,70 +218,64 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 	} else if (oldIDT0 == newIDT0) || (oldIDT0*-1 == newIDT0) {
 		return nil
 	}
-	type (
-		user struct {
-			model.UserIDField
-			model.DeserializedUsersKey
-			model.IDT0ResettableField
-			model.IDTMinus1ResettableField
-			model.MiningSessionSoloEndedAtField
-			model.ActiveT1ReferralsField
-			model.IDT0StateChangedAtField
-		}
-	)
+	type user struct {
+		model.UserIDField
+		model.DeserializedUsersKey
+		model.IDT0ResettableField
+		model.IDTMinus1ResettableField
+		model.IDT0OldField
+		model.IDTMinus1OldField
+		model.MiningSessionSoloEndedAtField
+		model.IDTMinus1ForT2UpdateInitiatedAtField
+		model.ActiveT1ReferralsField
+	}
 	newPartialState := &user{DeserializedUsersKey: model.DeserializedUsersKey{ID: id}}
-	if t0Referral, err2 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(newIDT0)); err2 != nil {
+	if newT0Referral, err2 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(newIDT0)); err2 != nil {
 		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", newIDT0)
-	} else if len(t0Referral) == 1 {
-		newPartialState.IDT0 = -t0Referral[0].ID
-		newPartialState.IDT0StateChangedAt = time.Now()
-		if t0Referral[0].IDT0 != 0 {
-			if t0Referral[0].IDT0 < 0 {
-				t0Referral[0].IDT0 *= -1
-			}
-			if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
-				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
-			} else if len(tMinus1Referral) == 1 {
-				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
-			}
-			dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(id))
-			if err != nil || len(dbUser) == 0 {
-				return errors.Wrapf(err, "failed to get users entry for id:%v", id)
-			}
-			oldIDT0Usr, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(oldIDT0))
-			if err != nil {
-				return errors.Wrapf(err, "failed to get users entry for id:%v", id)
-			}
-			oldIDT0Val := oldIDT0
-			if oldIDT0Val < 0 {
-				oldIDT0Val *= -1
-			}
-			if len(oldIDT0Usr) == 0 || oldIDT0Usr[0].UserID == "" {
-				if !dbUser[0].MiningSessionSoloEndedAt.IsNil() && dbUser[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
-					idT0Val := newPartialState.IDT0
-					if idT0Val < 0 {
-						idT0Val *= -1
-					}
-					if idT0Key := model.SerializedUsersKey(idT0Val); idT0Key != "" {
-						if err = s.db.HIncrBy(ctx, idT0Key, "active_t1_referrals", 1).Err(); err != nil {
-							return err
-						}
-					}
-					idTMinus1Val := newPartialState.IDTMinus1
-					if idTMinus1Val < 0 {
-						idTMinus1Val *= -1
-					}
-					if idTMinus1Key := model.SerializedUsersKey(idTMinus1Val); idTMinus1Key != "" {
-						if err = s.db.HIncrBy(ctx, idTMinus1Key, "active_t2_referrals", 1).Err(); err != nil {
-							return err
-						}
+	} else if len(newT0Referral) == 1 {
+		newPartialState.IDT0 = -newT0Referral[0].ID
+		if newT0Referral[0].IDT0 < 0 {
+			newT0Referral[0].IDT0 *= -1
+		}
+		if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(newT0Referral[0].IDT0)); err3 != nil {
+			return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", newT0Referral[0].IDT0)
+		} else if len(tMinus1Referral) == 1 {
+			newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
+		}
+		dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(id))
+		if err != nil || len(dbUser) == 0 {
+			return errors.Wrapf(err, "failed to get users entry for id:%v", id)
+		}
+		oldIDT0Usr, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(oldIDT0))
+		if err != nil {
+			return errors.Wrapf(err, "failed to get users entry for id:%v", id)
+		}
+		oldIDT0Val := oldIDT0
+		if oldIDT0Val < 0 {
+			oldIDT0Val *= -1
+		}
+		if dbUser[0].MiningSessionSoloEndedAt.IsNil() || dbUser[0].MiningSessionSoloEndedAt.Before(*time.Now().Time) {
+			if (len(oldIDT0Usr) == 0 || oldIDT0Usr[0].UserID == "") && dbUser[0].ActiveT1Referrals > 0 {
+				idT0Val := newPartialState.IDT0
+				if idT0Val < 0 {
+					idT0Val *= -1
+				}
+				if idT0Key := model.SerializedUsersKey(idT0Val); idT0Key != "" {
+					if err = s.db.HIncrBy(ctx, idT0Key, "active_t2_referrals", int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
+						return err
 					}
 				}
 			} else {
-				if !dbUser[0].MiningSessionSoloEndedAt.IsNil() && dbUser[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
-					if oldIDT0Key := model.SerializedUsersKey(oldIDT0Val); oldIDT0Key != "" {
-						if err = s.db.HIncrBy(ctx, oldIDT0Key, "active_t1_referrals", -1).Err(); err != nil {
-							return err
+				if dbUser[0].ActiveT1Referrals > 0 {
+					oldIDT0Val := oldIDT0Usr[0].ID
+					if oldIDT0Val < 0 {
+						oldIDT0Val *= -1
+					}
+					if oldIDT0Val != 0 {
+						if oldIDT0Key := model.SerializedUsersKey(oldIDT0Val); oldIDT0Key != "" {
+							if err = s.db.HIncrBy(ctx, oldIDT0Key, "active_t2_referrals", -int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
+								return err
+							}
 						}
 					}
 					newIDT0Val := newPartialState.IDT0
@@ -289,35 +283,17 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 						newIDT0Val *= -1
 					}
 					if newIDT0Key := model.SerializedUsersKey(newIDT0Val); newIDT0Key != "" {
-						if err = s.db.HIncrBy(ctx, newIDT0Key, "active_t1_referrals", 1).Err(); err != nil {
-							return err
-						}
-					}
-				}
-				if dbUser[0].ActiveT1Referrals > 0 {
-					oldIDTMinus1Val := oldIDT0Usr[0].IDT0
-					if oldIDTMinus1Val < 0 {
-						oldIDTMinus1Val *= -1
-					}
-					if oldIDT0Usr[0].IDT0 != 0 {
-						if idT0Minus1Key := model.SerializedUsersKey(oldIDTMinus1Val); idT0Minus1Key != "" {
-							if err = s.db.HIncrBy(ctx, idT0Minus1Key, "active_t2_referrals", -int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
-								return err
-							}
-						}
-					}
-					newIDTMinus1Val := newPartialState.IDTMinus1
-					if newIDTMinus1Val < 0 {
-						newIDTMinus1Val *= -1
-					}
-					if newIDTKeyMinus1 := model.SerializedUsersKey(newIDTMinus1Val); newIDTKeyMinus1 != "" {
-						if err = s.db.HIncrBy(ctx, newIDTKeyMinus1, "active_t2_referrals", int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
+						if err = s.db.HIncrBy(ctx, newIDT0Key, "active_t2_referrals", int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
 							return err
 						}
 					}
 				}
 			}
+		} else {
+			newPartialState.IDT0Old = oldIDT0
+			newPartialState.IDTMinus1Old = dbUser[0].IDTMinus1
 		}
+		newPartialState.IDTMinus1ForT2UpdateInitiatedAt = time.Now()
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed to replace newPartialState:%#v", newPartialState)

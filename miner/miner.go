@@ -114,27 +114,28 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		log.Error(dwhClient.Close())
 	}()
 	var (
-		batchNumber                                                int64
-		totalBatches                                               uint64
-		iteration                                                  uint64
-		now, lastIterationStartedAt                                = time.Now(), time.Now()
-		currentAdoption                                            = m.getAdoption(ctx, m.db, workerNumber)
-		workers                                                    = cfg.Workers
-		batchSize                                                  = cfg.BatchSize
-		userKeys, userHistoryKeys, referralKeys                    = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
-		userResults, referralResults                               = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
-		t0Referrals, tMinus1Referrals                              = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
-		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
-		referralsThatStoppedMining                                 = make([]*referralThatStoppedMining, 0, batchSize)
-		msgResponder                                               = make(chan error, 3*batchSize)
-		msgs                                                       = make([]*messagebroker.Message, 0, 3*batchSize)
-		errs                                                       = make([]error, 0, 3*batchSize)
-		updatedUsers                                               = make([]*UpdatedUser, 0, batchSize)
-		extraBonusOnlyUpdatedUsers                                 = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
-		histories                                                  = make([]*model.User, 0, batchSize)
-		userGlobalRanks                                            = make([]redis.Z, 0, batchSize)
-		historyColumns, historyInsertMetadata                      = dwh.InsertDDL(int(batchSize))
-		shouldSynchronizeBalanceFunc                               = func(batchNumberArg uint64) bool { return false }
+		batchNumber                                                          int64
+		totalBatches                                                         uint64
+		iteration                                                            uint64
+		now, lastIterationStartedAt                                          = time.Now(), time.Now()
+		currentAdoption                                                      = m.getAdoption(ctx, db, workerNumber)
+		workers                                                              = cfg.Workers
+		batchSize                                                            = cfg.BatchSize
+		userKeys, userHistoryKeys, referralKeys                              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
+		userResults, referralResults                                         = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
+		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
+		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
+		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining           = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
+		referralsThatStoppedMining                                           = make([]*referralThatStoppedMining, 0, batchSize)
+		msgResponder                                                         = make(chan error, 3*batchSize)
+		msgs                                                                 = make([]*messagebroker.Message, 0, 3*batchSize)
+		errs                                                                 = make([]error, 0, 3*batchSize)
+		updatedUsers                                                         = make([]*UpdatedUser, 0, batchSize)
+		extraBonusOnlyUpdatedUsers                                           = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
+		histories                                                            = make([]*model.User, 0, batchSize)
+		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
+		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
+		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
 	)
 	resetVars := func(success bool) {
 		if success && len(userKeys) == int(batchSize) && len(userResults) == 0 {
@@ -175,6 +176,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		for k := range t2ReferralsThatStoppedMining {
 			delete(t2ReferralsThatStoppedMining, k)
+		}
+		for k := range t1ReferralsToIncrementActiveValue {
+			delete(t1ReferralsToIncrementActiveValue, k)
+		}
+		for k := range t2ReferralsToIncrementActiveValue {
+			delete(t2ReferralsToIncrementActiveValue, k)
 		}
 	}
 	for ctx.Err() == nil {
@@ -273,22 +280,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDTMinus1 < 0 {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
-			idT0Minus1NeedToBeUpdated := false
-			if t0Ref != nil && !t0Ref.IDT0StateChangedAt.IsNil() {
-				idTMinus1Val := usr.IDTMinus1
-				if usr.IDTMinus1 < 0 {
-					idTMinus1Val *= -1
-				}
-				t0RefIDT0 := t0Ref.IDT0
-				if t0Ref.IDT0 < 0 {
-					t0RefIDT0 *= -1
-				}
-				if idTMinus1Val != t0RefIDT0 {
-					usr.IDTMinus1 = t0Ref.IDT0
-					idT0Minus1NeedToBeUpdated = true
-				}
-			}
-			updatedUser, shouldGenerateHistory := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
+			updatedUser, shouldGenerateHistory, IDT0Changed := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
@@ -304,11 +296,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 					referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
 				}
+				if IDT0Changed && t0Ref != nil && !usr.BalanceLastUpdatedAt.IsNil() {
+					t1ReferralsToIncrementActiveValue[t0Ref.ID]++
+				}
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
-				}
-				if idT0Minus1NeedToBeUpdated {
-					updatedUser.IDTMinus1 = t0Ref.IDT0
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
@@ -322,6 +314,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
 					extraBonusOnlyUpdatedUsers = append(extraBonusOnlyUpdatedUsers, &extraBonusOnlyUpdatedUsr)
 				}
+			}
+			if IDT0Changed && t0Ref != nil && usr.ActiveT1Referrals > 0 {
+				t2ReferralsToIncrementActiveValue[t0Ref.ID] += usr.ActiveT1Referrals
 			}
 			totalStandardBalance, totalPreStakingBalance := usr.BalanceTotalStandard, usr.BalanceTotalPreStaking
 			if updatedUser != nil {
@@ -439,6 +434,16 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			if len(userGlobalRanks) > 0 {
 				if err := pipeliner.ZAdd(reqCtx, "top_miners", userGlobalRanks...).Err(); err != nil {
+					return err
+				}
+			}
+			for id, value := range t1ReferralsToIncrementActiveValue {
+				if err := pipeliner.HIncrBy(reqCtx, model.SerializedUsersKey(id), "active_t1_referrals", int64(value)).Err(); err != nil {
+					return err
+				}
+			}
+			for id, value := range t2ReferralsToIncrementActiveValue {
+				if err := pipeliner.HIncrBy(reqCtx, model.SerializedUsersKey(id), "active_t2_referrals", int64(value)).Err(); err != nil {
 					return err
 				}
 			}
