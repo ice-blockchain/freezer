@@ -212,88 +212,35 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 		referredBy == "icenetwork" {
 		return nil
 	}
-	newIDT0, err := GetOrInitInternalID(ctx, s.db, referredBy)
+	idT0, err := GetOrInitInternalID(ctx, s.db, referredBy)
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for referredBy:%v", referredBy)
-	} else if (oldIDT0 == newIDT0) || (oldIDT0*-1 == newIDT0) {
+	} else if (oldIDT0 == idT0) || (oldIDT0*-1 == idT0) {
 		return nil
 	}
-	type user struct {
-		model.UserIDField
-		model.DeserializedUsersKey
-		model.IDT0ResettableField
-		model.IDTMinus1ResettableField
-		model.IDT0OldField
-		model.IDTMinus1OldField
-		model.MiningSessionSoloEndedAtField
-		model.IDTMinus1ForT2UpdateInitiatedAtField
-		model.ActiveT1ReferralsField
-	}
+	type (
+		user struct {
+			model.UserIDField
+			model.DeserializedUsersKey
+			model.IDT0ResettableField
+			model.IDTMinus1ResettableField
+		}
+	)
 	newPartialState := &user{DeserializedUsersKey: model.DeserializedUsersKey{ID: id}}
-	if newT0Referral, err2 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(newIDT0)); err2 != nil {
-		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", newIDT0)
-	} else if len(newT0Referral) == 1 {
-		newPartialState.IDT0 = -newT0Referral[0].ID
-		if newT0Referral[0].IDT0 < 0 {
-			newT0Referral[0].IDT0 *= -1
-		}
-		if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(newT0Referral[0].IDT0)); err3 != nil {
-			return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", newT0Referral[0].IDT0)
-		} else if len(tMinus1Referral) == 1 {
-			newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
-		}
-		dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(id))
-		if err != nil || len(dbUser) == 0 {
-			return errors.Wrapf(err, "failed to get users entry for id:%v", id)
-		}
-		oldIDT0Usr, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(oldIDT0))
-		if err != nil {
-			return errors.Wrapf(err, "failed to get users entry for id:%v", id)
-		}
-		oldIDT0Val := oldIDT0
-		if oldIDT0Val < 0 {
-			oldIDT0Val *= -1
-		}
-		if dbUser[0].MiningSessionSoloEndedAt.IsNil() || dbUser[0].MiningSessionSoloEndedAt.Before(*time.Now().Time) {
-			if (len(oldIDT0Usr) == 0 || oldIDT0Usr[0].UserID == "") && dbUser[0].ActiveT1Referrals > 0 {
-				idT0Val := newPartialState.IDT0
-				if idT0Val < 0 {
-					idT0Val *= -1
-				}
-				if idT0Key := model.SerializedUsersKey(idT0Val); idT0Key != "" {
-					if err = s.db.HIncrBy(ctx, idT0Key, "active_t2_referrals", int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
-						return err
-					}
-				}
-			} else {
-				if dbUser[0].ActiveT1Referrals > 0 {
-					oldIDT0Val := oldIDT0Usr[0].ID
-					if oldIDT0Val < 0 {
-						oldIDT0Val *= -1
-					}
-					if oldIDT0Val != 0 {
-						if oldIDT0Key := model.SerializedUsersKey(oldIDT0Val); oldIDT0Key != "" {
-							if err = s.db.HIncrBy(ctx, oldIDT0Key, "active_t2_referrals", -int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
-								return err
-							}
-						}
-					}
-					newIDT0Val := newPartialState.IDT0
-					if newIDT0Val < 0 {
-						newIDT0Val *= -1
-					}
-					if newIDT0Key := model.SerializedUsersKey(newIDT0Val); newIDT0Key != "" {
-						if err = s.db.HIncrBy(ctx, newIDT0Key, "active_t2_referrals", int64(dbUser[0].ActiveT1Referrals)).Err(); err != nil {
-							return err
-						}
-					}
-				}
+	if t0Referral, err2 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(idT0)); err2 != nil {
+		return errors.Wrapf(err2, "failed to get users entry for idT0:%v", idT0)
+	} else if len(t0Referral) == 1 {
+		newPartialState.IDT0 = -t0Referral[0].ID
+		if t0Referral[0].IDT0 != 0 {
+			if t0Referral[0].IDT0 < 0 {
+				t0Referral[0].IDT0 *= -1
 			}
-		} else {
-			newPartialState.IDT0Old = oldIDT0
-			newPartialState.IDTMinus1Old = dbUser[0].IDTMinus1
+			if tMinus1Referral, err3 := storage.Get[user](ctx, s.db, model.SerializedUsersKey(t0Referral[0].IDT0)); err3 != nil {
+				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
+			} else if len(tMinus1Referral) == 1 {
+				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
+			}
 		}
-		newPartialState.IDTMinus1ForT2UpdateInitiatedAt = time.Now()
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, newPartialState), "failed to replace newPartialState:%#v", newPartialState)

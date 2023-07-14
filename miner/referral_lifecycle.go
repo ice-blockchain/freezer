@@ -6,21 +6,25 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func changeT0AndTMinus1Referrals(usr *user) {
+func changeT0AndTMinus1Referrals(usr *user) (IDT0Changed, IDTMinus1Changed bool) {
 	if usr.IDT0 <= 0 {
 		usr.IDT0 *= -1
 		usr.IDTMinus1 *= -1
 		usr.BalanceT0, usr.BalanceForT0, usr.SlashingRateT0, usr.SlashingRateForT0 = 0, 0, 0, 0
 		usr.BalanceForTMinus1, usr.SlashingRateForTMinus1 = 0, 0
 		usr.ResurrectT0UsedAt, usr.ResurrectTMinus1UsedAt = new(time.Time), new(time.Time)
+		IDT0Changed = true
 	} else if usr.IDTMinus1 <= 0 {
 		usr.IDTMinus1 *= -1
 		usr.BalanceForTMinus1, usr.SlashingRateForTMinus1 = 0, 0
 		usr.ResurrectTMinus1UsedAt = new(time.Time)
+		IDTMinus1Changed = true
 	} else {
 		usr.IDT0 = 0
 		usr.IDTMinus1 = 0
 	}
+
+	return IDT0Changed, IDTMinus1Changed
 }
 
 func didReferralJustStopMining(now *time.Time, before *user, t0Ref, tMinus1Ref *referral) *referralThatStoppedMining {
@@ -44,23 +48,5 @@ func didReferralJustStopMining(now *time.Time, before *user, t0Ref, tMinus1Ref *
 		IDT0:            idT0,
 		IDTMinus1:       idTminus1,
 		StoppedMiningAt: before.MiningSessionSoloEndedAt,
-	}
-}
-
-func wasReferredByUpdated(usr *user) *activeUserWithUpdatedReferredBy {
-	if (usr.IDT0Old == 0 && usr.IDTMinus1Old == 0) ||
-		usr.IDT0Old == usr.IDT0 || usr.IDT0Old == usr.IDT0*-1 ||
-		usr.IDTMinus1 == usr.IDTMinus1Old || usr.IDTMinus1 == usr.IDTMinus1Old*-1 ||
-		usr.MiningSessionSoloEndedAt.IsNil() || usr.MiningSessionSoloEndedAt.Before(*time.Now().Time) {
-		return nil
-	}
-
-	return &activeUserWithUpdatedReferredBy{
-		ID:            usr.ID,
-		oldIDT0:       usr.IDT0Old,
-		oldIDTMinus1:  usr.IDTMinus1Old,
-		newIDT0:       usr.IDT0,
-		newIDTMinus1:  usr.IDTMinus1,
-		ActiveT1Count: usr.ActiveT1Referrals,
 	}
 }

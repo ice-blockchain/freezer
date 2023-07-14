@@ -7,14 +7,14 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory bool) {
+func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory, IDT0Changed bool) {
 	if usr == nil || usr.MiningSessionSoloStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil() {
-		return nil, false
+		return nil, false, false
 	}
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	resurrect(now, updatedUser, t0Ref, tMinus1Ref)
-	changeT0AndTMinus1Referrals(updatedUser)
+	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
 			updatedUser.BalanceT2Pending-updatedUser.BalanceT2PendingApplied != 0 {
@@ -22,10 +22,10 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 			updatedUser.BalanceLastUpdatedAt = now
 
-			return updatedUser, false
+			return updatedUser, false, IDT0Changed
 		}
 
-		return nil, false
+		return nil, false, IDT0Changed
 	}
 
 	if updatedUser.BalanceLastUpdatedAt.IsNil() {
@@ -214,7 +214,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
-	return updatedUser, shouldGenerateHistory
+	return updatedUser, shouldGenerateHistory, IDT0Changed
 }
 
 func (u *user) isAbsoluteZero() bool {
