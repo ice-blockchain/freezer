@@ -127,7 +127,7 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 		return errors.Wrap(err, "failed to getCurrentAdoption")
 	}
 	if timeToCheckForAdoptionSwitch.IsNil() {
-		timeToCheckForAdoptionSwitch = time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+		timeToCheckForAdoptionSwitch = time.New(currentAdoption.AchievedAt.Add(r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
 		if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
 			return nil
 		}
@@ -254,26 +254,25 @@ func (r *repository) getNextAdoption(ctx context.Context, currentAdoption *Adopt
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get global active users count")
 	}
-	var (
-		atLeastOneInvalid = false
-		lastValidIx       = -1
-	)
-	for ix, activeUsersCounterAny := range activeUsersCounters {
+	atLeastOneInvalid := false
+	for _, activeUsersCounterAny := range activeUsersCounters {
 		if val, ok := activeUsersCounterAny.(string); !ok || val == "" {
 			atLeastOneInvalid = true
 		} else if activeUsersCounter, pErr := strconv.ParseUint(val, 10, 64); pErr != nil {
 			return nil, errors.Wrapf(pErr, "failed to ParseUint: %#v", activeUsersCounterAny)
 		} else if activeUsersCounter < nextAdoption.TotalActiveUsers {
 			atLeastOneInvalid = true
-		} else if !atLeastOneInvalid {
-			lastValidIx = ix
 		}
 	}
-	timeToCheckForAdoptionSwitchBasedOnRemainingDurations := time.New(now.Add(stdlibtime.Duration(int(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired)-lastValidIx-1) * r.cfg.AdoptionMilestoneSwitch.Duration))   //nolint:lll // .
-	timeToCheckForAdoptionSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
-	timeToCheckForAdoptionSwitch = maxTime(timeToCheckForAdoptionSwitchBasedOnRemainingDurations, timeToCheckForAdoptionSwitchBasedOnPreviousAdoption)                                                                        //nolint:lll // .
+	timeToCheckForAdoptionSwitchBasedOnRemainingDurations := time.New(now.Add(r.cfg.AdoptionMilestoneSwitch.Duration))
+	timeToCheckForAdoptionSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(r.cfg.AdoptionMilestoneSwitch.Duration))
+	timeToCheckForAdoptionSwitch = maxTime(timeToCheckForAdoptionSwitchBasedOnRemainingDurations, timeToCheckForAdoptionSwitchBasedOnPreviousAdoption) //nolint:lll // .
 
 	if atLeastOneInvalid || len(activeUsersCounters) != len(globalKeys) {
+		return nil, nil
+	}
+	timeToSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+	if !atLeastOneInvalid && timeToSwitchBasedOnPreviousAdoption.After(*now.Time) {
 		return nil, nil
 	}
 	nextAdoption.AchievedAt = now
