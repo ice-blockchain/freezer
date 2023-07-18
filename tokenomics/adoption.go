@@ -122,7 +122,17 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 	if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
 		return nil
 	}
-	nextAdoption, err := r.getNextAdoption(ctx)
+	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
+	if err != nil {
+		return errors.Wrap(err, "failed to getCurrentAdoption")
+	}
+	if timeToCheckForAdoptionSwitch.IsNil() {
+		timeToCheckForAdoptionSwitch = time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+		if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
+			return nil
+		}
+	}
+	nextAdoption, err := r.getNextAdoption(ctx, currentAdoption)
 	if err != nil || nextAdoption == nil {
 		return errors.Wrap(err, "failed to try to get next adoption")
 	}
@@ -222,11 +232,7 @@ func GetCurrentAdoption(ctx context.Context, db storage.DB) (*Adoption[float64],
 	}
 }
 
-func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[float64], error) { //nolint:funlen // .
-	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to getCurrentAdoption")
-	}
+func (r *repository) getNextAdoption(ctx context.Context, currentAdoption *Adoption[float64]) (*Adoption[float64], error) { //nolint:funlen // .
 	nextAdoption, err := getAdoption(ctx, r.db, currentAdoption.Milestone+1)
 	if err != nil || !nextAdoption.AchievedAt.IsNil() {
 		if err != nil && errors.Is(err, ErrNotFound) {
