@@ -51,12 +51,6 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 		mb:            messagebroker.MustConnect(context.Background(), applicationYamlKey),
 		pictureClient: picture.New(applicationYamlKey),
 	}}
-
-	prc.mustInitAdoptions(ctx)
-	prc.mustInitAdoptionSwitchTime(ctx)
-	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
-	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
-
 	//nolint:contextcheck // It's intended. Cuz we want to close everything gracefully.
 	mbConsumer := messagebroker.MustConnectAndStartConsuming(context.Background(), cancel, applicationYamlKey,
 		&usersTableSource{processor: prc},
@@ -66,7 +60,11 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 		&deviceMetadataTableSource{processor: prc},
 	)
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
+
+	prc.mustInitAdoptions(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
+	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
+	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
 
 	return prc
 }
