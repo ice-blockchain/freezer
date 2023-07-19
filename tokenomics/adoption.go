@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
@@ -111,6 +112,7 @@ func (ms *MiningSession) detectIncrTotalActiveUsersKeys(repo *repository) []stri
 var (
 	timeToCheckForAdoptionSwitch   *time.Time
 	timeToCheckForAdoptionSwitchMx = new(sync.Mutex)
+	timeToCheckShift               = uint64(0)
 )
 
 func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
@@ -122,7 +124,17 @@ func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
 	if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
 		return nil
 	}
-	nextAdoption, err := r.getNextAdoption(ctx)
+	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
+	if err != nil {
+		return errors.Wrap(err, "failed to getCurrentAdoption")
+	}
+	if timeToCheckForAdoptionSwitch.IsNil() {
+		timeToCheckForAdoptionSwitch = time.New(currentAdoption.AchievedAt.Add(r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+		if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
+			return nil
+		}
+	}
+	nextAdoption, err := r.getNextAdoption(ctx, currentAdoption)
 	if err != nil || nextAdoption == nil {
 		return errors.Wrap(err, "failed to try to get next adoption")
 	}
@@ -222,25 +234,32 @@ func GetCurrentAdoption(ctx context.Context, db storage.DB) (*Adoption[float64],
 	}
 }
 
-func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[float64], error) { //nolint:funlen // .
-	currentAdoption, err := GetCurrentAdoption(ctx, r.db)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to getCurrentAdoption")
+func (r *repository) getNextAdoption(ctx context.Context, currentAdoption *Adoption[float64]) (*Adoption[float64], error) { //nolint:funlen // .
+	now := time.Now()
+	timeToSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+	timeToCheckForAdoptionSwitchBasedOnRemainingDurations := time.New(now.Add(stdlibtime.Duration(atomic.AddUint64(&timeToCheckShift, 1)) * r.cfg.AdoptionMilestoneSwitch.Duration))                          //nolint:lll
+	timeToCheckForAdoptionSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(r.cfg.AdoptionMilestoneSwitch.Duration))
+	timeToCheckForAdoptionSwitch = maxTime(timeToCheckForAdoptionSwitchBasedOnRemainingDurations, timeToCheckForAdoptionSwitchBasedOnPreviousAdoption) //nolint:lll // .
+	if timeToCheckForAdoptionSwitch.After(*timeToSwitchBasedOnPreviousAdoption.Time) {
+		atomic.StoreUint64(&timeToCheckShift, 0)
+		timeToCheckForAdoptionSwitch = time.New(now.Add(r.cfg.AdoptionMilestoneSwitch.Duration))
 	}
+
+	if timeToSwitchBasedOnPreviousAdoption.After(*now.Time) {
+		return nil, nil
+	}
+
 	nextAdoption, err := getAdoption(ctx, r.db, currentAdoption.Milestone+1)
 	if err != nil || !nextAdoption.AchievedAt.IsNil() {
 		if err != nil && errors.Is(err, ErrNotFound) {
-			timeToCheckForAdoptionSwitch = time.New(time.Now().Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
+			timeToCheckForAdoptionSwitch = time.New(time.Now().Add(stdlibtime.Duration(atomic.AddUint64(&timeToCheckShift, 1)) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
 
 			return nil, nil
 		}
 
 		return nil, errors.Wrapf(err, "failed to get next adoption `%v`", currentAdoption.Milestone+1)
 	}
-	var (
-		now        = time.Now()
-		globalKeys = make([]string, 0, stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired))
-	)
+	globalKeys := make([]string, 0, stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired))
 	for duration := stdlibtime.Duration(0); duration < stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired); duration++ {
 		globalKeys = append(globalKeys, r.totalActiveUsersKey(now.Add(-duration*r.cfg.AdoptionMilestoneSwitch.Duration)))
 	}
@@ -248,28 +267,21 @@ func (r *repository) getNextAdoption(ctx context.Context) (*Adoption[float64], e
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get global active users count")
 	}
-	var (
-		atLeastOneInvalid = false
-		lastValidIx       = -1
-	)
-	for ix, activeUsersCounterAny := range activeUsersCounters {
+	atLeastOneInvalid := false
+	for _, activeUsersCounterAny := range activeUsersCounters {
 		if val, ok := activeUsersCounterAny.(string); !ok || val == "" {
 			atLeastOneInvalid = true
 		} else if activeUsersCounter, pErr := strconv.ParseUint(val, 10, 64); pErr != nil {
 			return nil, errors.Wrapf(pErr, "failed to ParseUint: %#v", activeUsersCounterAny)
 		} else if activeUsersCounter < nextAdoption.TotalActiveUsers {
 			atLeastOneInvalid = true
-		} else if !atLeastOneInvalid {
-			lastValidIx = ix
 		}
 	}
-	timeToCheckForAdoptionSwitchBasedOnRemainingDurations := time.New(now.Add(stdlibtime.Duration(int(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired)-lastValidIx-1) * r.cfg.AdoptionMilestoneSwitch.Duration))   //nolint:lll // .
-	timeToCheckForAdoptionSwitchBasedOnPreviousAdoption := time.New(currentAdoption.AchievedAt.Add(stdlibtime.Duration(r.cfg.AdoptionMilestoneSwitch.ConsecutiveDurationsRequired) * r.cfg.AdoptionMilestoneSwitch.Duration)) //nolint:lll // .
-	timeToCheckForAdoptionSwitch = maxTime(timeToCheckForAdoptionSwitchBasedOnRemainingDurations, timeToCheckForAdoptionSwitchBasedOnPreviousAdoption)                                                                        //nolint:lll // .
 
 	if atLeastOneInvalid || len(activeUsersCounters) != len(globalKeys) {
 		return nil, nil
 	}
+
 	nextAdoption.AchievedAt = now
 
 	return nextAdoption, nil
