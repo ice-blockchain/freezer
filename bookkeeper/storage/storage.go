@@ -209,7 +209,7 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		columns.extraBonus.Append(usr.ExtraBonus)
 		columns.newsSeen.Append(usr.NewsSeen)
 		columns.extraBonusDaysClaimNotAvailable.Append(usr.ExtraBonusDaysClaimNotAvailable)
-		columns.utcOffset.Append(usr.UTCOffset)
+		columns.utcOffset.Append(int16(usr.UTCOffset))
 		columns.hideRanking.Append(usr.HideRanking)
 	}
 

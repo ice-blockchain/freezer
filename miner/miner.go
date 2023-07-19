@@ -284,7 +284,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			if updatedUser != nil {
 				var extraBonusIndex uint16
-				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, updatedUser.UTCOffset, &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
+				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, int16(updatedUser.UTCOffset), &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
 					eba := &extrabonusnotifier.ExtraBonusAvailable{UserID: updatedUser.UserID, ExtraBonusIndex: extraBonusIndex}
 					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
 				} else {
@@ -304,7 +304,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					DeserializedUsersKey:                           usr.DeserializedUsersKey,
 					ExtraBonusDaysClaimNotAvailableResettableField: model.ExtraBonusDaysClaimNotAvailableResettableField{ExtraBonusDaysClaimNotAvailable: usr.ExtraBonusDaysClaimNotAvailable},
 				}
-				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, usr.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, usr.ID, usr.UTCOffset, &extraBonusOnlyUpdatedUsr.ExtraBonusIndex, &extraBonusOnlyUpdatedUsr.ExtraBonusDaysClaimNotAvailable, &extraBonusOnlyUpdatedUsr.ExtraBonusLastClaimAvailableAt); isAvailable {
+				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, usr.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, usr.ID, int16(usr.UTCOffset), &extraBonusOnlyUpdatedUsr.ExtraBonusIndex, &extraBonusOnlyUpdatedUsr.ExtraBonusDaysClaimNotAvailable, &extraBonusOnlyUpdatedUsr.ExtraBonusLastClaimAvailableAt); isAvailable {
 					eba := &extrabonusnotifier.ExtraBonusAvailable{UserID: usr.UserID, ExtraBonusIndex: extraBonusOnlyUpdatedUsr.ExtraBonusIndex}
 					msgs = append(msgs, extrabonusnotifier.ExtraBonusAvailableMessage(reqCtx, eba))
 					extraBonusOnlyUpdatedUsers = append(extraBonusOnlyUpdatedUsers, &extraBonusOnlyUpdatedUsr)

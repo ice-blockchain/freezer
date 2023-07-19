@@ -97,7 +97,7 @@ func (r *repository) getAvailableExtraBonus(
 		now.Before(extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt.Add(r.cfg.ExtraBonuses.ClaimWindow)) {
 		return nil, ErrDuplicate
 	}
-	if bonusAvailable, bonusClaimable := extrabonusnotifier.IsExtraBonusAvailable(now, r.extraBonusStartDate, extraBonusStartedAtField.ExtraBonusStartedAt, r.extraBonusIndicesDistribution, id, utcOffsetField.UTCOffset, &extraBonusIndex, &extraBonusDaysClaimNotAvailableField.ExtraBonusDaysClaimNotAvailable, &extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt); bonusAvailable { //nolint:lll // .
+	if bonusAvailable, bonusClaimable := extrabonusnotifier.IsExtraBonusAvailable(now, r.extraBonusStartDate, extraBonusStartedAtField.ExtraBonusStartedAt, r.extraBonusIndicesDistribution, id, int16(utcOffsetField.UTCOffset), &extraBonusIndex, &extraBonusDaysClaimNotAvailableField.ExtraBonusDaysClaimNotAvailable, &extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt); bonusAvailable { //nolint:lll // .
 		if extraBonus = calculateExtraBonus(); extraBonus == 0 {
 			return nil, ErrNotFound
 		} else {
@@ -154,7 +154,7 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 		model.UTCOffsetField
 	}{
 		DeserializedUsersKey: model.DeserializedUsersKey{ID: id},
-		UTCOffsetField:       model.UTCOffsetField{UTCOffset: int16(duration / stdlibtime.Minute)},
+		UTCOffsetField:       model.UTCOffsetField{UTCOffset: int64(duration / stdlibtime.Minute)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, val), "failed to update users' timezone for %#v", &dm)

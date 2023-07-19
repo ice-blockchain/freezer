@@ -217,7 +217,7 @@ type (
 		ExtraBonusDaysClaimNotAvailable uint16 `redis:"extra_bonus_days_claim_not_available,omitempty"`
 	}
 	UTCOffsetField struct {
-		UTCOffset int16 `redis:"utc_offset"`
+		UTCOffset int64 `redis:"utc_offset"`
 	}
 	HideRankingField struct {
 		HideRanking bool `redis:"hide_ranking"`

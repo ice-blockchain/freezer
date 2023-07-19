@@ -53,7 +53,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.UTCOffset = 180
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.False(t, b)
 		require.False(t, c)
 		require.EqualValues(t, 7, m.ExtraBonusIndex)
@@ -67,7 +67,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.UTCOffset = 180
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.False(t, b)
 		require.False(t, c)
 		require.EqualValues(t, 7, m.ExtraBonusIndex)
@@ -81,7 +81,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.UTCOffset = 180
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.False(t, b)
 		require.False(t, c)
 		require.EqualValues(t, 7, m.ExtraBonusIndex)
@@ -95,7 +95,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.UTCOffset = 180
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.True(t, b)
 		require.True(t, c)
 
@@ -110,7 +110,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.UTCOffset = 180
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.False(t, b)
 		require.False(t, c)
 		require.EqualValues(t, 7, m.ExtraBonusIndex)
@@ -125,7 +125,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.True(t, b)
 		require.True(t, c)
 
@@ -142,7 +142,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.True(t, b)
 		require.True(t, c)
 		require.EqualValues(t, 10, m.ExtraBonusIndex)
@@ -158,7 +158,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Hour * 24))
 		m.UTCOffset = 180
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.True(t, b)
 		require.True(t, c)
 		require.EqualValues(t, 10, m.ExtraBonusIndex)
@@ -174,7 +174,7 @@ func Test_isExtraBonusAvailable(t *testing.T) {
 		m.ExtraBonusLastClaimAvailableAt = time.New(now.Add(-stdlibtime.Second))
 		m.UTCOffset = 180
 
-		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, m.UTCOffset, &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
+		b, c := IsExtraBonusAvailable(now, ExtraBonusStartedAt, nil, d, m.ID, int16(m.UTCOffset), &m.ExtraBonusIndex, &m.ExtraBonusDaysClaimNotAvailable, &m.ExtraBonusLastClaimAvailableAt)
 		require.False(t, b)
 		require.True(t, c)
 		require.EqualValues(t, 10, m.ExtraBonusIndex)
