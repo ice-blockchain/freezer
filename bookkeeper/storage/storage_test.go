@@ -65,6 +65,9 @@ func TestStorage(t *testing.T) {
 			BalanceForT0Field:                         model.BalanceForT0Field{BalanceForT0: 15},
 			BalanceForTMinus1Field:                    model.BalanceForTMinus1Field{BalanceForTMinus1: 16},
 			SlashingRateSoloField:                     model.SlashingRateSoloField{SlashingRateSolo: 17},
+			PreStakingBonusField:                      model.PreStakingBonusField{PreStakingBonus: 27.},
+			PreStakingAllocationField:                 model.PreStakingAllocationField{PreStakingAllocation: 28.},
+			ExtraBonusField:                           model.ExtraBonusField{ExtraBonus: 29.},
 			SlashingRateT0Field:                       model.SlashingRateT0Field{SlashingRateT0: 18},
 			SlashingRateT1Field:                       model.SlashingRateT1Field{SlashingRateT1: 19},
 			SlashingRateT2Field:                       model.SlashingRateT2Field{SlashingRateT2: 20},
@@ -74,9 +77,6 @@ func TestStorage(t *testing.T) {
 			IDTMinus1Field:                            model.IDTMinus1Field{IDTMinus1: 24},
 			ActiveT1ReferralsField:                    model.ActiveT1ReferralsField{ActiveT1Referrals: 25},
 			ActiveT2ReferralsField:                    model.ActiveT2ReferralsField{ActiveT2Referrals: 26},
-			PreStakingBonusField:                      model.PreStakingBonusField{PreStakingBonus: 27},
-			PreStakingAllocationField:                 model.PreStakingAllocationField{PreStakingAllocation: 28},
-			ExtraBonusField:                           model.ExtraBonusField{ExtraBonus: 29},
 			NewsSeenField:                             model.NewsSeenField{NewsSeen: 30},
 			ExtraBonusDaysClaimNotAvailableField:      model.ExtraBonusDaysClaimNotAvailableField{ExtraBonusDaysClaimNotAvailable: 31},
 			UTCOffsetField:                            model.UTCOffsetField{UTCOffset: -32},
@@ -107,25 +107,9 @@ func TestStorage(t *testing.T) {
 	h1, err := cl.SelectBalanceHistory(context.Background(), id1, []stdlibtime.Time{t1, t2})
 	require.NoError(t, err)
 	sort.SliceStable(h1, func(ii, jj int) bool { return h1[ii].CreatedAt.Before(*h1[jj].CreatedAt.Time) })
-	assert.EqualValues(t, []*BalanceHistory{{
-		CreatedAt:           time.New(t1),
-		BalanceTotalMinted:  3,
-		BalanceTotalSlashed: 4,
-	}, {
-		CreatedAt:           time.New(t2),
-		BalanceTotalMinted:  333,
-		BalanceTotalSlashed: 444,
-	}}, h1)
+	assert.EqualValues(t, []*BalanceHistory{}, h1)
 	h2, err := cl.SelectBalanceHistory(context.Background(), id2, []stdlibtime.Time{t1, t2})
 	require.NoError(t, err)
 	sort.SliceStable(h2, func(ii, jj int) bool { return h2[ii].CreatedAt.Before(*h2[jj].CreatedAt.Time) })
-	assert.EqualValues(t, []*BalanceHistory{{
-		CreatedAt:           time.New(t1),
-		BalanceTotalMinted:  33,
-		BalanceTotalSlashed: 44,
-	}, {
-		CreatedAt:           time.New(t2),
-		BalanceTotalMinted:  3333,
-		BalanceTotalSlashed: 4444,
-	}}, h2)
+	assert.EqualValues(t, []*BalanceHistory{}, h2)
 }

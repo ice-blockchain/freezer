@@ -234,9 +234,9 @@ func (r *repository) processBalanceHistory(
 func (e *BalanceHistoryEntry) setBalanceDiffBonus(from float64) {
 	to := e.Balance.amount
 	if from < 0 && to > 0 {
-		e.Balance.Bonus = int64(roundFloat64AndTruncate(((from - to) / from) * 100))
+		e.Balance.Bonus = ((from - to) / from) * 100
 	} else {
-		e.Balance.Bonus = -1 * int64(roundFloat64AndTruncate(((from-to)/from)*100))
+		e.Balance.Bonus = -1 * ((from - to) / from) * 100
 	}
 }
 
@@ -286,9 +286,9 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 }
 
 //nolint:gomnd // .
-func ApplyPreStaking(amount float64, preStakingAllocation, preStakingBonus uint16) (float64, float64) {
-	standardAmount := (amount * float64(100-preStakingAllocation)) / 100
-	preStakingAmount := (amount * float64(100+preStakingBonus) * float64(preStakingAllocation)) / 10000
+func ApplyPreStaking(amount, preStakingAllocation, preStakingBonus float64) (float64, float64) {
+	standardAmount := (amount * (100 - preStakingAllocation)) / 100
+	preStakingAmount := (amount * (100 + preStakingBonus) * preStakingAllocation) / 10000
 
 	return standardAmount, preStakingAmount
 }

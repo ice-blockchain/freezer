@@ -148,7 +148,7 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 }
 
 func (r *repository) validateRollbackNegativeMiningProgress(
-	preStakingAllocation, preStakingBonus uint16,
+	preStakingAllocation, preStakingBonus,
 	slashingRateSolo, slashingRateT0, slashingRateT1, slashingRateT2 float64,
 	miningSessionSoloEndedAt, resurrectSoloUsedAt, now *time.Time,
 	rollbackNegativeMiningProgress *bool,
@@ -162,7 +162,7 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 	slashingDuration := now.Sub(*miningSessionSoloEndedAt.Time)
 	delta := float64(slashingDuration/rateUnit) + float64(slashingDuration%rateUnit)/float64(rateUnit)
 	amountLost := (slashingRateSolo + slashingRateT0 + slashingRateT1 + slashingRateT2) * delta
-	amountLost = ((amountLost * float64(100-preStakingAllocation)) / 100) + ((amountLost * float64(preStakingAllocation*(preStakingBonus+100))) / (100 * 100))
+	amountLost = ((amountLost * (100 - preStakingAllocation)) / 100) + ((amountLost * (preStakingAllocation * (preStakingBonus + 100))) / (100 * 100))
 	if amountLost == 0.0 {
 		return nil, nil //nolint:nilnil // Nope.
 	}

@@ -85,8 +85,8 @@ func (r *repository) getAvailableExtraBonus(
 ) (*availableExtraBonus, error) {
 	var (
 		extraBonusIndex     uint16
-		extraBonus          uint16
-		calculateExtraBonus = func() uint16 {
+		extraBonus          float64
+		calculateExtraBonus = func() float64 {
 			return extrabonusnotifier.CalculateExtraBonus(newsSeenField.NewsSeen, extraBonusDaysClaimNotAvailableField.ExtraBonusDaysClaimNotAvailable, extraBonusIndex-1, now, extraBonusLastClaimAvailableAtField.ExtraBonusLastClaimAvailableAt, miningSessionSoloStartedAtField.MiningSessionSoloStartedAt, miningSessionSoloEndedAtField.MiningSessionSoloEndedAt) //nolint:lll // .
 		}
 	)

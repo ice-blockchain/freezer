@@ -28,9 +28,9 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 	return &PreStakingSummary{
 		PreStaking: &PreStaking{
 			Years:      uint64(PreStakingYearsByPreStakingBonuses[ps.PreStakingBonus]),
-			Allocation: uint64(ps.PreStakingAllocation),
+			Allocation: ps.PreStakingAllocation,
 		},
-		Bonus: uint64(ps.PreStakingBonus),
+		Bonus: ps.PreStakingBonus,
 	}, nil
 }
 
@@ -58,23 +58,23 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	if existing != nil {
 		existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
-		if (existing.PreStakingAllocation == 100 || existing.PreStakingAllocation == uint16(st.Allocation)) &&
+		if (existing.PreStakingAllocation == 100 || existing.PreStakingAllocation == st.Allocation) &&
 			(existingYears == MaxPreStakingYears || existingYears == st.Years) {
-			st.Allocation = uint64(existing.PreStakingAllocation)
+			st.Allocation = existing.PreStakingAllocation
 			st.Years = existingYears
-			st.Bonus = uint64(existing.PreStakingBonus)
+			st.Bonus = existing.PreStakingBonus
 
 			return nil
 		}
-		if existing.PreStakingAllocation > uint16(st.Allocation) || existingYears > st.Years {
+		if existing.PreStakingAllocation > st.Allocation || existingYears > st.Years {
 			return ErrDecreasingPreStakingAllocationOrYearsNotAllowed
 		}
 	}
-	st.Bonus = uint64(PreStakingBonusesPerYear[uint8(st.Years)])
+	st.Bonus = PreStakingBonusesPerYear[uint8(st.Years)]
 	existing = &preStaking{
 		DeserializedUsersKey:      model.DeserializedUsersKey{ID: id},
-		PreStakingBonusField:      model.PreStakingBonusField{PreStakingBonus: uint16(st.Bonus)},
-		PreStakingAllocationField: model.PreStakingAllocationField{PreStakingAllocation: uint16(st.Allocation)},
+		PreStakingBonusField:      model.PreStakingBonusField{PreStakingBonus: st.Bonus},
+		PreStakingAllocationField: model.PreStakingAllocationField{PreStakingAllocation: st.Allocation},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)
