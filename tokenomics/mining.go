@@ -321,7 +321,7 @@ func (r *repository) calculateMiningRateSummaries(
 				localTotalBonus = ((preStakingMiningRate - baseMiningRate) * 100) / baseMiningRate
 			}
 		case NegativeMiningRateType:
-			preStakingMiningRate = (negativeMiningRate * (preStakingBonus + 100) * float64(preStakingAllocation)) / (100 * 100)
+			preStakingMiningRate = (negativeMiningRate * (preStakingBonus + 100) * preStakingAllocation) / (100 * 100)
 		case NoneMiningRateType:
 		}
 		t1Bonus := float64((uint64(t0*r.cfg.ReferralBonusMiningRates.T0)+uint64(uint32(t1)*r.cfg.ReferralBonusMiningRates.T1))*uint64(preStakingAllocation)) / 100
