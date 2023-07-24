@@ -32,7 +32,7 @@ func init() {
 func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi := &miner{
 		mb:        messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
-		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, 1),
+		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, int(cfg.Workers)),
 		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:        new(sync.WaitGroup),
 		telemetry: new(telemetry).mustInit(),
@@ -102,14 +102,6 @@ func (m *miner) pingDB(ctx context.Context) error {
 }
 
 func (m *miner) mine(ctx context.Context, workerNumber int64) {
-	db := storage.MustConnect(context.Background(), parentApplicationYamlKey, 1)
-	defer func() {
-		if err := recover(); err != nil {
-			log.Error(db.Close())
-			panic(err)
-		}
-		log.Error(db.Close())
-	}()
 	dwhClient := dwh.MustConnect(context.Background(), applicationYamlKey)
 	defer func() {
 		if err := recover(); err != nil {
@@ -123,7 +115,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		totalBatches                                               uint64
 		iteration                                                  uint64
 		now, lastIterationStartedAt                                = time.Now(), time.Now()
-		currentAdoption                                            = m.getAdoption(ctx, db, workerNumber)
+		currentAdoption                                            = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                    = cfg.Workers
 		batchSize                                                  = cfg.BatchSize
 		userKeys, userHistoryKeys, referralKeys                    = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
@@ -159,7 +151,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		now = time.Now()
 		if batchNumber == 0 || currentAdoption == nil {
-			currentAdoption = m.getAdoption(ctx, db, workerNumber)
+			currentAdoption = m.getAdoption(ctx, m.db, workerNumber)
 		}
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
@@ -193,7 +185,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		before := time.Now()
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[user](reqCtx, db, userKeys, &userResults); err != nil {
+		if err := storage.Bind[user](reqCtx, m.db, userKeys, &userResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			now = time.Now()
@@ -235,7 +227,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[referral](reqCtx, db, referralKeys, &referralResults); err != nil {
+		if err := storage.Bind[referral](reqCtx, m.db, referralKeys, &referralResults); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get referrees for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)
@@ -351,7 +343,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[model.User](reqCtx, db, userHistoryKeys, &histories); err != nil {
+		if err := storage.Bind[model.User](reqCtx, m.db, userHistoryKeys, &histories); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)
@@ -396,9 +388,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		var pipeliner redis.Pipeliner
 		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(userGlobalRanks) > 0 {
-			pipeliner = db.TxPipeline()
+			pipeliner = m.db.TxPipeline()
 		} else {
-			pipeliner = db.Pipeline()
+			pipeliner = m.db.Pipeline()
 		}
 
 		before = time.Now()
