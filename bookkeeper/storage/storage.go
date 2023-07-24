@@ -204,9 +204,9 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		columns.slashingRateForTminus1.Append(usr.SlashingRateForTMinus1)
 		columns.activeT1Referrals.Append(usr.ActiveT1Referrals)
 		columns.activeT2Referrals.Append(usr.ActiveT2Referrals)
-		columns.preStakingBonus.Append(usr.PreStakingBonus)
-		columns.preStakingAllocation.Append(usr.PreStakingAllocation)
-		columns.extraBonus.Append(usr.ExtraBonus)
+		columns.preStakingBonus.Append(uint16(usr.PreStakingBonus))
+		columns.preStakingAllocation.Append(uint16(usr.PreStakingAllocation))
+		columns.extraBonus.Append(uint16(usr.ExtraBonus))
 		columns.newsSeen.Append(usr.NewsSeen)
 		columns.extraBonusDaysClaimNotAvailable.Append(usr.ExtraBonusDaysClaimNotAvailable)
 		columns.utcOffset.Append(int16(usr.UTCOffset))
@@ -263,11 +263,11 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		slashingRateT2                       = make(proto.ColFloat64, 0, rows)
 		slashingRateForT0                    = make(proto.ColFloat64, 0, rows)
 		slashingRateForTminus1               = make(proto.ColFloat64, 0, rows)
-		extraBonus                           = make(proto.ColFloat64, 0, rows)
-		preStakingBonus                      = make(proto.ColFloat64, 0, rows)
-		preStakingAllocation                 = make(proto.ColFloat64, 0, rows)
 		activeT1Referrals                    = make(proto.ColInt32, 0, rows)
 		activeT2Referrals                    = make(proto.ColInt32, 0, rows)
+		preStakingBonus                      = make(proto.ColUInt16, 0, rows)
+		preStakingAllocation                 = make(proto.ColUInt16, 0, rows)
+		extraBonus                           = make(proto.ColUInt16, 0, rows)
 		newsSeen                             = make(proto.ColUInt16, 0, rows)
 		extraBonusDaysClaimNotAvailable      = make(proto.ColUInt16, 0, rows)
 		utcOffset                            = make(proto.ColInt16, 0, rows)
@@ -367,11 +367,11 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		slashingRateT2:                       &slashingRateT2,
 		slashingRateForT0:                    &slashingRateForT0,
 		slashingRateForTminus1:               &slashingRateForTminus1,
-		extraBonus:                           &extraBonus,
-		preStakingBonus:                      &preStakingBonus,
-		preStakingAllocation:                 &preStakingAllocation,
 		activeT1Referrals:                    &activeT1Referrals,
 		activeT2Referrals:                    &activeT2Referrals,
+		preStakingBonus:                      &preStakingBonus,
+		preStakingAllocation:                 &preStakingAllocation,
+		extraBonus:                           &extraBonus,
 		newsSeen:                             &newsSeen,
 		extraBonusDaysClaimNotAvailable:      &extraBonusDaysClaimNotAvailable,
 		utcOffset:                            &utcOffset,

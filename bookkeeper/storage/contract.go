@@ -72,11 +72,11 @@ type (
 		slashingRateT2                       *proto.ColFloat64
 		slashingRateForT0                    *proto.ColFloat64
 		slashingRateForTminus1               *proto.ColFloat64
-		preStakingBonus                      *proto.ColFloat64
-		preStakingAllocation                 *proto.ColFloat64
-		extraBonus                           *proto.ColFloat64
 		activeT1Referrals                    *proto.ColInt32
 		activeT2Referrals                    *proto.ColInt32
+		preStakingBonus                      *proto.ColUInt16
+		preStakingAllocation                 *proto.ColUInt16
+		extraBonus                           *proto.ColUInt16
 		newsSeen                             *proto.ColUInt16
 		extraBonusDaysClaimNotAvailable      *proto.ColUInt16
 		utcOffset                            *proto.ColInt16
