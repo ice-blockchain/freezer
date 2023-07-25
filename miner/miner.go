@@ -67,7 +67,7 @@ func (m *miner) CheckHealth(ctx context.Context) error {
 	if err := m.dwhClient.Ping(ctx); err != nil {
 		return err
 	}
-	if err := m.pingDB(ctx); err != nil {
+	if err := m.checkDBHealth(ctx); err != nil {
 		return err
 	}
 	type ts struct {
@@ -89,13 +89,16 @@ func (m *miner) CheckHealth(ctx context.Context) error {
 	return errors.Wrapf(<-responder, "[health-check] failed to send health check message to broker")
 }
 
-func (m *miner) pingDB(ctx context.Context) error {
+func (m *miner) checkDBHealth(ctx context.Context) error {
 	if resp := m.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
 		if resp.Err() == nil {
 			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
 		}
 
 		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
+	}
+	if !m.db.IsRW(ctx) {
+		return errors.New("db is not writeable")
 	}
 
 	return nil

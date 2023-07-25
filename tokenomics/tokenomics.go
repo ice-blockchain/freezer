@@ -75,7 +75,7 @@ func (r *repository) Close() error {
 
 func (r *repository) CheckHealth(ctx context.Context) error {
 	return multierror.Append( //nolint:wrapcheck // Not needed.
-		errors.Wrap(r.pingDB(ctx), "db ping failed"),
+		errors.Wrap(r.checkDBHealth(ctx), "db ping failed"),
 		errors.Wrap(r.dwh.Ping(ctx), "dwh ping failed"),
 	).ErrorOrNil()
 }
@@ -102,7 +102,7 @@ func (p *processor) Close() error {
 }
 
 func (p *processor) CheckHealth(ctx context.Context) error {
-	if err := p.pingDB(ctx); err != nil {
+	if err := p.checkDBHealth(ctx); err != nil {
 		return err
 	}
 	type ts struct {
@@ -124,13 +124,16 @@ func (p *processor) CheckHealth(ctx context.Context) error {
 	return errors.Wrapf(<-responder, "[health-check] failed to send health check message to broker")
 }
 
-func (r *repository) pingDB(ctx context.Context) error {
+func (r *repository) checkDBHealth(ctx context.Context) error {
 	if resp := r.db.Ping(ctx); resp.Err() != nil || resp.Val() != "PONG" {
 		if resp.Err() == nil {
 			resp.SetErr(errors.Errorf("response `%v` is not `PONG`", resp.Val()))
 		}
 
 		return errors.Wrap(resp.Err(), "[health-check] failed to ping DB")
+	}
+	if !r.db.IsRW(ctx) {
+		return errors.New("db is not writeable")
 	}
 
 	return nil
