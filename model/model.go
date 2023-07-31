@@ -51,13 +51,13 @@ type (
 		SlashingRateT2Field
 		SlashingRateForT0Field
 		SlashingRateForTMinus1Field
+		PreStakingBonusField
+		PreStakingAllocationField
+		ExtraBonusField
 		IDT0Field
 		IDTMinus1Field
 		ActiveT1ReferralsField
 		ActiveT2ReferralsField
-		PreStakingBonusField
-		PreStakingAllocationField
-		ExtraBonusField
 		NewsSeenField
 		ExtraBonusDaysClaimNotAvailableField
 		UTCOffsetField
@@ -177,6 +177,15 @@ type (
 	SlashingRateForTMinus1Field struct {
 		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 	}
+	PreStakingBonusField struct {
+		PreStakingBonus float64 `redis:"pre_staking_bonus,omitempty"`
+	}
+	PreStakingAllocationField struct {
+		PreStakingAllocation float64 `redis:"pre_staking_allocation,omitempty"`
+	}
+	ExtraBonusField struct {
+		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
+	}
 	DeserializedUsersKey struct {
 		ID int64 `redis:"-"`
 	}
@@ -197,15 +206,6 @@ type (
 	}
 	ActiveT2ReferralsField struct {
 		ActiveT2Referrals int32 `redis:"active_t2_referrals,omitempty"`
-	}
-	PreStakingBonusField struct {
-		PreStakingBonus uint16 `redis:"pre_staking_bonus,omitempty"`
-	}
-	PreStakingAllocationField struct {
-		PreStakingAllocation uint16 `redis:"pre_staking_allocation,omitempty"`
-	}
-	ExtraBonusField struct {
-		ExtraBonus uint16 `redis:"extra_bonus,omitempty"`
 	}
 	NewsSeenField struct {
 		NewsSeen uint16 `redis:"news_seen"`

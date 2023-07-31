@@ -38,14 +38,14 @@ var (
 	ErrRaceCondition                                   = errors.New("race condition")
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
 	ErrDecreasingPreStakingAllocationOrYearsNotAllowed = errors.New("decreasing pre-staking allocation or years not allowed")
-	PreStakingBonusesPerYear                           = map[uint8]uint16{
+	PreStakingBonusesPerYear                           = map[uint8]float64{
 		1: 35,
 		2: 70,
 		3: 115,
 		4: 170,
 		5: 250,
 	}
-	PreStakingYearsByPreStakingBonuses = map[uint16]uint8{
+	PreStakingYearsByPreStakingBonuses = map[float64]uint8{
 		35:  1,
 		70:  2,
 		115: 3,
@@ -81,7 +81,7 @@ type (
 	BalanceHistoryBalanceDiff struct {
 		Amount   string  `json:"amount" example:"1,243.02"`
 		amount   float64 //nolint:revive // That's intended.
-		Bonus    int64   `json:"bonus" example:"120"`
+		Bonus    float64 `json:"bonus" example:"120.00"`
 		Negative bool    `json:"negative" example:"true"`
 	}
 	BalanceHistoryEntry struct {
@@ -105,19 +105,19 @@ type (
 	}
 	PreStakingSummary struct {
 		*PreStaking
-		Bonus uint64 `json:"bonus,omitempty" example:"100"`
+		Bonus float64 `json:"bonus,omitempty" example:"100.00"`
 	}
 	PreStaking struct {
-		UserID     string `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Years      uint64 `json:"years,omitempty" example:"1"`
-		Allocation uint64 `json:"allocation,omitempty" example:"100"`
+		UserID     string  `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Years      uint64  `json:"years,omitempty" example:"1"`
+		Allocation float64 `json:"allocation,omitempty" example:"100.00"`
 	}
 	MiningRateBonuses struct {
-		T1         uint64 `json:"t1,omitempty" example:"100"`
-		T2         uint64 `json:"t2,omitempty" example:"200"`
-		PreStaking uint64 `json:"preStaking,omitempty" example:"300"`
-		Extra      uint64 `json:"extra,omitempty" example:"300"`
-		Total      uint64 `json:"total,omitempty" example:"300"`
+		T1         float64 `json:"t1,omitempty" example:"100.00"`
+		T2         float64 `json:"t2,omitempty" example:"200.00"`
+		PreStaking float64 `json:"preStaking,omitempty" example:"300.00"`
+		Extra      float64 `json:"extra,omitempty" example:"300.00"`
+		Total      float64 `json:"total,omitempty" example:"300.00"`
 	}
 	MiningRateSummary[DENOM ~string | ~float64] struct {
 		Bonuses *MiningRateBonuses `json:"bonuses,omitempty"`
@@ -153,8 +153,8 @@ type (
 		MiningStreak                  uint64              `json:"miningStreak,omitempty" swaggerignore:"true" example:"11"`
 	}
 	ExtraBonusSummary struct {
-		UserID              string `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		AvailableExtraBonus uint16 `json:"availableExtraBonus,omitempty" example:"2"`
+		UserID              string  `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		AvailableExtraBonus float64 `json:"availableExtraBonus,omitempty" example:"2.00"`
 	}
 	RankingSummary struct {
 		GlobalRank uint64 `json:"globalRank" example:"12333"`

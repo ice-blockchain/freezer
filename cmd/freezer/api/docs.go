@@ -644,7 +644,7 @@ const docTemplate = `{
                     "example": "1,243.02"
                 },
                 "bonus": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 120
                 },
                 "negative": {
@@ -729,23 +729,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "extra": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 300
                 },
                 "preStaking": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 300
                 },
                 "t1": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 100
                 },
                 "t2": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 200
                 },
                 "total": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 300
                 }
             }
@@ -830,7 +830,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "availableExtraBonus": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 2
                 },
                 "miningRates": {
@@ -853,11 +853,11 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "allocation": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 100
                 },
                 "bonus": {
-                    "type": "integer",
+                    "type": "number",
                     "example": 100
                 },
                 "years": {

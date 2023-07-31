@@ -44,7 +44,7 @@ definitions:
         type: string
       bonus:
         example: 120
-        type: integer
+        type: number
       negative:
         example: true
         type: boolean
@@ -104,19 +104,19 @@ definitions:
     properties:
       extra:
         example: 300
-        type: integer
+        type: number
       preStaking:
         example: 300
-        type: integer
+        type: number
       t1:
         example: 100
-        type: integer
+        type: number
       t2:
         example: 200
-        type: integer
+        type: number
       total:
         example: 300
-        type: integer
+        type: number
     type: object
   tokenomics.MiningRateSummary-string:
     properties:
@@ -175,7 +175,7 @@ definitions:
     properties:
       availableExtraBonus:
         example: 2
-        type: integer
+        type: number
       miningRates:
         $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string'
       miningSession:
@@ -191,10 +191,10 @@ definitions:
     properties:
       allocation:
         example: 100
-        type: integer
+        type: number
       bonus:
         example: 100
-        type: integer
+        type: number
       years:
         example: 1
         type: integer
