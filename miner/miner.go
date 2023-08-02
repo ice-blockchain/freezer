@@ -299,17 +299,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 					referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
 				}
-				if IDT0Changed && t0Ref != nil && !usr.BalanceLastUpdatedAt.IsNil() {
-					t1ReferralsToIncrementActiveValue[t0Ref.ID]++
-					if t0Ref.IDT0 != 0 {
-						t2ReferralsToIncrementActiveValue[t0Ref.IDT0]++
-					}
-				}
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
 				}
-				if t0Ref != nil && usr.IDTMinus1 != t0Ref.IDT0 {
-					updatedUser.IDTMinus1 = t0Ref.IDT0
+				if t0Ref != nil {
+					if IDT0Changed && !usr.BalanceLastUpdatedAt.IsNil() {
+						t1ReferralsToIncrementActiveValue[t0Ref.ID]++
+						if t0Ref.IDT0 != 0 {
+							t2ReferralsToIncrementActiveValue[t0Ref.IDT0]++
+						}
+					}
+					if usr.IDTMinus1 != t0Ref.IDT0 {
+						updatedUser.IDTMinus1 = t0Ref.IDT0
+					}
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
