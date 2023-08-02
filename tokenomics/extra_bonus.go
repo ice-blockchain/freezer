@@ -171,7 +171,7 @@ func (s *viewedNewsSource) Process(ctx context.Context, msg *messagebroker.Messa
 	if err = json.UnmarshalContext(ctx, msg.Value, &vn); err != nil || vn.UserID == "" {
 		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), &vn)
 	}
-	duplGuardKey := fmt.Sprintf("news_seen_dupl_guards:%v", vn.UserID)
+	duplGuardKey := fmt.Sprintf("news_seen_dupl_guards:%v~%v", vn.UserID, vn.NewsID)
 	if set, dErr := s.db.SetNX(ctx, duplGuardKey, "", s.cfg.MiningSessionDuration.Min).Result(); dErr != nil || !set {
 		if dErr == nil {
 			dErr = ErrDuplicate
