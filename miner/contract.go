@@ -103,7 +103,7 @@ type (
 		model.ExtraBonusDaysClaimNotAvailableField
 	}
 
-	IDsOnlyUpdatedUser struct {
+	ReferralsUpdated struct {
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field

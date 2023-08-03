@@ -14,7 +14,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	resurrect(now, updatedUser, t0Ref, tMinus1Ref)
-	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser, false)
+	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
 			updatedUser.BalanceT2Pending-updatedUser.BalanceT2PendingApplied != 0 {
@@ -217,19 +217,20 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	return updatedUser, shouldGenerateHistory, IDT0Changed
 }
 
-func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *IDsOnlyUpdatedUser, IDT0Changed bool) {
+func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *ReferralsUpdated) {
 	if usr.IDT0 < 0 && (usr.MiningSessionSoloLastStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil()) &&
 		usr.BalanceLastUpdatedAt.IsNil() {
-		IDT0Changed, _ = changeT0AndTMinus1Referrals(usr, true)
-
-		return &IDsOnlyUpdatedUser{
-			DeserializedUsersKey: usr.DeserializedUsersKey,
-			IDT0Field:            usr.IDT0Field,
-			IDTMinus1Field:       usr.IDTMinus1Field,
-		}, IDT0Changed
+		IDT0Changed, _ := changeT0AndTMinus1Referrals(usr)
+		if IDT0Changed {
+			return &ReferralsUpdated{
+				DeserializedUsersKey: usr.DeserializedUsersKey,
+				IDT0Field:            usr.IDT0Field,
+				IDTMinus1Field:       usr.IDTMinus1Field,
+			}
+		}
 	}
 
-	return nil, false
+	return nil
 }
 
 func (u *user) isAbsoluteZero() bool {
