@@ -132,7 +132,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		errs                                                                 = make([]error, 0, 3*batchSize)
 		updatedUsers                                                         = make([]*UpdatedUser, 0, batchSize)
 		extraBonusOnlyUpdatedUsers                                           = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
-		referralsUpdated                                                     = make([]*ReferralsUpdated, 0, batchSize)
+		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))

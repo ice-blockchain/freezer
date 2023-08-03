@@ -217,12 +217,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	return updatedUser, shouldGenerateHistory, IDT0Changed
 }
 
-func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *ReferralsUpdated) {
+func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *referralUpdated) {
 	if usr.IDT0 < 0 && (usr.MiningSessionSoloLastStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil()) &&
 		usr.BalanceLastUpdatedAt.IsNil() {
-		IDT0Changed, _ := changeT0AndTMinus1Referrals(usr)
-		if IDT0Changed {
-			return &ReferralsUpdated{
+		if IDT0Changed, _ := changeT0AndTMinus1Referrals(usr); IDT0Changed {
+			return &referralUpdated{
 				DeserializedUsersKey: usr.DeserializedUsersKey,
 				IDT0Field:            usr.IDT0Field,
 				IDTMinus1Field:       usr.IDTMinus1Field,
