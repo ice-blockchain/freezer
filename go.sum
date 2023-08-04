@@ -302,8 +302,8 @@ github.com/ice-blockchain/wintr v1.123.0 h1:aIbcgAW5AS1MKm5CjyW+wqeAl4g+grbcti1q
 github.com/ice-blockchain/wintr v1.123.0/go.mod h1:W00amynhZVzMoDoOG7BNuCPvhAibK/eNuXjxUNKsPh8=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
-github.com/imroc/req/v3 v3.39.0 h1:d4j0Wgxo/9XM6vEBZ+D3WIOeNBtK3ulemg7nOL3mqXc=
-github.com/imroc/req/v3 v3.39.0/go.mod h1:4wMbz0QYY5jmXNWk0BsWrRTR9ItZqOxzSJdGL0M9kzY=
+github.com/imroc/req/v3 v3.40.0 h1:+OX24V5KrPxyNEr38c48IZq590xNgHYoKDKQ9M3QZ/g=
+github.com/imroc/req/v3 v3.40.0/go.mod h1:4wMbz0QYY5jmXNWk0BsWrRTR9ItZqOxzSJdGL0M9kzY=
 github.com/ip2location/ip2location-go/v9 v9.6.0 h1:do+hKM2wbVG3lXMavZzWuy0znXxJBvGc7mv0wzRVoYc=
 github.com/ip2location/ip2location-go/v9 v9.6.0/go.mod h1:MPLnsKxwQlvd2lBNcQCsLoyzJLDBFizuO67wXXdzoyI=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
