@@ -18,13 +18,15 @@ func init() {
 type telemetry struct {
 	registry metrics.Registry
 	steps    [8]string
+	cfg      config
 }
 
-func (t *telemetry) mustInit() *telemetry {
+func (t *telemetry) mustInit(cfg config) *telemetry {
 	const (
 		decayAlpha    = 0.015
 		reservoirSize = 10_000
 	)
+	t.cfg = cfg
 	t.registry = metrics.NewRegistry()
 	t.steps = [8]string{"mine[full iteration]", "mine", "get_users", "get_referrals", "send_messages", "get_history", "insert_history", "update_users"}
 	for ix := range &t.steps {
@@ -47,17 +49,18 @@ func (t *telemetry) collectElapsed(step int, since stdlibtime.Time) {
 
 func (t *telemetry) shouldSynchronizeBalanceFunc(workerNumber, totalBatches, iteration uint64) func(batchNumber uint64) bool {
 	var deadline float64
-	if cfg.Development {
+	if t.cfg.Development {
 		deadline = float64(stdlibtime.Minute)
 	} else {
 		deadline = float64(stdlibtime.Hour)
 	}
-	targetIterations := uint64(deadline / t.registry.Get(t.steps[0]).(metrics.Timer).Percentile(0.99))
-	targetIterations = (targetIterations / uint64(cfg.Workers)) * uint64(cfg.Workers)
+	timingPrevStep := t.registry.Get(t.steps[0]).(metrics.Timer).Percentile(0.99) // nolint:forcetypeassert
+	targetIterations := uint64(deadline / timingPrevStep)
+	targetIterations = (targetIterations / uint64(t.cfg.Workers)) * uint64(t.cfg.Workers)
 	if targetIterations <= 0 {
 		targetIterations = 1
 	}
-	iterationsOwnedBy1Worker := targetIterations / uint64(cfg.Workers)
+	iterationsOwnedBy1Worker := targetIterations / uint64(t.cfg.Workers)
 	if iterationsOwnedBy1Worker <= 0 {
 		iterationsOwnedBy1Worker = 1
 	}
@@ -67,8 +70,8 @@ func (t *telemetry) shouldSynchronizeBalanceFunc(workerNumber, totalBatches, ite
 	}
 	if totalBatches <= iterationsOwnedBy1Worker {
 		iterationsOwnedBy1Worker = totalBatches
-		if targetIterations > 1 {
-			targetIterations = iterationsOwnedBy1Worker * uint64(cfg.Workers)
+		if targetIterations >= 1 {
+			targetIterations = iterationsOwnedBy1Worker * uint64(t.cfg.Workers)
 		}
 	}
 	var (
@@ -76,13 +79,18 @@ func (t *telemetry) shouldSynchronizeBalanceFunc(workerNumber, totalBatches, ite
 		left             = workerNumber * iterationsOwnedBy1Worker
 		right            = (workerNumber + 1) * iterationsOwnedBy1Worker
 	)
-
+	if targetIterations == 1 {
+		if currentIteration == 0 {
+			currentIteration = iteration % totalBatches
+		}
+		targetIterations = totalBatches
+	}
 	if currentIteration < left || currentIteration >= right {
 		return func(batchNumber uint64) bool {
 			return false
 		}
 	}
-	if cfg.Development {
+	if t.cfg.Development {
 		return func(batchNumber uint64) bool {
 			return currentIteration == left
 		}

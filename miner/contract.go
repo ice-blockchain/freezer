@@ -44,12 +44,7 @@ const (
 // .
 var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
-	cfg struct {
-		tokenomics.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		Workers           int64                    `yaml:"workers"`
-		BatchSize         int64                    `yaml:"batchSize"`
-		Development       bool                     `yaml:"development"`
-	}
+	cfg config
 )
 
 type (
@@ -133,5 +128,11 @@ type (
 		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
+	}
+	config struct {
+		tokenomics.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
+		Workers           int64                    `yaml:"workers"`
+		BatchSize         int64                    `yaml:"batchSize"`
+		Development       bool                     `yaml:"development"`
 	}
 )
