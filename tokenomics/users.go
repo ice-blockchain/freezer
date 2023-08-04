@@ -83,6 +83,7 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 		model.IDTMinus1Field
 		model.BalanceForT0Field
 		model.BalanceForTMinus1Field
+		model.ActiveT1ReferralsField
 	}](ctx, s.db, model.SerializedUsersKey(id))
 	if err != nil || len(dbUserAfterMiningStopped) == 0 {
 		if err == nil && len(dbUserAfterMiningStopped) == 0 {
@@ -107,6 +108,11 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 			if !dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.IsNil() &&
 				dbUserBeforeMiningStopped[0].MiningSessionSoloEndedAt.After(*time.Now().Time) {
 				if err = pipeliner.HIncrBy(ctx, idT0Key, "active_t1_referrals", -1).Err(); err != nil {
+					return err
+				}
+			}
+			if dbUserAfterMiningStopped[0].ActiveT1Referrals > 0 {
+				if err = pipeliner.HIncrBy(ctx, idT0Key, "active_t2_referrals", -int64(dbUserAfterMiningStopped[0].ActiveT1Referrals)).Err(); err != nil {
 					return err
 				}
 			}

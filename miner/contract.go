@@ -103,8 +103,15 @@ type (
 		model.ExtraBonusDaysClaimNotAvailableField
 	}
 
+	referralUpdated struct {
+		model.DeserializedUsersKey
+		model.IDT0Field
+		model.IDTMinus1Field
+	}
+
 	referral struct {
 		model.UserIDField
+		model.IDT0Field
 		model.MiningSessionSoloStartedAtField
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
