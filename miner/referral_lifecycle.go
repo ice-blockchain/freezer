@@ -13,12 +13,16 @@ func changeT0AndTMinus1Referrals(usr *user) (IDT0Changed, IDTMinus1Changed bool)
 		usr.BalanceT0, usr.BalanceForT0, usr.SlashingRateT0, usr.SlashingRateForT0 = 0, 0, 0, 0
 		usr.BalanceForTMinus1, usr.SlashingRateForTMinus1 = 0, 0
 		usr.ResurrectT0UsedAt, usr.ResurrectTMinus1UsedAt = new(time.Time), new(time.Time)
-		IDT0Changed = true
+		if usr.IDT0 != 0 {
+			IDT0Changed = true
+		}
 	} else if usr.IDTMinus1 <= 0 {
 		usr.IDTMinus1 *= -1
 		usr.BalanceForTMinus1, usr.SlashingRateForTMinus1 = 0, 0
 		usr.ResurrectTMinus1UsedAt = new(time.Time)
-		IDTMinus1Changed = true
+		if usr.IDTMinus1 != 0 {
+			IDTMinus1Changed = true
+		}
 	} else {
 		usr.IDT0 = 0
 		usr.IDTMinus1 = 0

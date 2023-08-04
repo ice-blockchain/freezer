@@ -282,7 +282,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDTMinus1 < 0 {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
-			var IDT0Changed bool
 			updatedUser, shouldGenerateHistory, IDT0Changed := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
