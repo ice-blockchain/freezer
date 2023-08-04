@@ -780,8 +780,6 @@ func Test_MinerPending(t *testing.T) {
 		m, _, IDT0Changed := mine(testMiningBase, testTime, m, nil, nil)
 		require.Nil(t, m)
 		require.False(t, IDT0Changed)
-		require.EqualValues(t, 0, m.IDT0)
-		require.EqualValues(t, 0, m.IDTMinus1)
 	})
 }
 
