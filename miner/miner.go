@@ -35,7 +35,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, int(cfg.Workers)),
 		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:        new(sync.WaitGroup),
-		telemetry: new(telemetry).mustInit(),
+		telemetry: new(telemetry).mustInit(cfg),
 	}
 	mi.wg.Add(int(cfg.Workers))
 	mi.cancel = cancel
