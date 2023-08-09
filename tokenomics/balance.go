@@ -234,9 +234,9 @@ func (r *repository) processBalanceHistory(
 func (e *BalanceHistoryEntry) setBalanceDiffBonus(from float64) {
 	to := e.Balance.amount
 	if from < 0 && to > 0 {
-		e.Balance.Bonus = ((from - to) / from) * 100
+		e.Balance.Bonus = roundFloat64(((from - to) / from) * 100)
 	} else {
-		e.Balance.Bonus = -1 * ((from - to) / from) * 100
+		e.Balance.Bonus = roundFloat64(-1 * ((from - to) / from) * 100)
 	}
 }
 
