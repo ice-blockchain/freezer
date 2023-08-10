@@ -34,7 +34,7 @@ func didANewDayOffJustStart(now *time.Time, usr *user) *DayOffStarted {
 		StartedAt:                   startedAt,
 		EndedAt:                     time.New(startedAt.Add(miningSessionDuration)),
 		UserID:                      usr.UserID,
-		ID:                          fmt.Sprint(startedAt.UnixNano() / miningSessionDuration.Nanoseconds()),
+		ID:                          fmt.Sprintf("%v~%v", usr.UserID, startedAt.UnixNano()/miningSessionDuration.Nanoseconds()),
 		RemainingFreeMiningSessions: uint64(usr.MiningSessionSoloEndedAt.Sub(*now.Time) / miningSessionDuration),
 		MiningStreak:                uint64(now.Sub(*usr.MiningSessionSoloStartedAt.Time) / miningSessionDuration),
 	}
