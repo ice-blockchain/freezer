@@ -80,10 +80,10 @@ func (t *telemetry) shouldSynchronizeBalanceFunc(workerNumber, totalBatches, ite
 		right            = (workerNumber + 1) * iterationsOwnedBy1Worker
 	)
 	if targetIterations == 1 {
+		targetIterations = iterationsOwnedBy1Worker * uint64(t.cfg.Workers)
 		if currentIteration == 0 {
-			currentIteration = iteration % totalBatches
+			currentIteration = iteration % targetIterations
 		}
-		targetIterations = totalBatches
 	}
 	if currentIteration < left || currentIteration >= right {
 		return func(batchNumber uint64) bool {

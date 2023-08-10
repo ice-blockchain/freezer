@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type expectedFunc func(worker, batch, iteration uint64) bool
+type (
+	expectedFunc func(worker, batch, iteration uint64) bool
+)
 
 //nolint:funlen
 func TestShouldSynchronizeBalance(t *testing.T) {
@@ -31,7 +33,7 @@ func TestShouldSynchronizeBalance(t *testing.T) {
 	t.Run("one iteration and multiple batches", func(t *testing.T) {
 		t.Parallel()
 		tel := slowTelemetry(800)
-		iterateOverBatches(t, tel, 9, 1000, trueOncePerWorkerIterationPerBatch(t, 9, 9, 1, 9))
+		iterateOverBatches(t, tel, 9, 1000, trueOncePerWorkerIterationPerBatch(t, 9, 800, 1, 9))
 	})
 	t.Run("multiple iterations and batches per worker", func(t *testing.T) {
 		t.Parallel()
@@ -47,6 +49,68 @@ func TestShouldSynchronizeBalance(t *testing.T) {
 		tel := slowTelemetry(1)
 		iterateOverBatches(t, tel, 59, 1000, trueOncePerWorkerIteration(t, 1, 59))
 	})
+	t.Run("every batch is processed at least once", func(t *testing.T) {
+		t.Parallel()
+		maxWorkers := int64(70)
+		tel := new(telemetry).mustInit(config{Workers: maxWorkers})
+		tel.collectElapsed(0, stdlibtime.Now().Add(-2*stdlibtime.Second))
+		count := 0
+		for w := uint64(0); w < uint64(maxWorkers); w++ {
+			for i := uint64(0); i < uint64(10000); i++ {
+				shouldSync := tel.shouldSynchronizeBalanceFunc(w, 3, i)
+				if shouldSync(0) {
+					count += 1
+				}
+				if shouldSync(1) {
+					count += 1
+				}
+				if shouldSync(2) {
+					count += 1
+				}
+			}
+		}
+		assert.Equal(t, 10000, count)
+	})
+	t.Run("previous workers waits in queue until all next is processed", func(t *testing.T) {
+		t.Parallel()
+		tel := slowTelemetry(400)
+		checkPerWorkerAndIteration(t, tel, 0, 2, map[uint64]bool{
+			0: true, 1: false, 2: false, 3: false, 4: false,
+			400: true, 401: false, 402: false,
+			799: false,
+			800: true, 801: false,
+		})
+		checkPerWorkerAndIteration(t, tel, 1, 2, map[uint64]bool{
+			0: false, 1: true, 2: false, 3: false, 4: false,
+			400: false, 401: true, 402: false,
+			800: false, 801: true, 802: false, 803: false,
+		})
+		checkPerWorkerAndIteration(t, tel, 163, 2, map[uint64]bool{
+			0: false, 1: false, 2: false, 3: false,
+			162: false, 163: true, 164: false,
+			400: false, 401: false, 402: false,
+			562: false, 563: true,
+			800: false, 801: false,
+			963: true,
+		})
+		checkPerWorkerAndIteration(t, tel, 399, 2, map[uint64]bool{
+			0: false, 1: false, 2: false, 3: false,
+			398: false, 399: true, 400: false,
+			797: false, 798: true, 799: false, 800: false,
+		})
+	})
+}
+
+func checkPerWorkerAndIteration(tb testing.TB, tel *telemetry, worker, totalBatches uint64, iterations map[uint64]bool) {
+	tb.Helper()
+	for i := uint64(0); i < uint64(len(iterations)); i++ {
+		shouldSync := tel.shouldSynchronizeBalanceFunc(worker, totalBatches, i)
+		for b := uint64(0); b < totalBatches; b++ {
+			assert.Equal(tb, iterations[i], shouldSync(b),
+				"iteration %v on worker %v should be %v (batch %v)", i, worker, iterations[i], b)
+		}
+	}
+
 }
 
 func iterateOverBatches(t testing.TB, tel *telemetry, totalBatches, iterations uint64, expected expectedFunc) {
@@ -108,5 +172,6 @@ func slowTelemetry(workers int64) *telemetry {
 	tel.collectElapsed(4, stdlibtime.Now().Add(-20*stdlibtime.Second))
 	tel.collectElapsed(5, stdlibtime.Now().Add(-10*stdlibtime.Second))
 	tel.collectElapsed(6, stdlibtime.Now().Add(-1*stdlibtime.Second))
+
 	return tel
 }
