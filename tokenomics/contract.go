@@ -242,7 +242,6 @@ type (
 			} `yaml:"activeUserMilestones"`
 			ConsecutiveDurationsRequired uint64              `yaml:"consecutiveDurationsRequired"`
 			Duration                     stdlibtime.Duration `yaml:"duration"`
-			Disabled                     bool                `yaml:"disabled"`
 		} `yaml:"adoptionMilestoneSwitch"`
 		messagebroker.Config                `mapstructure:",squash"`
 		extrabonusnotifier.ExtraBonusConfig `mapstructure:",squash"`
