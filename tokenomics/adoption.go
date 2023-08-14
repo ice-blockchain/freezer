@@ -116,6 +116,9 @@ var (
 )
 
 func (r *repository) trySwitchToNextAdoption(ctx context.Context) error {
+	if true {
+		return nil
+	}
 	if now := *time.Now().Time; !timeToCheckForAdoptionSwitch.IsNil() && timeToCheckForAdoptionSwitch.After(now) {
 		return nil
 	}
