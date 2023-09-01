@@ -134,9 +134,15 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		}
 		offset = nextOffset
 	}
-	defer func() {
-		sort.SliceStable(topMiners, sortTopMiners)
-	}()
+	sort.SliceStable(topMiners, sortTopMiners)
+	// This is the hack for preview GetTopMiners call with limit = 5 (we know this case for sure). We just remove all extra rows from result.
+	if limit == 5 {
+		bound := limit
+		if len(topMiners) < int(limit) {
+			bound = uint64(len(topMiners))
+		}
+		topMiners = topMiners[:bound]
+	}
 
 	return topMiners, nextOffset, nil
 }
