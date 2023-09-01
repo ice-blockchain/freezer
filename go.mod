@@ -3,19 +3,19 @@ module github.com/ice-blockchain/freezer
 go 1.21
 
 require (
-	github.com/ClickHouse/ch-go v0.58.0
+	github.com/ClickHouse/ch-go v0.58.2
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.154.0
+	github.com/ice-blockchain/eskimo v1.156.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
-	github.com/ice-blockchain/wintr v1.124.0
+	github.com/ice-blockchain/wintr v1.125.0
 	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
-	github.com/redis/go-redis/v9 v9.0.5
+	github.com/redis/go-redis/v9 v9.1.0
 	github.com/stretchr/testify v1.8.4
-	github.com/swaggo/swag v1.16.1
-	github.com/testcontainers/testcontainers-go v0.22.0
+	github.com/swaggo/swag v1.16.2
+	github.com/testcontainers/testcontainers-go v0.23.0
 	go.uber.org/zap v1.25.0
 )
 
@@ -26,8 +26,9 @@ require (
 	cloud.google.com/go/firestore v1.12.0 // indirect
 	cloud.google.com/go/iam v1.1.2 // indirect
 	cloud.google.com/go/longrunning v0.5.1 // indirect
-	cloud.google.com/go/storage v1.31.0 // indirect
-	cosmossdk.io/math v1.0.1 // indirect
+	cloud.google.com/go/storage v1.32.0 // indirect
+	cosmossdk.io/math v1.1.2 // indirect
+	dario.cat/mergo v1.0.0 // indirect
 	firebase.google.com/go/v4 v4.12.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
@@ -39,9 +40,10 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.0 // indirect
+	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/containerd/cgroups/v3 v3.0.2 // indirect
-	github.com/containerd/containerd v1.7.3 // indirect
-	github.com/containerd/continuity v0.4.1 // indirect
+	github.com/containerd/containerd v1.7.5 // indirect
+	github.com/containerd/continuity v0.4.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dmarkham/enumer v1.5.8 // indirect
@@ -65,7 +67,7 @@ require (
 	github.com/go-openapi/swag v0.22.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.15.0 // indirect
+	github.com/go-playground/validator/v10 v10.15.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/goccy/go-reflect v1.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -75,17 +77,16 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
-	github.com/google/pprof v0.0.0-20230811205829-9131a7e9cc17 // indirect
+	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
 	github.com/google/s2a-go v0.1.5 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/imdario/mergo v0.3.16 // indirect
-	github.com/imroc/req/v3 v3.41.4 // indirect
+	github.com/imroc/req/v3 v3.41.10 // indirect
 	github.com/ip2location/ip2location-go/v9 v9.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
@@ -108,18 +109,18 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc4 // indirect
 	github.com/opencontainers/runc v1.1.9 // indirect
 	github.com/pascaldekloe/name v1.0.1 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
+	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-20 v0.3.2 // indirect
-	github.com/quic-go/quic-go v0.37.4 // indirect
-	github.com/refraction-networking/utls v1.4.3 // indirect
+	github.com/quic-go/qtls-go1-20 v0.3.3 // indirect
+	github.com/quic-go/quic-go v0.38.1 // indirect
+	github.com/refraction-networking/utls v1.5.2 // indirect
 	github.com/rs/zerolog v1.30.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -128,25 +129,25 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.16.0 // indirect
-	github.com/subosito/gotenv v1.4.2 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/swaggo/gin-swagger v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/twmb/franz-go v1.14.3 // indirect
+	github.com/twmb/franz-go v1.14.4 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.9.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.6.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel v1.16.0 // indirect
-	go.opentelemetry.io/otel/metric v1.16.0 // indirect
-	go.opentelemetry.io/otel/trace v1.16.0 // indirect
+	go.opentelemetry.io/otel v1.17.0 // indirect
+	go.opentelemetry.io/otel/metric v1.17.0 // indirect
+	go.opentelemetry.io/otel/trace v1.17.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb // indirect
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
@@ -154,14 +155,14 @@ require (
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.136.0 // indirect
+	google.golang.org/api v0.138.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/appengine/v2 v2.0.4 // indirect
-	google.golang.org/genproto v0.0.0-20230807174057-1744710a1577 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230807174057-1744710a1577 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230807174057-1744710a1577 // indirect
+	google.golang.org/appengine/v2 v2.0.5 // indirect
+	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/grpc v1.57.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
@@ -172,5 +173,6 @@ require (
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.19
 	github.com/docker/docker => github.com/docker/docker v20.10.3+incompatible
+	github.com/redis/go-redis/v9 => github.com/redis/go-redis/v9 v9.0.5
 	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.15.0
 )
