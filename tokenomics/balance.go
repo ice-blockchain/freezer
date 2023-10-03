@@ -174,7 +174,12 @@ func (r *repository) processBalanceHistory(
 				Balance: new(BalanceHistoryBalanceDiff),
 			}
 		}
-		total := bal.BalanceTotalMinted - bal.BalanceTotalSlashed
+		var total float64
+		if bal.BalanceTotalSlashed >= 0 {
+			total = bal.BalanceTotalMinted - bal.BalanceTotalSlashed
+		} else {
+			total = bal.BalanceTotalMinted - (bal.BalanceTotalSlashed * -1)
+		}
 		parents[parentFormat].children[childFormat].Balance.amount = total
 		parents[parentFormat].children[childFormat].Balance.Negative = total < 0
 		parents[parentFormat].children[childFormat].Balance.Amount = fmt.Sprintf(floatToStringFormatter, math.Abs(total))
