@@ -23,6 +23,7 @@ import (
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
@@ -38,6 +39,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi := &miner{
 		mb:        messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, int(cfg.Workers)),
+		dbPG:      storagePG.MustConnect(ctx, ddl, applicationYamlKey),
 		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:        new(sync.WaitGroup),
 		telemetry: new(telemetry).mustInit(cfg),
@@ -65,6 +67,7 @@ func (m *miner) Close() error {
 	return multierror.Append(
 		errors.Wrap(m.mb.Close(), "failed to close mb"),
 		errors.Wrap(m.db.Close(), "failed to close db"),
+		errors.Wrap(m.dbPG.Close(), "failed to close db pg"),
 		errors.Wrap(m.dwhClient.Close(), "failed to close dwh"),
 	).ErrorOrNil()
 }
@@ -137,8 +140,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		msgs                                                                 = make([]*messagebroker.Message, 0, 3*batchSize)
 		errs                                                                 = make([]error, 0, 3*batchSize)
 		updatedUsers                                                         = make([]*UpdatedUser, 0, batchSize)
+		userRecalculatedResults                                              = make([]*recalculatedUser, 0, batchSize)
+		recalculatedUsersUpdated                                             = make([]*recalculatedUser, 0, batchSize)
 		extraBonusOnlyUpdatedUsers                                           = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
+		usersBalanceTiersUpdated                                             = make([]*userBalanceTiersUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
@@ -166,8 +172,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
+		userRecalculatedResults = make([]*recalculatedUser, 0, batchSize)
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
+		recalculatedUsersUpdated = recalculatedUsersUpdated[:0]
+		usersBalanceTiersUpdated = usersBalanceTiersUpdated[:0]
 		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
 		referralsUpdated = referralsUpdated[:0]
 		histories = histories[:0]
@@ -214,6 +223,21 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
 		}
+		userKeys = userKeys[:0]
+		if len(userKeys) == 0 {
+			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
+				userKeys = append(userKeys, model.SerializedRecalculatedUsersKey((workers*ix)+workerNumber))
+			}
+		}
+		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+		if err := storage.Bind[recalculatedUser](reqCtx, m.db, userKeys, &userRecalculatedResults); err != nil {
+			log.Panic(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			reqCancel()
+			now = time.Now()
+
+			continue
+		}
+		reqCancel()
 
 		/******************************************************************************************************************************************************
 			2. Fetching T0 & T-1 referrals of the fetched users.
@@ -269,11 +293,44 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				t0Referrals[ref.ID] = ref
 			}
 		}
-
+		recalculatedTiersBalancesUsers, err := m.showTiersDiffBalances(ctx, userResults, userRecalculatedResults, tMinus1Referrals, t0Referrals)
+		if err != nil {
+			log.Error(errors.New("tiers diff balances error"), err)
+		}
 		shouldSynchronizeBalance := shouldSynchronizeBalanceFunc(uint64(batchNumber))
 		for _, usr := range userResults {
 			if usr.UserID == "" {
 				continue
+			}
+			for _, recalculatedUsr := range recalculatedTiersBalancesUsers {
+				if usr.ID == recalculatedUsr.ID {
+					// Uncomment to adjust t1/t2 balances and t1/t2 active counts.
+					/*
+						diffT1ActiveValue := recalculatedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
+						diffT2ActiveValue := recalculatedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
+						if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
+							diffT1ActiveValue = -usr.ActiveT1Referrals
+						}
+						if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
+							diffT2ActiveValue = -usr.ActiveT2Referrals
+						}
+						t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+						t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
+
+						usr.ActiveT1Referrals = recalculatedUsr.ActiveT1Referrals
+						usr.ActiveT2Referrals = recalculatedUsr.ActiveT2Referrals
+
+						usr.BalanceT1 = recalculatedUsr.BalanceT1
+						usr.BalanceT2 = recalculatedUsr.BalanceT2
+					*/
+
+					recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculatedUser{
+						DeserializedRecalculatedUsersKey: model.DeserializedRecalculatedUsersKey{ID: usr.ID},
+						RecalculatedTiersBalancesAtField: model.RecalculatedTiersBalancesAtField{RecalculatedTiersBalancesAt: time.Now()},
+					})
+
+					break
+				}
 			}
 			var t0Ref, tMinus1Ref *referral
 			if usr.IDT0 > 0 {
@@ -328,6 +385,20 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
+				// Uncomment to adjust t1/t2 balances and t1/t2 active counts.
+				/*
+					for _, recalculatedUsr := range recalculatedTiersBalancesUsers {
+						if usr.ID == recalculatedUsr.ID {
+							usersBalanceTiersUpdated = append(usersBalanceTiersUpdated, &userBalanceTiersUpdated{
+								DeserializedUsersKey: usr.DeserializedUsersKey,
+								BalanceT1Field:       recalculatedUsr.BalanceT1Field,
+								BalanceT2Field:       recalculatedUsr.BalanceT2Field,
+							})
+
+							break
+						}
+					}
+				*/
 				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
 					ExtraBonusLastClaimAvailableAtField:            usr.ExtraBonusLastClaimAvailableAtField,
 					DeserializedUsersKey:                           usr.DeserializedUsersKey,
@@ -430,7 +501,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 
 		var pipeliner redis.Pipeliner
-		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
+		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks)+len(recalculatedUsersUpdated)+len(usersBalanceTiersUpdated) > 0 {
 			pipeliner = m.db.TxPipeline()
 		} else {
 			pipeliner = m.db.Pipeline()
@@ -470,6 +541,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 			}
 			for _, value := range referralsUpdated {
+				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
+					return err
+				}
+			}
+			// Uncomment to adjust t1/t2 balances and t1/t2 active counts.
+			/*
+				for _, value := range recalculatedTiersBalancesUsers {
+					if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
+						return err
+					}
+				}
+			*/
+			for _, value := range recalculatedUsersUpdated {
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err
 				}

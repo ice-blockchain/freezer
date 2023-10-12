@@ -96,6 +96,9 @@ type (
 	ExtraBonusLastClaimAvailableAtField struct {
 		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
 	}
+	RecalculatedTiersBalancesAtField struct {
+		RecalculatedTiersBalancesAt *time.Time `redis:"recalculated_tiers_balances_at,omitempty"`
+	}
 	UserIDField struct {
 		UserID string `redis:"user_id,omitempty"`
 	}
@@ -192,6 +195,9 @@ type (
 	DeserializedUsersKey struct {
 		ID int64 `redis:"-"`
 	}
+	DeserializedRecalculatedUsersKey struct {
+		ID int64 `redis:"-"`
+	}
 	IDT0Field struct {
 		IDT0 int64 `redis:"id_t0,omitempty"`
 	}
@@ -247,6 +253,26 @@ func (k *DeserializedUsersKey) SetKey(val string) {
 	log.Panic(err)
 }
 
+func (k *DeserializedRecalculatedUsersKey) Key() string {
+	if k == nil || k.ID == 0 {
+		return ""
+	}
+
+	return SerializedRecalculatedUsersKey(k.ID)
+}
+
+func (k *DeserializedRecalculatedUsersKey) SetKey(val string) {
+	if val == "" || val == "recalculated:" {
+		return
+	}
+	if val[0] == 'r' {
+		val = val[13:]
+	}
+	var err error
+	k.ID, err = strconv.ParseInt(val, 10, 64)
+	log.Panic(err)
+}
+
 func SerializedUsersKey(val any) string {
 	switch typedVal := val.(type) {
 	case string:
@@ -263,5 +289,24 @@ func SerializedUsersKey(val any) string {
 		return "users:" + strconv.FormatInt(typedVal, 10)
 	default:
 		panic(fmt.Sprintf("%#v cannot be used as users key", val))
+	}
+}
+
+func SerializedRecalculatedUsersKey(val any) string {
+	switch typedVal := val.(type) {
+	case string:
+		if typedVal == "" {
+			return ""
+		}
+
+		return "recalculated:" + typedVal
+	case int64:
+		if typedVal == 0 {
+			return ""
+		}
+
+		return "recalculated:" + strconv.FormatInt(typedVal, 10)
+	default:
+		panic(fmt.Sprintf("%#v cannot be used as recalculated key", val))
 	}
 }

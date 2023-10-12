@@ -4,6 +4,7 @@ package miner
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -44,6 +46,9 @@ const (
 
 // .
 var (
+	//go:embed DDL.sql
+	ddl string
+
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
 )
@@ -105,6 +110,16 @@ type (
 		model.IDT0Field
 		model.IDTMinus1Field
 	}
+	userBalanceTiersUpdated struct {
+		model.DeserializedUsersKey
+		model.BalanceT1Field
+		model.BalanceT2Field
+	}
+
+	recalculatedUser struct {
+		model.DeserializedRecalculatedUsersKey
+		model.RecalculatedTiersBalancesAtField
+	}
 
 	referral struct {
 		model.MiningSessionSoloStartedAtField
@@ -124,6 +139,7 @@ type (
 	miner struct {
 		mb                            messagebroker.Client
 		db                            storage.DB
+		dbPG                          *storagePG.DB
 		dwhClient                     dwh.Client
 		cancel                        context.CancelFunc
 		telemetry                     *telemetry

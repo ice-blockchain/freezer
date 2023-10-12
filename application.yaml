@@ -156,11 +156,20 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
+wintr/connectors/storage/v2: &db
+  runDDL: true
+  primaryURL: postgresql://root:pass@localhost:5433/eskimo
+  credentials:
+    user: root
+    password: pass
+  replicaURLs:
+    - postgresql://root:pass@localhost:5433/eskimo
 miner:
   bookkeeper/storage: *bookkeeperStorage
   development: true
   workers: 1
   batchSize: 100
+  wintr/connectors/storage/v2: *db
 extra-bonus-notifier:
   workers: 1
   miningSessionDuration: 1m

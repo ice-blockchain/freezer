@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: ice License 1.0
+
+development: true
+logger:
+  encoder: console
+  level: info
+santa: &santa
+  milestones:
+    c1:
+      toInclusive: 10
+    c2:
+      fromInclusive: 20
+      toInclusive: 30
+    c3:
+      fromInclusive: 40
+      toInclusive: 50
+    c4:
+      fromInclusive: 60
+      toInclusive: 70
+    c5:
+      fromInclusive: 80
+      toInclusive: 90
+    c6:
+      fromInclusive: 100
+      toInclusive: 110
+    c7:
+      fromInclusive: 120
+      toInclusive: 130
+    c8:
+      fromInclusive: 140
+      toInclusive: 150
+    c9:
+      fromInclusive: 160
+      toInclusive: 170
+    c10:
+      fromInclusive: 180
+    s1:
+      toInclusive: 1
+    s2:
+      fromInclusive: 2
+      toInclusive: 3
+    s3:
+      fromInclusive: 4
+      toInclusive: 5
+    s4:
+      fromInclusive: 6
+      toInclusive: 7
+    s5:
+      fromInclusive: 8
+      toInclusive: 9
+    s6:
+      fromInclusive: 10
+      toInclusive: 11
+    s7:
+      fromInclusive: 12
+      toInclusive: 13
+    s8:
+      fromInclusive: 14
+      toInclusive: 15
+    s9:
+      fromInclusive: 16
+      toInclusive: 17
+    s10:
+      fromInclusive: 18
+  wintr/connectors/storage/v2:
+    runDDL: true
+    primaryURL: postgresql://root:pass@localhost:5436/ice  # TODO: Change.
+    credentials:
+      user: root      # TODO: Change.
+      password: pass  # TODO: Change.
+    replicaURLs:
+      - postgresql://root:pass@localhost:5436/ice  # TODO: Change.
+  requiredInvitedFriendsToBecomeAmbassador: 3
+  requiredFriendsInvited: 5
+santa_test:
+  <<: *santa
+tokenomics: &tokenomics
+  wintr/connectors/storage/v3:
+    url: redis://default:@localhost:6379 # TODO: Change.
+  miningSessionDuration:
+    min: 30s
+    max: 1m
+    warnAboutExpirationAfter: 50s
+miner:
+  development: true
+  workers: 6
+  batchSize: 100
+tokenomics_test:
+  <<: *tokenomics
+users: &users
+  skipIp2LocationBinary: true
+  disableConsumer: true
+  wintr/connectors/storage/v2:
+    runDDL: true
+    primaryURL: postgresql://root:pass@localhost:5433/eskimo # TODO: Change.
+    credentials: # TODO: Change credentials.
+      user: root     
+      password: pass
+    replicaURLs:
+      - postgresql://root:pass@localhost:5433/eskimo # TODO: Change.
+users_test:
+  <<: *users
