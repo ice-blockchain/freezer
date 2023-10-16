@@ -130,7 +130,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		currentAdoption                                                      = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                              = cfg.Workers
 		batchSize                                                            = cfg.BatchSize
-		userKeys, userHistoryKeys, referralKeys                              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
+		userKeys, recalculatedUserKeys, userHistoryKeys, referralKeys        = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
 		userResults, referralResults                                         = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
 		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
 		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
@@ -170,7 +170,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if batchNumber == 0 || currentAdoption == nil {
 			currentAdoption = m.getAdoption(ctx, m.db, workerNumber)
 		}
-		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
+		userKeys, recalculatedUserKeys, userHistoryKeys, referralKeys = userKeys[:0], recalculatedUserKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
 		userRecalculatedResults = make([]*recalculatedUser, 0, batchSize)
 		msgs, errs = msgs[:0], errs[:0]
@@ -223,14 +223,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
 		}
-		userKeys = userKeys[:0]
-		if len(userKeys) == 0 {
+		if len(recalculatedUserKeys) == 0 {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
-				userKeys = append(userKeys, model.SerializedRecalculatedUsersKey((workers*ix)+workerNumber))
+				recalculatedUserKeys = append(recalculatedUserKeys, model.SerializedRecalculatedUsersKey((workers*ix)+workerNumber))
 			}
 		}
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		if err := storage.Bind[recalculatedUser](reqCtx, m.db, userKeys, &userRecalculatedResults); err != nil {
+		if err := storage.Bind[recalculatedUser](reqCtx, m.db, recalculatedUserKeys, &userRecalculatedResults); err != nil {
 			log.Panic(errors.Wrapf(err, "[miner] failed to get users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			now = time.Now()
@@ -317,11 +316,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
 						t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-						usr.ActiveT1Referrals = recalculatedUsr.ActiveT1Referrals
-						usr.ActiveT2Referrals = recalculatedUsr.ActiveT2Referrals
-
 						usr.BalanceT1 = recalculatedUsr.BalanceT1
 						usr.BalanceT2 = recalculatedUsr.BalanceT2
+
+						usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
+						usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
 					*/
 
 					recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculatedUser{
@@ -385,20 +384,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
-				// Uncomment to adjust t1/t2 balances and t1/t2 active counts.
-				/*
-					for _, recalculatedUsr := range recalculatedTiersBalancesUsers {
-						if usr.ID == recalculatedUsr.ID {
-							usersBalanceTiersUpdated = append(usersBalanceTiersUpdated, &userBalanceTiersUpdated{
-								DeserializedUsersKey: usr.DeserializedUsersKey,
-								BalanceT1Field:       recalculatedUsr.BalanceT1Field,
-								BalanceT2Field:       recalculatedUsr.BalanceT2Field,
-							})
-
-							break
-						}
-					}
-				*/
 				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
 					ExtraBonusLastClaimAvailableAtField:            usr.ExtraBonusLastClaimAvailableAtField,
 					DeserializedUsersKey:                           usr.DeserializedUsersKey,
@@ -545,14 +530,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					return err
 				}
 			}
-			// Uncomment to adjust t1/t2 balances and t1/t2 active counts.
-			/*
-				for _, value := range recalculatedTiersBalancesUsers {
-					if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
-						return err
-					}
-				}
-			*/
 			for _, value := range recalculatedUsersUpdated {
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err

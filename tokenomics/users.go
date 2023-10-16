@@ -43,6 +43,9 @@ func (s *usersTableSource) Process(ctx context.Context, msg *messagebroker.Messa
 	if err := s.replaceUser(ctx, usr.User); err != nil {
 		return errors.Wrapf(err, "failed to replace user:%#v", usr.User)
 	}
+	if err := s.initializeRecalculated(ctx, usr.User); err != nil {
+		return errors.Wrapf(err, "failed to initialize recalculated user:%#v", usr.User)
+	}
 
 	return nil
 }
@@ -156,6 +159,25 @@ func (s *usersTableSource) deleteUser(ctx context.Context, usr *users.User) erro
 	}
 
 	return errors.Wrapf(multierror.Append(nil, errs...).ErrorOrNil(), "failed to delete userID:%v,id:%v", usr.ID, id)
+}
+
+func (s *usersTableSource) initializeRecalculated(ctx context.Context, usr *users.User) error {
+	internalID, err := GetOrInitInternalID(ctx, s.db, usr.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to getOrInitInternalID for user:%#v", usr)
+	}
+	type (
+		user struct {
+			model.DeserializedRecalculatedUsersKey
+			model.RecalculatedTiersBalancesAtField
+		}
+	)
+	recalculated := &user{
+		DeserializedRecalculatedUsersKey: model.DeserializedRecalculatedUsersKey{ID: internalID},
+		RecalculatedTiersBalancesAtField: model.RecalculatedTiersBalancesAtField{RecalculatedTiersBalancesAt: time.Now()},
+	}
+
+	return errors.Wrapf(storage.Set(ctx, s.db, recalculated), "failed to initialize recalculated:%#v", recalculated)
 }
 
 func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) error { //nolint:funlen // .

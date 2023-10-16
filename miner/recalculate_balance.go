@@ -475,7 +475,7 @@ outer:
 						updatedUser = nil
 					}
 				} else {
-					if timeDiff >= 60*stdlibtime.Hour {
+					if timeDiff >= 60*stdlibtime.Hour*24 {
 						updatedUser = nil
 					}
 				}
@@ -493,9 +493,9 @@ outer:
 	return updatedUsers, nil
 }
 
-func showDiff(users []*user, actualBalancesT1, actualBalancesT2 map[int64]float64) {
+func showDiff(recalculatedUsers []*user, actualBalancesT1, actualBalancesT2 map[int64]float64) {
 	log.Info("id,diffBalanceT1,diffBalanceT2,activeT1Count,activeT2Count,recalculatedBalanceT1,recalculatedBalanceT2,actualBalanceT1,actualBalanceT2")
-	for _, usr := range users {
+	for _, usr := range recalculatedUsers {
 		balanceT1Diff := usr.BalanceT1
 		balanceT2Diff := usr.BalanceT2
 		if _, ok := actualBalancesT1[usr.ID]; ok {
