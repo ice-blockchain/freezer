@@ -139,6 +139,7 @@ type (
 		ExtraBonusSummary
 		MiningStreak                uint64 `json:"miningStreak,omitempty"  example:"2"`
 		RemainingFreeMiningSessions uint64 `json:"remainingFreeMiningSessions,omitempty" example:"1"`
+		MiningStarted               bool   `json:"miningStarted,omitempty" example:"true"`
 	}
 	MiningSession struct {
 		LastNaturalMiningStartedAt    *time.Time          `json:"lastNaturalMiningStartedAt,omitempty" example:"2022-01-03T16:20:52.156534Z" swaggerignore:"true"`

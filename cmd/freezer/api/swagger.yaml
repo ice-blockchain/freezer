@@ -180,6 +180,9 @@ definitions:
         $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string'
       miningSession:
         $ref: '#/definitions/tokenomics.MiningSession'
+      miningStarted:
+        example: true
+        type: boolean
       miningStreak:
         example: 2
         type: integer

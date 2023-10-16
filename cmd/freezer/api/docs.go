@@ -840,6 +840,10 @@ const docTemplate = `{
                 "miningSession": {
                     "$ref": "#/definitions/tokenomics.MiningSession"
                 },
+                "miningStarted": {
+                    "type": "boolean",
+                    "example": true
+                },
                 "miningStreak": {
                     "type": "integer",
                     "example": 2
