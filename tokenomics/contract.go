@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"io"
+	"sync/atomic"
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
@@ -236,6 +237,7 @@ type (
 	}
 
 	Config struct {
+		disableAdvancedTeam     *atomic.Pointer[[]string]
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
 				Users          uint64  `yaml:"users"`

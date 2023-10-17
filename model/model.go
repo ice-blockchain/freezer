@@ -56,11 +56,11 @@ type (
 		ExtraBonusField
 		IDT0Field
 		IDTMinus1Field
+		UTCOffsetField
 		ActiveT1ReferralsField
 		ActiveT2ReferralsField
 		NewsSeenField
 		ExtraBonusDaysClaimNotAvailableField
-		UTCOffsetField
 		HideRankingField
 	}
 	BalanceLastUpdatedAtField struct {
@@ -110,6 +110,9 @@ type (
 	}
 	BlockchainAccountAddressField struct {
 		BlockchainAccountAddress string `redis:"blockchain_account_address,omitempty"`
+	}
+	LatestDeviceField struct {
+		LatestDevice string `redis:"latest_device,omitempty"`
 	}
 	BalanceTotalStandardField struct {
 		BalanceTotalStandard float64 `redis:"balance_total_standard"`

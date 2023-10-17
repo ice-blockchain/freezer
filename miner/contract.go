@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 	stdlibtime "time"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
@@ -54,6 +55,7 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ExtraBonusStartedAtField
+		model.LatestDeviceField
 		model.UserIDField
 		UpdatedUser
 		model.BalanceSoloPendingField
@@ -105,12 +107,12 @@ type (
 	}
 
 	referral struct {
-		model.UserIDField
-		model.IDT0Field
 		model.MiningSessionSoloStartedAtField
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ResurrectSoloUsedAtField
+		model.UserIDField
+		model.IDT0Field
 		model.DeserializedUsersKey
 	}
 
@@ -130,9 +132,10 @@ type (
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 	}
 	config struct {
-		tokenomics.Config `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		Workers           int64                    `yaml:"workers"`
-		BatchSize         int64                    `yaml:"batchSize"`
-		Development       bool                     `yaml:"development"`
+		disableAdvancedTeam *atomic.Pointer[[]string]
+		tokenomics.Config   `mapstructure:",squash"` //nolint:tagliatelle // Nope.
+		Workers             int64                    `yaml:"workers"`
+		BatchSize           int64                    `yaml:"batchSize"`
+		Development         bool                     `yaml:"development"`
 	}
 )

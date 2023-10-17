@@ -30,6 +30,7 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 	}
 	res, err := storage.Get[struct {
 		model.UserIDField
+		model.LatestDeviceField
 		model.BalanceSoloField
 		model.BalanceT0Field
 		model.BalanceT1Field
@@ -43,6 +44,9 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 		}
 
 		return nil, errors.Wrapf(err, "failed to get balanceSummary for id:%v", id)
+	}
+	if r.isAdvancedTeamDisabled(res[0].LatestDevice) {
+		res[0].BalanceT2 = 0
 	}
 	t1Standard, t1PreStaking := ApplyPreStaking(res[0].BalanceT0+res[0].BalanceT1, res[0].PreStakingAllocation, res[0].PreStakingBonus)
 	t2Standard, t2PreStaking := ApplyPreStaking(res[0].BalanceT2, res[0].PreStakingAllocation, res[0].PreStakingBonus)

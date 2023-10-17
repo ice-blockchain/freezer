@@ -132,9 +132,11 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	}
 	type (
 		deviceMetadata struct {
-			Before *deviceMetadata `json:"before,omitempty"`
-			UserID string          `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-			TZ     string          `json:"tz,omitempty" example:"+03:00"`
+			Before          *deviceMetadata `json:"before,omitempty"`
+			UserID          string          `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+			TZ              string          `json:"tz,omitempty" example:"+03:00"`
+			SystemName      string          `json:"systemName,omitempty" example:"Android"`
+			ReadableVersion string          `json:"readableVersion,omitempty" example:"9.9.9.2637"`
 		}
 	)
 	var dm deviceMetadata
@@ -149,12 +151,15 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for %#v", &dm)
 	}
+	sanitizedDeviceSystemName := strings.ReplaceAll(strings.ToLower(dm.SystemName), " ", "")
 	val := &struct {
+		model.LatestDeviceField
 		model.DeserializedUsersKey
 		model.UTCOffsetField
 	}{
 		DeserializedUsersKey: model.DeserializedUsersKey{ID: id},
 		UTCOffsetField:       model.UTCOffsetField{UTCOffset: int64(duration / stdlibtime.Minute)},
+		LatestDeviceField:    model.LatestDeviceField{LatestDevice: fmt.Sprintf("%v:%v", sanitizedDeviceSystemName, dm.ReadableVersion)},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, val), "failed to update users' timezone for %#v", &dm)

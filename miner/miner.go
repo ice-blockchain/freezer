@@ -5,7 +5,11 @@ package miner
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
+	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
@@ -27,6 +31,7 @@ import (
 func init() {
 	appCfg.MustLoadFromKey(parentApplicationYamlKey, &cfg.Config)
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+	cfg.disableAdvancedTeam = new(atomic.Pointer[[]string])
 }
 
 func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
@@ -37,6 +42,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		wg:        new(sync.WaitGroup),
 		telemetry: new(telemetry).mustInit(cfg),
 	}
+	go mi.startDisableAdvancedTeamCfgSyncer(ctx)
 	mi.wg.Add(int(cfg.Workers))
 	mi.cancel = cancel
 	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, mi.db)
@@ -282,6 +288,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDTMinus1 < 0 {
 				tMinus1Ref = tMinus1Referrals[-usr.IDTMinus1]
 			}
+			if isAdvancedTeamDisabled(usr.LatestDevice) {
+				usr.ActiveT2Referrals = 0
+			}
 			updatedUser, shouldGenerateHistory, IDT0Changed := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
@@ -503,7 +512,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		reqCancel()
 		resetVars(true)
 	}
-
 }
 
 func (m *miner) getAdoption(ctx context.Context, db storage.DB, workerNumber int64) (currentAdoption *tokenomics.Adoption[float64]) {
@@ -515,4 +523,65 @@ func (m *miner) getAdoption(ctx context.Context, db storage.DB, workerNumber int
 	}
 
 	return currentAdoption
+}
+
+func (m *miner) startDisableAdvancedTeamCfgSyncer(ctx context.Context) {
+	ticker := stdlibtime.NewTicker(5 * stdlibtime.Minute) //nolint:gosec,gomnd // Not an  issue.
+	defer ticker.Stop()
+	log.Panic(errors.Wrap(m.syncDisableAdvancedTeamCfg(ctx), "failed to syncDisableAdvancedTeamCfg"))
+
+	for {
+		select {
+		case <-ticker.C:
+			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			log.Error(errors.Wrap(m.syncDisableAdvancedTeamCfg(reqCtx), "failed to syncDisableAdvancedTeamCfg"))
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (m *miner) syncDisableAdvancedTeamCfg(ctx context.Context) error {
+	result, err := m.db.Get(ctx, "disable_advanced_team_cfg").Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return errors.Wrap(err, "could not get `disable_advanced_team_cfg`")
+	}
+	var (
+		oldCfg []string
+		newCfg = strings.Split(strings.ReplaceAll(strings.ToLower(result), " ", ""), ",")
+	)
+	sort.SliceStable(newCfg, func(ii, jj int) bool { return newCfg[ii] < newCfg[jj] })
+	if old := cfg.disableAdvancedTeam.Swap(&newCfg); old != nil {
+		oldCfg = *old
+	}
+	if strings.Join(oldCfg, "") != strings.Join(newCfg, "") {
+		log.Info(fmt.Sprintf("`disable_advanced_team_cfg` changed from: %#v, to: %#v", oldCfg, newCfg))
+	}
+
+	return nil
+}
+
+func isAdvancedTeamEnabled(device string) bool {
+	if device == "" {
+		return true
+	}
+	var disableAdvancedTeamFor []string
+	if cfgVal := cfg.disableAdvancedTeam.Load(); cfgVal != nil {
+		disableAdvancedTeamFor = *cfgVal
+	}
+	if len(disableAdvancedTeamFor) == 0 {
+		return true
+	}
+	for _, disabled := range disableAdvancedTeamFor {
+		if strings.EqualFold(device, disabled) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isAdvancedTeamDisabled(device string) bool {
+	return !isAdvancedTeamEnabled(device)
 }

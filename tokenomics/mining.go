@@ -64,9 +64,7 @@ const (
 	everythingNotAllowedInUsernameRegex = `[^.a-zA-Z0-9]+`
 )
 
-var (
-	everythingNotAllowedInUsernamePattern = regexp.MustCompile(everythingNotAllowedInUsernameRegex)
-)
+var everythingNotAllowedInUsernamePattern = regexp.MustCompile(everythingNotAllowedInUsernameRegex)
 
 //nolint:funlen // .
 func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, nextOffset uint64, err error) {
@@ -111,10 +109,14 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 		}
 		resp, err := storage.Get[struct {
 			model.UserIDField
+			model.LatestDeviceField
 			model.UsernameField
 			model.ProfilePictureNameField
 			model.BalanceTotalStandardField
 			model.BalanceTotalPreStakingField
+			model.BalanceT2Field
+			model.PreStakingAllocationField
+			model.PreStakingBonusField
 			model.HideRankingField
 		}](ctx, r.db, ids...)
 		if err != nil {
@@ -124,9 +126,18 @@ func (r *repository) GetTopMiners(ctx context.Context, keyword string, limit, of
 			if topMiner.HideRanking {
 				continue
 			}
+			if r.isAdvancedTeamDisabled(topMiner.LatestDevice) {
+				t2Standard, t2PreStaking := ApplyPreStaking(topMiner.BalanceT2, topMiner.PreStakingAllocation, topMiner.PreStakingBonus)
+				topMiner.BalanceTotalStandard -= t2Standard
+				topMiner.BalanceTotalPreStaking -= t2PreStaking
+			}
+			total := topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking
+			if total < 0 {
+				total = 0
+			}
 			topMiners = append(topMiners, &Miner{
-				Balance:           fmt.Sprintf(floatToStringFormatter, topMiner.BalanceTotalStandard+topMiner.BalanceTotalPreStaking),
-				balance:           topMiner.BalanceTotalStandard + topMiner.BalanceTotalPreStaking,
+				Balance:           fmt.Sprintf(floatToStringFormatter, total),
+				balance:           total,
 				UserID:            topMiner.UserID,
 				Username:          topMiner.Username,
 				ProfilePictureURL: r.pictureClient.DownloadURL(topMiner.ProfilePictureName),
@@ -161,6 +172,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		model.MiningSessionSoloEndedAtField
 		model.ExtraBonusStartedAtField
 		model.ExtraBonusLastClaimAvailableAtField
+		model.LatestDeviceField
 		model.UserIDField
 		model.BalanceTotalStandardField
 		model.BalanceTotalPreStakingField
@@ -202,12 +214,16 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 	if avb, gErr := r.getAvailableExtraBonus(now, id, ms[0].ExtraBonusStartedAtField, ms[0].ExtraBonusLastClaimAvailableAtField, ms[0].MiningSessionSoloStartedAtField, ms[0].MiningSessionSoloEndedAtField, ms[0].ExtraBonusDaysClaimNotAvailableResettableField, ms[0].UTCOffsetField, ms[0].NewsSeenField); gErr == nil { //nolint:lll // .
 		availableExtraBonusVal = avb.ExtraBonus
 	}
+	var t2 int32
+	if r.isAdvancedTeamEnabled(ms[0].LatestDevice) {
+		t2 = ms[0].ActiveT2Referrals
+	}
 
 	return &MiningSummary{
 		MiningStreak:                r.calculateMiningStreak(now, ms[0].MiningSessionSoloStartedAt, ms[0].MiningSessionSoloEndedAt),
 		MiningSession:               r.calculateMiningSession(now, ms[0].MiningSessionSoloLastStartedAt, ms[0].MiningSessionSoloEndedAt),
 		RemainingFreeMiningSessions: r.calculateRemainingFreeMiningSessions(now, ms[0].MiningSessionSoloEndedAt),
-		MiningRates:                 r.calculateMiningRateSummaries(t0, extraBonus, ms[0].PreStakingAllocation, ms[0].PreStakingBonus, ms[0].ActiveT1Referrals, ms[0].ActiveT2Referrals, currentAdoption.BaseMiningRate, negativeMiningRate, ms[0].BalanceTotalStandard+ms[0].BalanceTotalPreStaking, now, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
+		MiningRates:                 r.calculateMiningRateSummaries(t0, extraBonus, ms[0].PreStakingAllocation, ms[0].PreStakingBonus, ms[0].ActiveT1Referrals, t2, currentAdoption.BaseMiningRate, negativeMiningRate, ms[0].BalanceTotalStandard+ms[0].BalanceTotalPreStaking, now, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
 		ExtraBonusSummary:           ExtraBonusSummary{AvailableExtraBonus: availableExtraBonusVal},
 		MiningStarted:               !ms[0].MiningSessionSoloStartedAt.IsNil(),
 	}, nil

@@ -5,12 +5,16 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
+	"sync/atomic"
 	stdlibtime "time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
@@ -28,8 +32,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 
 	db := storage.MustConnect(ctx, applicationYamlKey)
 	dwhClient := dwh.MustConnect(ctx, applicationYamlKey)
-
-	return &repository{
+	repo := &repository{
 		cfg:                           &cfg,
 		extraBonusStartDate:           extrabonusnotifier.MustGetExtraBonusStartDate(ctx, db),
 		extraBonusIndicesDistribution: extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, db),
@@ -40,6 +43,9 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 		dwh:           dwhClient,
 		pictureClient: picture.New(applicationYamlKey),
 	}
+	go repo.startDisableAdvancedTeamCfgSyncer(ctx)
+
+	return repo
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
@@ -61,6 +67,7 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	)
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
+	go prc.startDisableAdvancedTeamCfgSyncer(ctx)
 	prc.mustInitAdoptions(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
 	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
@@ -137,6 +144,68 @@ func (r *repository) checkDBHealth(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *repository) startDisableAdvancedTeamCfgSyncer(ctx context.Context) {
+	ticker := stdlibtime.NewTicker(5 * stdlibtime.Minute) //nolint:gosec,gomnd // Not an  issue.
+	defer ticker.Stop()
+	r.cfg.disableAdvancedTeam = new(atomic.Pointer[[]string])
+	log.Panic(errors.Wrap(r.syncDisableAdvancedTeamCfg(ctx), "failed to syncDisableAdvancedTeamCfg"))
+
+	for {
+		select {
+		case <-ticker.C:
+			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			log.Error(errors.Wrap(r.syncDisableAdvancedTeamCfg(reqCtx), "failed to syncDisableAdvancedTeamCfg"))
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (r *repository) syncDisableAdvancedTeamCfg(ctx context.Context) error {
+	result, err := r.db.Get(ctx, "disable_advanced_team_cfg").Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return errors.Wrap(err, "could not get `disable_advanced_team_cfg`")
+	}
+	var (
+		oldCfg []string
+		newCfg = strings.Split(strings.ReplaceAll(strings.ToLower(result), " ", ""), ",")
+	)
+	sort.SliceStable(newCfg, func(ii, jj int) bool { return newCfg[ii] < newCfg[jj] })
+	if old := r.cfg.disableAdvancedTeam.Swap(&newCfg); old != nil {
+		oldCfg = *old
+	}
+	if strings.Join(oldCfg, "") != strings.Join(newCfg, "") {
+		log.Info(fmt.Sprintf("`disable_advanced_team_cfg` changed from: %#v, to: %#v", oldCfg, newCfg))
+	}
+
+	return nil
+}
+
+func (r *repository) isAdvancedTeamEnabled(device string) bool {
+	if device == "" {
+		return true
+	}
+	var disableAdvancedTeamFor []string
+	if cfgVal := r.cfg.disableAdvancedTeam.Load(); cfgVal != nil {
+		disableAdvancedTeamFor = *cfgVal
+	}
+	if len(disableAdvancedTeamFor) == 0 {
+		return true
+	}
+	for _, disabled := range disableAdvancedTeamFor {
+		if strings.EqualFold(device, disabled) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *repository) isAdvancedTeamDisabled(device string) bool {
+	return !r.isAdvancedTeamEnabled(device)
 }
 
 func retry(ctx context.Context, op func() error) error {
