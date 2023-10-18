@@ -132,16 +132,18 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 	}
 	type (
 		deviceMetadata struct {
-			Before          *deviceMetadata `json:"before,omitempty"`
-			UserID          string          `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-			TZ              string          `json:"tz,omitempty" example:"+03:00"`
-			SystemName      string          `json:"systemName,omitempty" example:"Android"`
-			ReadableVersion string          `json:"readableVersion,omitempty" example:"9.9.9.2637"`
+			UserID          string `json:"userId,omitempty" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+			TZ              string `json:"tz,omitempty" example:"+03:00"`
+			SystemName      string `json:"systemName,omitempty" example:"Android"`
+			ReadableVersion string `json:"readableVersion,omitempty" example:"9.9.9.2637"`
 		}
 	)
 	var dm deviceMetadata
-	if err := json.UnmarshalContext(ctx, msg.Value, &dm); err != nil || dm.UserID == "" || dm.TZ == "" || (dm.Before != nil && dm.Before.TZ == dm.TZ) {
+	if err := json.UnmarshalContext(ctx, msg.Value, &dm); err != nil || dm.UserID == "" {
 		return errors.Wrapf(err, "process: cannot unmarshall %v into %#v", string(msg.Value), &dm)
+	}
+	if dm.TZ == "" {
+		dm.TZ = "+00:00"
 	}
 	duration, err := stdlibtime.ParseDuration(strings.Replace(dm.TZ+"m", ":", "h", 1))
 	if err != nil {
@@ -160,6 +162,9 @@ func (s *deviceMetadataTableSource) Process(ctx context.Context, msg *messagebro
 		DeserializedUsersKey: model.DeserializedUsersKey{ID: id},
 		UTCOffsetField:       model.UTCOffsetField{UTCOffset: int64(duration / stdlibtime.Minute)},
 		LatestDeviceField:    model.LatestDeviceField{LatestDevice: fmt.Sprintf("%v:%v", sanitizedDeviceSystemName, dm.ReadableVersion)},
+	}
+	if val.LatestDevice == ":" {
+		val.LatestDevice = ""
 	}
 
 	return errors.Wrapf(storage.Set(ctx, s.db, val), "failed to update users' timezone for %#v", &dm)
