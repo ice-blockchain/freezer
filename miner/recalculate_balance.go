@@ -10,10 +10,15 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
+)
+
+const (
+	maxLimit = 10000
 )
 
 var (
@@ -23,9 +28,9 @@ var (
 type (
 	UserID string
 	pgUser struct {
-		LastMiningEndedAt *time.Time
-		ID, ReferredBy    UserID
-		TierType          string
+		Active         *users.NotExpired
+		ID, ReferredBy UserID
+		ReferralType   string
 	}
 
 	splittedAdoptionByRange struct {
@@ -54,66 +59,82 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]in
 		referredByIDs                  []string
 		now                            = time.Now()
 		t1ActiveCounts, t2ActiveCounts = make(map[int64]uint64), make(map[int64]uint64)
+		t1Referrals, t2Referrals       = make(map[int64][]int64), make(map[int64][]int64)
+		offset                         = 0
 	)
 	for _, val := range users {
 		referredByIDs = append(referredByIDs, val.UserID)
 	}
-	sql := `
-		SELECT
-			id,
-			referred_by,
-			'T1' AS tier_type,
-			last_mining_ended_at
-		FROM users
-		WHERE referred_by = ANY($1)
-			  AND referred_by != id
-			  AND username != id
-		UNION
-		SELECT
-			t2.id AS id,
-			t0.id AS referred_by,
-			'T2'  AS tier_type,
-			t2.last_mining_ended_at
-		FROM users t0
-			JOIN users t1
-				ON t1.referred_by = t0.id
-			JOIN users t2
-				ON t2.referred_by = t1.id
-		WHERE t0.id = ANY($1)
-			  AND t2.referred_by != t2.id
-			  AND t2.username != t2.id`
+	for {
+		sql := `SELECT 
+				u.last_mining_ended_at									  	  	  AS active,
+				u.id 												 	  		  AS id,
+				u.referred_by													  AS referred_by,
+				u.referral_type 										  		  AS referral_type
+		FROM (
+				SELECT 
+					(CASE 
+						WHEN COALESCE(u.last_mining_ended_at, to_timestamp(1)) > $1
+							THEN COALESCE(u.last_mining_ended_at, to_timestamp(1))
+							ELSE NULL
+					END) 														  AS last_mining_ended_at,
+					u.id         												  AS id,
+					(CASE
+							WHEN u.referred_by = user_requesting_this.id 
+								THEN 'T1'
+							WHEN t0.referred_by = user_requesting_this.id and t0.id != t0.referred_by
+								THEN 'T2'
+							ELSE ''
+						END) 														  AS referral_type,
+						user_requesting_this.id 									  AS referred_by
+					FROM users u
+						JOIN USERS t0
+							ON t0.id = u.referred_by
+							AND t0.referred_by != t0.id
+							AND t0.username != t0.id
+						JOIN users user_requesting_this
+							ON user_requesting_this.id = ANY($2)
+							AND user_requesting_this.username != user_requesting_this.id
+							AND user_requesting_this.referred_by != user_requesting_this.id
+		) u
+		WHERE referral_type != ''
+		LIMIT $3 OFFSET $4`
 
-	rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, referredByIDs)
-	if err != nil {
-		return nil, nil, nil, nil, errors.Wrap(err, "can't get users from pg for showing actual data")
-	}
-	t1Referrals, t2Referrals := make(map[int64][]int64), make(map[int64][]int64)
-	for _, row := range rows {
-		if row.ReferredBy != "bogus" && row.ReferredBy != "icenetwork" && row.ID != "bogus" && row.ID != "icenetwork" {
-			referredByID, err := tokenomics.GetInternalID(ctx, m.db, string(row.ReferredBy))
-			if err != nil {
-				log.Error(errWrongInternalID, referredByID)
+		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, now.Time, referredByIDs, maxLimit, offset)
+		if err != nil {
+			return nil, nil, nil, nil, errors.Wrap(err, "can't get users from pg for showing actual data")
+		}
+		if len(rows) == 0 {
+			break
+		}
+		offset += maxLimit
+		for _, row := range rows {
+			if row.ReferredBy != "bogus" && row.ReferredBy != "icenetwork" && row.ID != "bogus" && row.ID != "icenetwork" {
+				referredByID, err := tokenomics.GetInternalID(ctx, m.db, string(row.ReferredBy))
+				if err != nil {
+					log.Error(errWrongInternalID, referredByID)
 
-				continue
-			}
-			id, err := tokenomics.GetInternalID(ctx, m.db, string(row.ID))
-			if err != nil {
-				log.Error(errWrongInternalID, row.ID)
-
-				continue
-			}
-			if row.TierType == "T1" {
-				t1Referrals[referredByID] = append(t1Referrals[referredByID], id)
-				if !row.LastMiningEndedAt.IsNil() && row.LastMiningEndedAt.After(*now.Time) {
-					t1ActiveCounts[referredByID]++
+					continue
 				}
-			} else if row.TierType == "T2" {
-				t2Referrals[referredByID] = append(t2Referrals[referredByID], id)
-				if !row.LastMiningEndedAt.IsNil() && row.LastMiningEndedAt.After(*now.Time) {
-					t2ActiveCounts[referredByID]++
+				id, err := tokenomics.GetInternalID(ctx, m.db, string(row.ID))
+				if err != nil {
+					log.Error(errWrongInternalID, row.ID)
+
+					continue
 				}
-			} else {
-				log.Panic("wrong tier type")
+				if row.ReferralType == "T1" {
+					t1Referrals[referredByID] = append(t1Referrals[referredByID], id)
+					if row.Active != nil && *row.Active {
+						t1ActiveCounts[referredByID]++
+					}
+				} else if row.ReferralType == "T2" {
+					t2Referrals[referredByID] = append(t2Referrals[referredByID], id)
+					if row.Active != nil && *row.Active {
+						t2ActiveCounts[referredByID]++
+					}
+				} else {
+					log.Panic("wrong tier type")
+				}
 			}
 		}
 	}
@@ -220,8 +241,6 @@ outer:
 			}
 		}
 		needToBeRecalculatedUsers = append(needToBeRecalculatedUsers, usr)
-	}
-	for _, usr := range needToBeRecalculatedUsers {
 		actualBalancesT1[usr.ID] = usr.BalanceT1
 		actualBalancesT2[usr.ID] = usr.BalanceT2
 	}
@@ -230,23 +249,33 @@ outer:
 	if err != nil {
 		return nil, errors.Wrap(err, "can't get active users for users")
 	}
+	if len(t1Referrals) == 0 && len(t2Referrals) == 0 {
+		log.Debug("No t1/t2 referrals gathered")
+
+		return nil, nil
+	}
+
 	/******************************************************************************************************************************************************
 		1. Fetching users history time ranges & adoptions information.
 	******************************************************************************************************************************************************/
 	var (
 		now               = time.Now()
 		historyTimeRanges = make(map[int64][]*historyRangeTime)
-		usrIDs            []int64
+		usrIDs            = make(map[int64]struct{}, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
 		updatedUsers      []*user
 	)
 	for _, values := range t1Referrals {
-		usrIDs = append(usrIDs, values...)
+		for _, val := range values {
+			usrIDs[val] = struct{}{}
+		}
 	}
 	for _, values := range t2Referrals {
-		usrIDs = append(usrIDs, values...)
+		for _, val := range values {
+			usrIDs[val] = struct{}{}
+		}
 	}
 	for _, usr := range needToBeRecalculatedUsers {
-		usrIDs = append(usrIDs, usr.ID)
+		usrIDs[usr.ID] = struct{}{}
 	}
 	if len(usrIDs) == 0 {
 		log.Debug("no user ids to be recalculated")
@@ -494,7 +523,7 @@ outer:
 }
 
 func showDiff(recalculatedUsers []*user, actualBalancesT1, actualBalancesT2 map[int64]float64) {
-	log.Info("id,diffBalanceT1,diffBalanceT2,activeT1Count,activeT2Count,recalculatedBalanceT1,recalculatedBalanceT2,actualBalanceT1,actualBalanceT2")
+	log.Info("id,diffBalanceT1,diffBalanceT2,activeT1Count,activeT2Count,recalculatedBalanceT1,recalculatedBalanceT2,actualBalanceT1,actualBalanceT2,SlashingRateT1,SlashingRateT2")
 	for _, usr := range recalculatedUsers {
 		balanceT1Diff := usr.BalanceT1
 		balanceT2Diff := usr.BalanceT2
@@ -504,7 +533,7 @@ func showDiff(recalculatedUsers []*user, actualBalancesT1, actualBalancesT2 map[
 		if _, ok := actualBalancesT2[usr.ID]; ok {
 			balanceT1Diff -= actualBalancesT2[usr.ID]
 		}
-		info := fmt.Sprintf("%v,%v,%v,%v,%v,%v,%v,%v,%v", usr.ID, balanceT1Diff, balanceT2Diff, usr.ActiveT1Referrals, usr.ActiveT2Referrals, usr.BalanceT1, usr.BalanceT2, actualBalancesT1[usr.ID], actualBalancesT2[usr.ID])
+		info := fmt.Sprintf("%v,%v,%v,%v,%v,%v,%v,%v,%v,%v,%v", usr.ID, balanceT1Diff, balanceT2Diff, usr.ActiveT1Referrals, usr.ActiveT2Referrals, usr.BalanceT1, usr.BalanceT2, actualBalancesT1[usr.ID], actualBalancesT2[usr.ID], usr.SlashingRateT1, usr.SlashingRateT2)
 		log.Info(info)
 	}
 }

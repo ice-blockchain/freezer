@@ -443,7 +443,7 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 	return res, nil
 }
 
-func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs []int64) ([]*AdjustUserInfo, error) {
+func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}) ([]*AdjustUserInfo, error) {
 	var (
 		id                                 = make(proto.ColInt64, 0, len(userIDs))
 		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
@@ -460,8 +460,8 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs []int64) ([]
 		res                                = make([]*AdjustUserInfo, 0, len(userIDs))
 	)
 	var userIDArray []string
-	for _, id := range userIDs {
-		userIDArray = append(userIDArray, fmt.Sprint(id))
+	for key, _ := range userIDs {
+		userIDArray = append(userIDArray, fmt.Sprint(key))
 	}
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
 		Body: fmt.Sprintf(`SELECT id,
