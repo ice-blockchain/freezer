@@ -66,40 +66,40 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]in
 		referredByIDs = append(referredByIDs, val.UserID)
 	}
 	for {
-		sql := `SELECT 
-				u.last_mining_ended_at									  	  	  AS active,
-				u.id 												 	  		  AS id,
-				u.referred_by													  AS referred_by,
-				u.referral_type 										  		  AS referral_type
-		FROM (
-				SELECT 
-					(CASE 
-						WHEN COALESCE(u.last_mining_ended_at, to_timestamp(1)) > $1
-							THEN COALESCE(u.last_mining_ended_at, to_timestamp(1))
-							ELSE NULL
-					END) 														  AS last_mining_ended_at,
-					u.id         												  AS id,
-					(CASE
-							WHEN u.referred_by = user_requesting_this.id 
-								THEN 'T1'
-							WHEN t0.referred_by = user_requesting_this.id and t0.id != t0.referred_by
-								THEN 'T2'
-							ELSE ''
-						END) 														  AS referral_type,
-						user_requesting_this.id 									  AS referred_by
-					FROM users u
-						JOIN USERS t0
-							ON t0.id = u.referred_by
-							AND t0.referred_by != t0.id
-							AND t0.username != t0.id
-						JOIN users user_requesting_this
-							ON user_requesting_this.id = ANY($2)
-							AND user_requesting_this.username != user_requesting_this.id
-							AND user_requesting_this.referred_by != user_requesting_this.id
-		) u
-		WHERE referral_type != ''
-		LIMIT $3 OFFSET $4`
-
+		sql := `SELECT * FROM(
+					SELECT
+						id,
+						referred_by,
+						'T1' AS referral_type,
+						(CASE 
+							WHEN COALESCE(last_mining_ended_at, to_timestamp(1)) > $1
+								THEN COALESCE(last_mining_ended_at, to_timestamp(1))
+								ELSE NULL
+						END) 														  AS active
+					FROM users
+					WHERE referred_by = ANY($2)
+						AND referred_by != id
+						AND username != id
+					UNION
+					SELECT
+						t2.id AS id,
+						t0.id AS referred_by,
+						'T2'  AS referral_type,
+						(CASE 
+							WHEN COALESCE(t2.last_mining_ended_at, to_timestamp(1)) > $1
+								THEN COALESCE(t2.last_mining_ended_at, to_timestamp(1))
+								ELSE NULL
+						END) 														  AS active
+					FROM users t0
+						JOIN users t1
+							ON t1.referred_by = t0.id
+						JOIN users t2
+							ON t2.referred_by = t1.id
+					WHERE t0.id = ANY($2)
+						AND t2.referred_by != t2.id
+						AND t2.username != t2.id
+				) X
+				LIMIT $3 OFFSET $4`
 		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, now.Time, referredByIDs, maxLimit, offset)
 		if err != nil {
 			return nil, nil, nil, nil, errors.Wrap(err, "can't get users from pg for showing actual data")
