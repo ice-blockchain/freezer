@@ -46,9 +46,6 @@ const (
 
 // .
 var (
-	//go:embed DDL.sql
-	ddl string
-
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
 )
@@ -116,11 +113,6 @@ type (
 		model.BalanceT2Field
 	}
 
-	recalculatedUser struct {
-		model.DeserializedRecalculatedUsersKey
-		model.RecalculatedTiersBalancesAtField
-	}
-
 	referral struct {
 		model.MiningSessionSoloStartedAtField
 		model.MiningSessionSoloEndedAtField
@@ -146,6 +138,7 @@ type (
 		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
+		recalculationBalanceStartDate *time.Time
 	}
 	config struct {
 		disableAdvancedTeam *atomic.Pointer[[]string]

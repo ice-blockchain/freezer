@@ -443,7 +443,7 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 	return res, nil
 }
 
-func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}) ([]*AdjustUserInfo, error) {
+func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}, limit, offset int64) ([]*AdjustUserInfo, error) {
 	var (
 		id                                 = make(proto.ColInt64, 0, len(userIDs))
 		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
@@ -463,6 +463,10 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 	for key, _ := range userIDs {
 		userIDArray = append(userIDArray, fmt.Sprint(key))
 	}
+	var offsetStr string
+	if offset > 0 {
+		offsetStr = fmt.Sprintf(", %v", offset)
+	}
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
 		Body: fmt.Sprintf(`SELECT id,
 								  mining_session_solo_started_at, 
@@ -479,7 +483,8 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 						   FROM %[1]v
 						   WHERE id IN [%[2]v]
 						   ORDER BY created_at ASC
-						`, tableName, strings.Join(userIDArray, ",")),
+						   LIMIT %[3]v %[4]v
+						`, tableName, strings.Join(userIDArray, ","), limit, offsetStr),
 		Result: append(make(proto.Results, 0, 12),
 			proto.ResultColumn{Name: "id", Data: &id},
 			proto.ResultColumn{Name: "mining_session_solo_started_at", Data: &miningSessionSoloStartedAt},

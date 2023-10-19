@@ -24,7 +24,7 @@ type (
 		Ping(ctx context.Context) error
 		Insert(ctx context.Context, columns *Columns, input InsertMetadata, usrs []*model.User) error
 		SelectBalanceHistory(ctx context.Context, id int64, createdAts []stdlibtime.Time) ([]*BalanceHistory, error)
-		GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}) ([]*AdjustUserInfo, error)
+		GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}, limit, offset int64) ([]*AdjustUserInfo, error)
 	}
 	AdjustUserInfo struct {
 		MiningSessionSoloStartedAt         *time.Time

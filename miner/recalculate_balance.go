@@ -4,7 +4,6 @@ package miner
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	stdlibtime "time"
 
@@ -18,7 +17,7 @@ import (
 )
 
 const (
-	maxLimit = 10000
+	maxLimit int64 = 10000
 )
 
 var (
@@ -31,6 +30,10 @@ type (
 		Active         *users.NotExpired
 		ID, ReferredBy UserID
 		ReferralType   string
+	}
+	pgUserCreated struct {
+		ID        UserID
+		CreatedAt *time.Time
 	}
 
 	splittedAdoptionByRange struct {
@@ -54,13 +57,51 @@ type (
 	}
 )
 
+func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserCreated, error) {
+	var (
+		userIDs []string
+		offset  int64 = 0
+		result        = make(map[int64]*pgUserCreated, len(users))
+	)
+	for _, val := range users {
+		userIDs = append(userIDs, val.UserID)
+	}
+	for {
+		sql := `SELECT
+					id,
+					created_at
+				FROM users
+				WHERE id = ANY($1)
+				LIMIT $2 OFFSET $3`
+		rows, err := storagePG.Select[pgUserCreated](ctx, m.dbPG, sql, userIDs, maxLimit, offset)
+		if err != nil {
+			return nil, errors.Wrap(err, "can't get users from pg")
+		}
+		if len(rows) == 0 {
+			break
+		}
+		offset += maxLimit
+		for _, row := range rows {
+			id, err := tokenomics.GetInternalID(ctx, m.db, string(row.ID))
+			if err != nil {
+				log.Error(errWrongInternalID, row.ID)
+
+				continue
+			}
+			result[id] = row
+		}
+	}
+
+	return result, nil
+}
+
 func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]int64, map[int64][]int64, map[int64]uint64, map[int64]uint64, error) {
 	var (
 		referredByIDs                  []string
-		now                            = time.Now()
-		t1ActiveCounts, t2ActiveCounts = make(map[int64]uint64), make(map[int64]uint64)
-		t1Referrals, t2Referrals       = make(map[int64][]int64), make(map[int64][]int64)
-		offset                         = 0
+		offset                         int64 = 0
+		now                                  = time.Now()
+		t1ActiveCounts, t2ActiveCounts       = make(map[int64]uint64), make(map[int64]uint64)
+		t1Referrals, t2Referrals             = make(map[int64][]int64), make(map[int64][]int64)
 	)
 	for _, val := range users {
 		referredByIDs = append(referredByIDs, val.UserID)
@@ -102,7 +143,7 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]in
 				LIMIT $3 OFFSET $4`
 		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, now.Time, referredByIDs, maxLimit, offset)
 		if err != nil {
-			return nil, nil, nil, nil, errors.Wrap(err, "can't get users from pg for showing actual data")
+			return nil, nil, nil, nil, errors.Wrap(err, "can't get referrals from pg for showing actual data")
 		}
 		if len(rows) == 0 {
 			break
@@ -224,27 +265,29 @@ func initializeEmptyUser(updatedUser, usr *user) *user {
 	return &newUser
 }
 
-func (m *miner) showTiersDiffBalances(ctx context.Context, users []*user, userRecalculated []*recalculatedUser, tMinus1Referrals map[int64]*referral, t0Referrals map[int64]*referral) ([]*user, error) {
+func (m *miner) showTiersDiffBalances(ctx context.Context, users []*user, tMinus1Referrals map[int64]*referral, t0Referrals map[int64]*referral) (map[int64]*user, error) {
 	var (
 		needToBeRecalculatedUsers []*user
 		actualBalancesT1          = make(map[int64]float64)
 		actualBalancesT2          = make(map[int64]float64)
 	)
-outer:
+	usrs, err := m.getUsers(ctx, users)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't get CreatedAt information for users:%#v", usrs)
+	}
 	for _, usr := range users {
 		if usr.UserID == "" {
 			continue
 		}
-		for _, recalculatedUser := range userRecalculated {
-			if recalculatedUser.ID == usr.ID && !recalculatedUser.RecalculatedTiersBalancesAt.IsNil() {
-				continue outer
+		if _, ok := usrs[usr.ID]; ok {
+			if usrs[usr.ID].CreatedAt == nil || usrs[usr.ID].CreatedAt.After(*m.recalculationBalanceStartDate.Time) {
+				continue
 			}
 		}
 		needToBeRecalculatedUsers = append(needToBeRecalculatedUsers, usr)
 		actualBalancesT1[usr.ID] = usr.BalanceT1
 		actualBalancesT2[usr.ID] = usr.BalanceT2
 	}
-
 	t1Referrals, t2Referrals, t1ActiveCounts, t2ActiveCounts, err := m.collectTiers(ctx, needToBeRecalculatedUsers)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't get active users for users")
@@ -262,7 +305,7 @@ outer:
 		now               = time.Now()
 		historyTimeRanges = make(map[int64][]*historyRangeTime)
 		usrIDs            = make(map[int64]struct{}, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
-		updatedUsers      []*user
+		updatedUsers      = make(map[int64]*user, len(users))
 	)
 	for _, values := range t1Referrals {
 		for _, val := range values {
@@ -282,27 +325,34 @@ outer:
 
 		return nil, nil
 	}
-	historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, usrIDs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", usrIDs)
-	}
 	adoptions, err := tokenomics.GetAllAdoptions[float64](ctx, m.db)
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't get adoptions for users:%#v", needToBeRecalculatedUsers)
 	}
-	for _, info := range historyInformation {
-		historyTimeRanges[info.ID] = append(historyTimeRanges[info.ID], &historyRangeTime{
-			MiningSessionSoloPreviouslyEndedAt: info.MiningSessionSoloPreviouslyEndedAt,
-			MiningSessionSoloStartedAt:         info.MiningSessionSoloStartedAt,
-			MiningSessionSoloEndedAt:           info.MiningSessionSoloEndedAt,
-			ResurrectSoloUsedAt:                info.ResurrectSoloUsedAt,
-			CreatedAt:                          info.CreatedAt,
-			SlashingRateSolo:                   info.SlashingRateSolo,
-			BalanceT1Pending:                   info.BalanceT1Pending,
-			BalanceT1PendingApplied:            info.BalanceT1PendingApplied,
-			BalanceT2Pending:                   info.BalanceT2Pending,
-			BalanceT2PendingApplied:            info.BalanceT2PendingApplied,
-		})
+	offset := int64(0)
+	for {
+		historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, usrIDs, maxLimit, offset)
+		if err != nil {
+			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", usrIDs)
+		}
+		if len(historyInformation) == 0 {
+			break
+		}
+		offset += maxLimit
+		for _, info := range historyInformation {
+			historyTimeRanges[info.ID] = append(historyTimeRanges[info.ID], &historyRangeTime{
+				MiningSessionSoloPreviouslyEndedAt: info.MiningSessionSoloPreviouslyEndedAt,
+				MiningSessionSoloStartedAt:         info.MiningSessionSoloStartedAt,
+				MiningSessionSoloEndedAt:           info.MiningSessionSoloEndedAt,
+				ResurrectSoloUsedAt:                info.ResurrectSoloUsedAt,
+				CreatedAt:                          info.CreatedAt,
+				SlashingRateSolo:                   info.SlashingRateSolo,
+				BalanceT1Pending:                   info.BalanceT1Pending,
+				BalanceT1PendingApplied:            info.BalanceT1PendingApplied,
+				BalanceT2Pending:                   info.BalanceT2Pending,
+				BalanceT2PendingApplied:            info.BalanceT2PendingApplied,
+			})
+		}
 	}
 	if len(historyTimeRanges) == 0 {
 		log.Debug("empty history time ranges")
@@ -515,25 +565,8 @@ outer:
 		}
 		updatedUser.ActiveT1Referrals = int32(t1ActiveCounts[usr.ID])
 		updatedUser.ActiveT2Referrals = int32(t2ActiveCounts[usr.ID])
-		updatedUsers = append(updatedUsers, updatedUser)
+		updatedUsers[updatedUser.ID] = updatedUser
 	}
-	showDiff(updatedUsers, actualBalancesT1, actualBalancesT2)
 
 	return updatedUsers, nil
-}
-
-func showDiff(recalculatedUsers []*user, actualBalancesT1, actualBalancesT2 map[int64]float64) {
-	log.Info("id,diffBalanceT1,diffBalanceT2,activeT1Count,activeT2Count,recalculatedBalanceT1,recalculatedBalanceT2,actualBalanceT1,actualBalanceT2,SlashingRateT1,SlashingRateT2")
-	for _, usr := range recalculatedUsers {
-		balanceT1Diff := usr.BalanceT1
-		balanceT2Diff := usr.BalanceT2
-		if _, ok := actualBalancesT1[usr.ID]; ok {
-			balanceT1Diff -= actualBalancesT1[usr.ID]
-		}
-		if _, ok := actualBalancesT2[usr.ID]; ok {
-			balanceT1Diff -= actualBalancesT2[usr.ID]
-		}
-		info := fmt.Sprintf("%v,%v,%v,%v,%v,%v,%v,%v,%v,%v,%v", usr.ID, balanceT1Diff, balanceT2Diff, usr.ActiveT1Referrals, usr.ActiveT2Referrals, usr.BalanceT1, usr.BalanceT2, actualBalancesT1[usr.ID], actualBalancesT2[usr.ID], usr.SlashingRateT1, usr.SlashingRateT2)
-		log.Info(info)
-	}
 }
