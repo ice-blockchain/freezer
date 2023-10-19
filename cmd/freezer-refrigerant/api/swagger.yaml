@@ -10,6 +10,13 @@ definitions:
           `true` recovers all the lost balance, `false` deletes it forever, `null/undefined` does nothing. Default is `null/undefined`.
         example: true
         type: boolean
+      skipKYCStep:
+        allOf:
+        - $ref: '#/definitions/users.KYCStep'
+        description: |-
+          Specify this if you want to skip a specific KYC step before starting a new mining session or extending an existing one.
+          Some KYC steps are not skippable.
+        example: 0
     type: object
   main.StartOrUpdatePreStakingRequestBody:
     properties:
@@ -142,6 +149,22 @@ definitions:
         example: 1
         type: integer
     type: object
+  users.KYCStep:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    type: integer
+    x-enum-varnames:
+    - NoneKYCStep
+    - FacialRecognitionKYCStep
+    - LivenessDetectionKYCStep
+    - Social1KYCStep
+    - QuizKYCStep
+    - Social2KYCStep
 info:
   contact:
     name: ice.io
@@ -258,7 +281,7 @@ paths:
             $ref: '#/definitions/server.ErrorResponse'
         "409":
           description: if mining is in progress or if a decision about negative mining
-            progress is required
+            progress or kyc is required
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "422":

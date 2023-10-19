@@ -35,7 +35,7 @@ func (s *service) setupTokenomicsRoutes(router *server.Router) {
 //	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
 //	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
 //	@Failure		404				{object}	server.ErrorResponse	"if user not found"
-//	@Failure		409				{object}	server.ErrorResponse	"if mining is in progress or if a decision about negative mining progress is required"
+//	@Failure		409				{object}	server.ErrorResponse	"if mining is in progress or if a decision about negative mining progress or kyc is required"
 //	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
 //	@Failure		500				{object}	server.ErrorResponse
 //	@Failure		504				{object}	server.ErrorResponse	"if request times out"
@@ -45,12 +45,18 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 	req *server.Request[StartNewMiningSessionRequestBody, tokenomics.MiningSummary],
 ) (*server.Response[tokenomics.MiningSummary], *server.Response[server.ErrorResponse]) {
 	ms := &tokenomics.MiningSummary{MiningSession: &tokenomics.MiningSession{UserID: &req.Data.UserID}}
-	if err := s.tokenomicsProcessor.StartNewMiningSession(contextWithHashCode(ctx, req), ms, req.Data.Resurrect); err != nil {
+	if err := s.tokenomicsProcessor.StartNewMiningSession(contextWithHashCode(ctx, req), ms, req.Data.Resurrect, req.Data.SkipKYCStep); err != nil {
 		err = errors.Wrapf(err, "failed to start a new mining session for userID:%v, data:%#v", req.Data.UserID, req.Data)
 		switch {
 		case errors.Is(err, tokenomics.ErrNegativeMiningProgressDecisionRequired):
 			if tErr := terror.As(err); tErr != nil {
 				return nil, server.Conflict(err, resurrectionDecisionRequiredErrorCode, tErr.Data)
+			}
+
+			fallthrough
+		case errors.Is(err, tokenomics.ErrKYCRequired):
+			if tErr := terror.As(err); tErr != nil {
+				return nil, server.Conflict(err, kycStepRequiredErrorCode, tErr.Data)
 			}
 
 			fallthrough

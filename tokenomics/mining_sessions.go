@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
@@ -12,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -44,7 +46,7 @@ type (
 )
 
 func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of handling.
-	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool,
+	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool, skipKYCStep *users.KYCStep,
 ) error {
 	userID := *ms.MiningSession.UserID
 	id, err := GetOrInitInternalID(ctx, r.db, userID)
@@ -69,6 +71,13 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress) //nolint:lll // .
 	if err != nil {
 		return err
+	}
+	if skipKYCStep != nil && *skipKYCStep == users.NoneKYCStep { // TODO implement this properly.
+		if rand.Intn(10) == 0 {
+			return terror.New(ErrKYCRequired, map[string]any{
+				"kycStep": users.QuizKYCStep,
+			})
+		}
 	}
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
 		return errors.Wrapf(err, "failed to updateTMinus1 for id:%v", id)

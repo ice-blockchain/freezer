@@ -177,7 +177,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "if mining is in progress or if a decision about negative mining progress is required",
+                        "description": "if mining is in progress or if a decision about negative mining progress or kyc is required",
                         "schema": {
                             "$ref": "#/definitions/server.ErrorResponse"
                         }
@@ -302,6 +302,15 @@ const docTemplate = `{
                     "description": "Specify this if you want to resurrect the user.\n` + "`" + `true` + "`" + ` recovers all the lost balance, ` + "`" + `false` + "`" + ` deletes it forever, ` + "`" + `null/undefined` + "`" + ` does nothing. Default is ` + "`" + `null/undefined` + "`" + `.",
                     "type": "boolean",
                     "example": true
+                },
+                "skipKYCStep": {
+                    "description": "Specify this if you want to skip a specific KYC step before starting a new mining session or extending an existing one.\nSome KYC steps are not skippable.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/users.KYCStep"
+                        }
+                    ],
+                    "example": 0
                 }
             }
         },
@@ -490,6 +499,25 @@ const docTemplate = `{
                     "example": 1
                 }
             }
+        },
+        "users.KYCStep": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "x-enum-varnames": [
+                "NoneKYCStep",
+                "FacialRecognitionKYCStep",
+                "LivenessDetectionKYCStep",
+                "Social1KYCStep",
+                "QuizKYCStep",
+                "Social2KYCStep"
+            ]
         }
     }
 }`

@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/eskimo/users"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
@@ -36,6 +37,7 @@ var (
 	ErrRelationNotFound                                = errors.New("relationship not found")
 	ErrDuplicate                                       = errors.New("duplicate")
 	ErrNegativeMiningProgressDecisionRequired          = errors.New("you have negative mining progress, please decide what to do with it")
+	ErrKYCRequired                                     = errors.New("user needs to complete a kyc step or skip it(if allowed)")
 	ErrRaceCondition                                   = errors.New("race condition")
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
 	ErrDecreasingPreStakingAllocationOrYearsNotAllowed = errors.New("decreasing pre-staking allocation or years not allowed")
@@ -171,7 +173,7 @@ type (
 		GetAdoptionSummary(context.Context) (*AdoptionSummary, error)
 	}
 	WriteRepository interface {
-		StartNewMiningSession(ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool) error
+		StartNewMiningSession(ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool, skipKYCStep *users.KYCStep) error
 		ClaimExtraBonus(ctx context.Context, ebs *ExtraBonusSummary) error
 		StartOrUpdatePreStaking(context.Context, *PreStakingSummary) error
 	}

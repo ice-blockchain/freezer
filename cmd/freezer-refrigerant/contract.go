@@ -3,6 +3,7 @@
 package main
 
 import (
+	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/freezer/tokenomics"
 )
 
@@ -12,8 +13,11 @@ type (
 	StartNewMiningSessionRequestBody struct {
 		// Specify this if you want to resurrect the user.
 		// `true` recovers all the lost balance, `false` deletes it forever, `null/undefined` does nothing. Default is `null/undefined`.
-		Resurrect *bool  `json:"resurrect" example:"true"`
-		UserID    string `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Resurrect *bool `json:"resurrect" example:"true"`
+		// Specify this if you want to skip a specific KYC step before starting a new mining session or extending an existing one.
+		// Some KYC steps are not skippable.
+		SkipKYCStep *users.KYCStep `json:"skipKYCStep" example:"0"`
+		UserID      string         `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
 	}
 	ClaimExtraBonusRequestBody struct {
 		UserID string `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
@@ -39,6 +43,7 @@ const (
 	miningInProgressErrorCode                                = "MINING_IN_PROGRESS"
 	raceConditionErrorCode                                   = "RACE_CONDITION"
 	resurrectionDecisionRequiredErrorCode                    = "RESURRECTION_DECISION_REQUIRED"
+	kycStepRequiredErrorCode                                 = "KYC_STEP_REQUIRED"
 	noExtraBonusAvailableErrorCode                           = "NO_EXTRA_BONUS_AVAILABLE"
 	extraBonusAlreadyClaimedErrorCode                        = "EXTRA_BONUS_ALREADY_CLAIMED"
 )
