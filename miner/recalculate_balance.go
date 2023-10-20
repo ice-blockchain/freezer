@@ -265,7 +265,7 @@ func initializeEmptyUser(updatedUser, usr *user) *user {
 	return &newUser
 }
 
-func (m *miner) showTiersDiffBalances(ctx context.Context, users []*user, tMinus1Referrals map[int64]*referral, t0Referrals map[int64]*referral) (map[int64]*user, error) {
+func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMinus1Referrals map[int64]*referral, t0Referrals map[int64]*referral) (map[int64]*user, error) {
 	var (
 		needToBeRecalculatedUsers []*user
 		actualBalancesT1          = make(map[int64]float64)

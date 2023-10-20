@@ -96,9 +96,6 @@ type (
 	ExtraBonusLastClaimAvailableAtField struct {
 		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
 	}
-	RecalculatedTiersBalancesAtField struct {
-		RecalculatedTiersBalancesAt *time.Time `redis:"recalculated_tiers_balances_at,omitempty"`
-	}
 	UserIDField struct {
 		UserID string `redis:"user_id,omitempty"`
 	}
@@ -228,6 +225,9 @@ type (
 	HideRankingField struct {
 		HideRanking bool `redis:"hide_ranking"`
 	}
+	DeserializedBackupUsersKey struct {
+		ID int64 `redis:"-"`
+	}
 )
 
 func (k *DeserializedUsersKey) Key() string {
@@ -266,5 +266,44 @@ func SerializedUsersKey(val any) string {
 		return "users:" + strconv.FormatInt(typedVal, 10)
 	default:
 		panic(fmt.Sprintf("%#v cannot be used as users key", val))
+	}
+}
+
+func (k *DeserializedBackupUsersKey) Key() string {
+	if k == nil || k.ID == 0 {
+		return ""
+	}
+
+	return SerializedBackupUsersKey(k.ID)
+}
+
+func (k *DeserializedBackupUsersKey) SetKey(val string) {
+	if val == "" || val == "backup:" {
+		return
+	}
+	if val[0] == 'b' {
+		val = val[7:]
+	}
+	var err error
+	k.ID, err = strconv.ParseInt(val, 10, 64)
+	log.Panic(err)
+}
+
+func SerializedBackupUsersKey(val any) string {
+	switch typedVal := val.(type) {
+	case string:
+		if typedVal == "" {
+			return ""
+		}
+
+		return "backup:" + typedVal
+	case int64:
+		if typedVal == 0 {
+			return ""
+		}
+
+		return "backup:" + strconv.FormatInt(typedVal, 10)
+	default:
+		panic(fmt.Sprintf("%#v cannot be used as backup key", val))
 	}
 }

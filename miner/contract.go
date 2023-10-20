@@ -107,10 +107,15 @@ type (
 		model.IDT0Field
 		model.IDTMinus1Field
 	}
-	userBalanceTiersUpdated struct {
-		model.DeserializedUsersKey
+
+	backupUserUpdated struct {
+		model.DeserializedBackupUsersKey
 		model.BalanceT1Field
 		model.BalanceT2Field
+		model.SlashingRateT1Field
+		model.SlashingRateT2Field
+		model.ActiveT1ReferralsField
+		model.ActiveT2ReferralsField
 	}
 
 	referral struct {
@@ -139,6 +144,7 @@ type (
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 		recalculationBalanceStartDate *time.Time
+		balanceBackupStartDate        *time.Time
 	}
 	config struct {
 		disableAdvancedTeam *atomic.Pointer[[]string]
