@@ -137,13 +137,13 @@ func mustGetRecalculationBalancesStartDate(ctx context.Context, db storage.DB) (
 	return recalculationBalancesStartDate
 }
 
-func mustGetBalancesBackupStartDate(ctx context.Context, db storage.DB) (result bool, err error) {
-	balancesBackupString, err := db.Get(ctx, "balances_backup").Result()
+func mustGetBalancesBackupMode(ctx context.Context, db storage.DB) (result bool, err error) {
+	balancesBackupModeString, err := db.Get(ctx, "balances_backup_mode").Result()
 	if err != nil && errors.Is(err, redis.Nil) {
 		err = nil
 	}
 
-	return balancesBackupString == "true", err
+	return balancesBackupModeString == "true", err
 }
 
 func (m *miner) mine(ctx context.Context, workerNumber int64) {
@@ -270,7 +270,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
-		balanceBackup, err := mustGetBalancesBackupStartDate(ctx, m.db)
+		balanceBackupMode, err := mustGetBalancesBackupMode(ctx, m.db)
 		if err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get backup flag for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 
@@ -335,7 +335,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				t0Referrals[ref.ID] = ref
 			}
 		}
-		if !balanceBackup {
+		if !balanceBackupMode {
 			var err error
 			recalculatedTiersBalancesUsers, err = m.recalculateTiersBalances(ctx, userResults, tMinus1Referrals, t0Referrals)
 			if err != nil {
@@ -347,7 +347,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.UserID == "" {
 				continue
 			}
-			if balanceBackup {
+			if balanceBackupMode {
 				if backupedUsr, ok := backupedUsers[usr.ID]; ok {
 					diffT1ActiveValue := backupedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
 					diffT2ActiveValue := backupedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
