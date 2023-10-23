@@ -116,6 +116,12 @@ type (
 		model.SlashingRateT2Field
 		model.ActiveT1ReferralsField
 		model.ActiveT2ReferralsField
+		model.FirstRecalculatedBalanceT1Field
+		model.FirstRecalculatedBalanceT2Field
+		model.FirstRecalculatedActiveT1ReferralsField
+		model.FirstRecalculatedActiveT2ReferralsField
+		model.FirstRecalculatedSlashingRateT1Field
+		model.FirstRecalculatedSlashingRateT2Field
 	}
 
 	referral struct {
@@ -144,7 +150,6 @@ type (
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 		recalculationBalanceStartDate *time.Time
-		balanceBackupStartDate        *time.Time
 	}
 	config struct {
 		disableAdvancedTeam *atomic.Pointer[[]string]

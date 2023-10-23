@@ -50,7 +50,6 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, mi.db)
 	mi.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, mi.db)
 	mi.recalculationBalanceStartDate = mustGetRecalculationBalancesStartDate(ctx, mi.db)
-	mi.balanceBackupStartDate = mustGetBalancesBackupStartDate(ctx, mi.db)
 
 	for workerNumber := int64(0); workerNumber < cfg.Workers; workerNumber++ {
 		go func(wn int64) {
@@ -138,20 +137,13 @@ func mustGetRecalculationBalancesStartDate(ctx context.Context, db storage.DB) (
 	return recalculationBalancesStartDate
 }
 
-func mustGetBalancesBackupStartDate(ctx context.Context, db storage.DB) (balancesBackupStartDate *time.Time) {
-	balancesBackupStartDateString, err := db.Get(ctx, "balances_backup_start_date").Result()
+func mustGetBalancesBackupStartDate(ctx context.Context, db storage.DB) (result bool, err error) {
+	balancesBackupString, err := db.Get(ctx, "balances_backup").Result()
 	if err != nil && errors.Is(err, redis.Nil) {
 		err = nil
 	}
-	log.Panic(errors.Wrap(err, "failed to get balances_backup_start_date"))
-	if balancesBackupStartDateString != "" {
-		balancesBackupStartDate = new(time.Time)
-		log.Panic(errors.Wrapf(balancesBackupStartDate.UnmarshalText([]byte(balancesBackupStartDateString)), "failed to parse balances_backup_start_date `%v`", balancesBackupStartDateString)) //nolint:lll // .
 
-		return
-	}
-
-	return balancesBackupStartDate
+	return balancesBackupString == "true", err
 }
 
 func (m *miner) mine(ctx context.Context, workerNumber int64) {
@@ -278,6 +270,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
+		balanceBackup, err := mustGetBalancesBackupStartDate(ctx, m.db)
+		if err != nil {
+			log.Error(errors.Wrapf(err, "[miner] failed to get backup flag for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+
+			continue
+		}
 		reqCancel()
 		for _, usr := range backupUserResults {
 			backupedUsers[usr.ID] = usr
@@ -337,7 +335,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				t0Referrals[ref.ID] = ref
 			}
 		}
-		if m.balanceBackupStartDate.IsNil() {
+		if !balanceBackup {
 			var err error
 			recalculatedTiersBalancesUsers, err = m.recalculateTiersBalances(ctx, userResults, tMinus1Referrals, t0Referrals)
 			if err != nil {
@@ -349,7 +347,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.UserID == "" {
 				continue
 			}
-			if !m.balanceBackupStartDate.IsNil() {
+			if balanceBackup {
 				if backupedUsr, ok := backupedUsers[usr.ID]; ok {
 					diffT1ActiveValue := backupedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
 					diffT2ActiveValue := backupedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
@@ -381,21 +379,33 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
 					t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
+					oldBalanceT1 := usr.BalanceT1
+					oldBalanceT2 := usr.BalanceT2
+
 					usr.BalanceT1 = recalculatedUsr.BalanceT1
 					usr.BalanceT2 = recalculatedUsr.BalanceT2
+
+					oldSlashingT1Rate := usr.SlashingRateT1
+					oldSlashingT2Rate := usr.SlashingRateT2
 
 					usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
 					usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
 
 					if _, ok := backupedUsers[usr.ID]; !ok {
 						backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
-							DeserializedBackupUsersKey: model.DeserializedBackupUsersKey{ID: usr.ID},
-							BalanceT1Field:             usr.BalanceT1Field,
-							BalanceT2Field:             usr.BalanceT2Field,
-							SlashingRateT1Field:        usr.SlashingRateT1Field,
-							SlashingRateT2Field:        usr.SlashingRateT2Field,
-							ActiveT1ReferralsField:     model.ActiveT1ReferralsField{ActiveT1Referrals: usr.ActiveT1Referrals + diffT1ActiveValue},
-							ActiveT2ReferralsField:     model.ActiveT2ReferralsField{ActiveT2Referrals: usr.ActiveT2Referrals + diffT2ActiveValue},
+							DeserializedBackupUsersKey:              model.DeserializedBackupUsersKey{ID: usr.ID},
+							BalanceT1Field:                          model.BalanceT1Field{BalanceT1: oldBalanceT1},
+							BalanceT2Field:                          model.BalanceT2Field{BalanceT2: oldBalanceT2},
+							SlashingRateT1Field:                     model.SlashingRateT1Field{SlashingRateT1: oldSlashingT1Rate},
+							SlashingRateT2Field:                     model.SlashingRateT2Field{SlashingRateT2: oldSlashingT2Rate},
+							ActiveT1ReferralsField:                  model.ActiveT1ReferralsField{ActiveT1Referrals: usr.ActiveT1Referrals},
+							ActiveT2ReferralsField:                  model.ActiveT2ReferralsField{ActiveT2Referrals: usr.ActiveT2Referrals},
+							FirstRecalculatedBalanceT1Field:         model.FirstRecalculatedBalanceT1Field{FirstRecalculatedBalanceT1: usr.BalanceT1},
+							FirstRecalculatedBalanceT2Field:         model.FirstRecalculatedBalanceT2Field{FirstRecalculatedBalanceT2: usr.BalanceT2},
+							FirstRecalculatedSlashingRateT1Field:    model.FirstRecalculatedSlashingRateT1Field{FirstRecalculatedSlashingRateT1: usr.SlashingRateT1},
+							FirstRecalculatedSlashingRateT2Field:    model.FirstRecalculatedSlashingRateT2Field{FirstRecalculatedSlashingRateT2: usr.SlashingRateT2},
+							FirstRecalculatedActiveT1ReferralsField: model.FirstRecalculatedActiveT1ReferralsField{FirstRecalculatedActiveT1Referrals: usr.ActiveT1Referrals + diffT1ActiveValue},
+							FirstRecalculatedActiveT2ReferralsField: model.FirstRecalculatedActiveT2ReferralsField{FirstRecalculatedActiveT2Referrals: usr.ActiveT2Referrals + diffT2ActiveValue},
 						})
 					}
 				}

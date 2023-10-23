@@ -14,6 +14,7 @@ import (
 	"github.com/ClickHouse/ch-go/chpool"
 	"github.com/ClickHouse/ch-go/proto"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/ice-blockchain/freezer/model"
@@ -444,46 +445,77 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 }
 
 func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}, limit, offset int64) ([]*AdjustUserInfo, error) {
-	var (
-		id                                 = make(proto.ColInt64, 0, len(userIDs))
-		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
-		miningSessionSoloEndedAt           = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
-		miningSessionSoloPreviouslyEndedAt = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
-		slashingRateSolo                   = make(proto.ColFloat64, 0, len(userIDs))
-		createdAt                          = proto.ColDateTime{Data: make([]proto.DateTime, 0), Location: stdlibtime.UTC}
-		resurrectSoloUsedAt                = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDs)), Location: stdlibtime.UTC}
-		balanceSolo                        = make(proto.ColFloat64, 0, len(userIDs))
-		balanceT1Pending                   = make(proto.ColFloat64, 0, len(userIDs))
-		balanceT1PendingApplied            = make(proto.ColFloat64, 0, len(userIDs))
-		balanceT2Pending                   = make(proto.ColFloat64, 0, len(userIDs))
-		balanceT2PendingApplied            = make(proto.ColFloat64, 0, len(userIDs))
-		res                                = make([]*AdjustUserInfo, 0, len(userIDs))
+	const (
+		maxIDCount = 25_000
 	)
+	var (
+		res = make([]*AdjustUserInfo, 0, len(userIDs))
+	)
+	counter := 0
 	var userIDArray []string
-	for key, _ := range userIDs {
-		userIDArray = append(userIDArray, fmt.Sprint(key))
+	for userID, _ := range userIDs {
+		userIDArray = append(userIDArray, fmt.Sprint(userID))
+		counter++
+		if counter >= maxIDCount { // Hack not to have 'Max query size exceeded' error.
+			result, err := db.getAdjustUserInformation(ctx, userIDArray, limit, offset)
+			if err != nil {
+				return nil, errors.Wrapf(err, "can't get adjust user information for userIDs:%#v", userIDArray)
+			}
+			res = append(res, result...)
+			userIDArray = nil
+			counter = 0
+
+			continue
+		}
 	}
+	if len(userIDArray) > 0 {
+		result, err := db.getAdjustUserInformation(ctx, userIDArray, limit, offset)
+		if err != nil {
+			return nil, errors.Wrapf(err, "can't get adjust user information for userIDs:%#v", userIDArray)
+		}
+		res = append(res, result...)
+	}
+
+	return res, nil
+}
+
+func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string, limit, offset int64) ([]*AdjustUserInfo, error) {
+	var (
+		id                                 = make(proto.ColInt64, 0, len(userIDArray))
+		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
+		miningSessionSoloEndedAt           = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
+		miningSessionSoloPreviouslyEndedAt = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
+		slashingRateSolo                   = make(proto.ColFloat64, 0, len(userIDArray))
+		createdAt                          = proto.ColDateTime{Data: make([]proto.DateTime, 0), Location: stdlibtime.UTC}
+		resurrectSoloUsedAt                = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
+		balanceSolo                        = make(proto.ColFloat64, 0, len(userIDArray))
+		balanceT1Pending                   = make(proto.ColFloat64, 0, len(userIDArray))
+		balanceT1PendingApplied            = make(proto.ColFloat64, 0, len(userIDArray))
+		balanceT2Pending                   = make(proto.ColFloat64, 0, len(userIDArray))
+		balanceT2PendingApplied            = make(proto.ColFloat64, 0, len(userIDArray))
+		res                                = make([]*AdjustUserInfo, 0, len(userIDArray))
+	)
 	var offsetStr string
 	if offset > 0 {
 		offsetStr = fmt.Sprintf(", %v", offset)
 	}
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
 		Body: fmt.Sprintf(`SELECT id,
-								  mining_session_solo_started_at, 
-								  mining_session_solo_ended_at,
-								  mining_session_solo_previously_ended_at,
-								  slashing_rate_solo,
-								  created_at,
-								  resurrect_solo_used_at,
-								  balance_solo,
-								  balance_t1_pending,
-								  balance_t1_pending_applied,
-								  balance_t2_pending,
-								  balance_t2_pending_applied
-						   FROM %[1]v
-						   WHERE id IN [%[2]v]
-						   ORDER BY created_at ASC
-						   LIMIT %[3]v %[4]v
+									mining_session_solo_started_at, 
+									mining_session_solo_ended_at,
+									mining_session_solo_previously_ended_at,
+									slashing_rate_solo,
+									created_at,
+									resurrect_solo_used_at,
+									balance_solo,
+									balance_t1_pending,
+									balance_t1_pending_applied,
+									balance_t2_pending,
+									balance_t2_pending_applied
+							FROM %[1]v
+							WHERE id IN [%[2]v]
+							ORDER BY created_at ASC
+							LIMIT %[3]v %[4]v
 						`, tableName, strings.Join(userIDArray, ","), limit, offsetStr),
 		Result: append(make(proto.Results, 0, 12),
 			proto.ResultColumn{Name: "id", Data: &id},

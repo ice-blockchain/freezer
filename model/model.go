@@ -156,6 +156,12 @@ type (
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
 	}
+	FirstRecalculatedBalanceT1Field struct {
+		FirstRecalculatedBalanceT1 float64 `redis:"first_recalculated_balance_t1"`
+	}
+	FirstRecalculatedBalanceT2Field struct {
+		FirstRecalculatedBalanceT2 float64 `redis:"first_recalculated_balance_t2"`
+	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
 	}
@@ -173,6 +179,12 @@ type (
 	}
 	SlashingRateT2Field struct {
 		SlashingRateT2 float64 `redis:"slashing_rate_t2"`
+	}
+	FirstRecalculatedSlashingRateT1Field struct {
+		FirstRecalculatedSlashingRateT1 float64 `redis:"first_recalculated_slashing_rate_t1"`
+	}
+	FirstRecalculatedSlashingRateT2Field struct {
+		FirstRecalculatedSlashingRateT2 float64 `redis:"first_recalculated_slashing_rate_t2"`
 	}
 	SlashingRateForT0Field struct {
 		SlashingRateForT0 float64 `redis:"slashing_rate_for_t0"`
@@ -209,6 +221,12 @@ type (
 	}
 	ActiveT2ReferralsField struct {
 		ActiveT2Referrals int32 `redis:"active_t2_referrals,omitempty"`
+	}
+	FirstRecalculatedActiveT1ReferralsField struct {
+		FirstRecalculatedActiveT1Referrals int32 `redis:"first_recalculated_active_t1_referrals,omitempty"`
+	}
+	FirstRecalculatedActiveT2ReferralsField struct {
+		FirstRecalculatedActiveT2Referrals int32 `redis:"first_recalculated_active_t2_referrals,omitempty"`
 	}
 	NewsSeenField struct {
 		NewsSeen uint16 `redis:"news_seen"`
