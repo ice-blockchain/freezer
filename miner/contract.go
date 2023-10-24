@@ -4,6 +4,7 @@ package miner
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -106,6 +108,22 @@ type (
 		model.IDTMinus1Field
 	}
 
+	backupUserUpdated struct {
+		model.DeserializedBackupUsersKey
+		model.BalanceT1Field
+		model.BalanceT2Field
+		model.SlashingRateT1Field
+		model.SlashingRateT2Field
+		model.ActiveT1ReferralsField
+		model.ActiveT2ReferralsField
+		model.FirstRecalculatedBalanceT1Field
+		model.FirstRecalculatedBalanceT2Field
+		model.FirstRecalculatedActiveT1ReferralsField
+		model.FirstRecalculatedActiveT2ReferralsField
+		model.FirstRecalculatedSlashingRateT1Field
+		model.FirstRecalculatedSlashingRateT2Field
+	}
+
 	referral struct {
 		model.MiningSessionSoloStartedAtField
 		model.MiningSessionSoloEndedAtField
@@ -124,12 +142,14 @@ type (
 	miner struct {
 		mb                            messagebroker.Client
 		db                            storage.DB
+		dbPG                          *storagePG.DB
 		dwhClient                     dwh.Client
 		cancel                        context.CancelFunc
 		telemetry                     *telemetry
 		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
+		recalculationBalanceStartDate *time.Time
 	}
 	config struct {
 		disableAdvancedTeam *atomic.Pointer[[]string]
