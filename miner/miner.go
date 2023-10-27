@@ -347,8 +347,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.UserID == "" {
 				continue
 			}
+			backupedUsr, backupExists := backupedUsers[usr.ID]
 			if balanceBackupMode {
-				if backupedUsr, ok := backupedUsers[usr.ID]; ok {
+				if backupExists {
 					diffT1ActiveValue := backupedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
 					diffT2ActiveValue := backupedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
 					if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
@@ -365,6 +366,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 					usr.SlashingRateT1 = backupedUsr.SlashingRateT1
 					usr.SlashingRateT2 = backupedUsr.SlashingRateT2
+
+					backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
+						DeserializedBackupUsersKey: model.DeserializedBackupUsersKey{ID: usr.ID},
+						BalancesBackupUsedAtField:  model.BalancesBackupUsedAtField{BalancesBackupUsedAt: time.Now()},
+					})
 				}
 			} else {
 				if recalculatedUsr, ok := recalculatedTiersBalancesUsers[usr.ID]; ok {
@@ -391,19 +397,20 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
 					usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
 
-					if _, ok := backupedUsers[usr.ID]; !ok {
+					if !backupExists {
 						backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
 							DeserializedBackupUsersKey:              model.DeserializedBackupUsersKey{ID: usr.ID},
+							UserIDField:                             usr.UserIDField,
 							BalanceT1Field:                          model.BalanceT1Field{BalanceT1: oldBalanceT1},
 							BalanceT2Field:                          model.BalanceT2Field{BalanceT2: oldBalanceT2},
 							SlashingRateT1Field:                     model.SlashingRateT1Field{SlashingRateT1: oldSlashingT1Rate},
 							SlashingRateT2Field:                     model.SlashingRateT2Field{SlashingRateT2: oldSlashingT2Rate},
 							ActiveT1ReferralsField:                  model.ActiveT1ReferralsField{ActiveT1Referrals: usr.ActiveT1Referrals},
 							ActiveT2ReferralsField:                  model.ActiveT2ReferralsField{ActiveT2Referrals: usr.ActiveT2Referrals},
-							FirstRecalculatedBalanceT1Field:         model.FirstRecalculatedBalanceT1Field{FirstRecalculatedBalanceT1: usr.BalanceT1},
-							FirstRecalculatedBalanceT2Field:         model.FirstRecalculatedBalanceT2Field{FirstRecalculatedBalanceT2: usr.BalanceT2},
-							FirstRecalculatedSlashingRateT1Field:    model.FirstRecalculatedSlashingRateT1Field{FirstRecalculatedSlashingRateT1: usr.SlashingRateT1},
-							FirstRecalculatedSlashingRateT2Field:    model.FirstRecalculatedSlashingRateT2Field{FirstRecalculatedSlashingRateT2: usr.SlashingRateT2},
+							FirstRecalculatedBalanceT1Field:         model.FirstRecalculatedBalanceT1Field{FirstRecalculatedBalanceT1: recalculatedUsr.BalanceT1},
+							FirstRecalculatedBalanceT2Field:         model.FirstRecalculatedBalanceT2Field{FirstRecalculatedBalanceT2: recalculatedUsr.BalanceT2},
+							FirstRecalculatedSlashingRateT1Field:    model.FirstRecalculatedSlashingRateT1Field{FirstRecalculatedSlashingRateT1: recalculatedUsr.SlashingRateT1},
+							FirstRecalculatedSlashingRateT2Field:    model.FirstRecalculatedSlashingRateT2Field{FirstRecalculatedSlashingRateT2: recalculatedUsr.SlashingRateT2},
 							FirstRecalculatedActiveT1ReferralsField: model.FirstRecalculatedActiveT1ReferralsField{FirstRecalculatedActiveT1Referrals: usr.ActiveT1Referrals + diffT1ActiveValue},
 							FirstRecalculatedActiveT2ReferralsField: model.FirstRecalculatedActiveT2ReferralsField{FirstRecalculatedActiveT2Referrals: usr.ActiveT2Referrals + diffT2ActiveValue},
 						})
@@ -440,8 +447,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
 					updatedUser.ExtraBonusLastClaimAvailableAt = nil
 				}
-				if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
-					referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
+				if balanceBackupMode || !backupExists {
+					if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
+						referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
+					}
 				}
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))

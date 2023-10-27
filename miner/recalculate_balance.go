@@ -75,7 +75,7 @@ func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserC
 				LIMIT $2 OFFSET $3`
 		rows, err := storagePG.Select[pgUserCreated](ctx, m.dbPG, sql, userIDs, maxLimit, offset)
 		if err != nil {
-			return nil, errors.Wrap(err, "can't get users from pg")
+			return nil, errors.Wrapf(err, "can't get users from pg for: %#v", userIDs)
 		}
 		if len(rows) == 0 {
 			break
@@ -100,7 +100,7 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]in
 		referredByIDs                  []string
 		offset                         int64 = 0
 		now                                  = time.Now()
-		t1ActiveCounts, t2ActiveCounts       = make(map[int64]uint64), make(map[int64]uint64)
+		t1ActiveCounts, t2ActiveCounts       = make(map[int64]uint64, len(users)), make(map[int64]uint64, len(users))
 		t1Referrals, t2Referrals             = make(map[int64][]int64), make(map[int64][]int64)
 	)
 	for _, val := range users {
@@ -276,7 +276,7 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 		return nil, errors.Wrapf(err, "can't get CreatedAt information for users:%#v", usrs)
 	}
 	for _, usr := range users {
-		if usr.UserID == "" {
+		if usr.UserID == "" || usr.Username == "" {
 			continue
 		}
 		if _, ok := usrs[usr.ID]; ok {
@@ -288,13 +288,14 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 		actualBalancesT1[usr.ID] = usr.BalanceT1
 		actualBalancesT2[usr.ID] = usr.BalanceT2
 	}
+	if len(users) == 0 {
+		return nil, nil
+	}
 	t1Referrals, t2Referrals, t1ActiveCounts, t2ActiveCounts, err := m.collectTiers(ctx, needToBeRecalculatedUsers)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't get active users for users")
 	}
 	if len(t1Referrals) == 0 && len(t2Referrals) == 0 {
-		log.Debug("No t1/t2 referrals gathered")
-
 		return nil, nil
 	}
 
@@ -321,8 +322,6 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 		usrIDs[usr.ID] = struct{}{}
 	}
 	if len(usrIDs) == 0 {
-		log.Debug("no user ids to be recalculated")
-
 		return nil, nil
 	}
 	adoptions, err := tokenomics.GetAllAdoptions[float64](ctx, m.db)

@@ -15,17 +15,17 @@ require (
 	github.com/redis/go-redis/v9 v9.2.1
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/swag v1.16.2
-	github.com/testcontainers/testcontainers-go v0.25.0
+	github.com/testcontainers/testcontainers-go v0.26.0
 	go.uber.org/zap v1.26.0
 )
 
 require (
 	cloud.google.com/go v0.110.9 // indirect
-	cloud.google.com/go/compute v1.23.1 // indirect
+	cloud.google.com/go/compute v1.23.2 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/firestore v1.14.0 // indirect
-	cloud.google.com/go/iam v1.1.3 // indirect
-	cloud.google.com/go/longrunning v0.5.2 // indirect
+	cloud.google.com/go/iam v1.1.4 // indirect
+	cloud.google.com/go/longrunning v0.5.3 // indirect
 	cloud.google.com/go/storage v1.33.0 // indirect
 	cosmossdk.io/math v1.1.2 // indirect
 	dario.cat/mergo v1.0.0 // indirect
@@ -42,14 +42,14 @@ require (
 	github.com/chenzhuoyu/iasm v0.9.0 // indirect
 	github.com/cloudflare/circl v1.3.5 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
-	github.com/containerd/containerd v1.7.7 // indirect
+	github.com/containerd/containerd v1.7.8 // indirect
 	github.com/containerd/continuity v0.4.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dmarkham/enumer v1.5.9 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v24.0.6+incompatible // indirect
+	github.com/docker/docker v24.0.7+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -60,7 +60,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -78,7 +78,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/pprof v0.0.0-20231023181126-ff6d637d2a7b // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
-	github.com/google/uuid v1.3.1 // indirect
+	github.com/google/uuid v1.4.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
@@ -118,7 +118,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
-	github.com/quic-go/quic-go v0.39.2 // indirect
+	github.com/quic-go/quic-go v0.39.3 // indirect
 	github.com/refraction-networking/utls v1.5.4 // indirect
 	github.com/rs/zerolog v1.31.0 // indirect
 	github.com/sagikazarmark/locafero v0.3.0 // indirect
@@ -138,7 +138,7 @@ require (
 	github.com/twmb/franz-go/pkg/kadm v1.10.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.7.0 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
-	github.com/vmihailenco/msgpack/v5 v5.4.0 // indirect
+	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.19.0 // indirect
