@@ -172,7 +172,9 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			model.BlockchainAccountAddressField
 			model.DeserializedUsersKey
 			model.IDT0Field
+			model.IDTMinus1Field
 			model.HideRankingField
+			model.BalanceForTMinus1Field
 		}
 	)
 	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
@@ -200,12 +202,12 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 
 	return multierror.Append( //nolint:wrapcheck // Not Needed.
 		errors.Wrapf(err, "failed to replace user:%#v", usr),
-		errors.Wrapf(s.updateReferredBy(ctx, internalID, dbUser[0].IDT0, usr.ID, usr.ReferredBy), "failed to updateReferredBy for user:%#v", usr),
+		errors.Wrapf(s.updateReferredBy(ctx, internalID, dbUser[0].IDT0, dbUser[0].IDTMinus1, usr.ID, usr.ReferredBy, dbUser[0].BalanceForTMinus1), "failed to updateReferredBy for user:%#v", usr),
 		errors.Wrapf(s.updateUsernameKeywords(ctx, internalID, dbUser[0].Username, usr.Username), "failed to updateUsernameKeywords for oldUser:%#v, user:%#v", dbUser, usr), //nolint:lll // .
 	).ErrorOrNil()
 }
 
-func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int64, userID, referredBy string) error {
+func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0, oldTMinus1 int64, userID, referredBy string, balanceForTMinus1 float64) error {
 	if referredBy == userID ||
 		referredBy == "" ||
 		referredBy == "bogus" ||
@@ -239,6 +241,34 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0 int
 				return errors.Wrapf(err3, "failed to get users entry for tMinus1ID:%v", t0Referral[0].IDT0)
 			} else if len(tMinus1Referral) == 1 {
 				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
+				if balanceForTMinus1 > 0.0 {
+					results, err4 := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+						if oldIdTMinus1Key := model.SerializedUsersKey(oldTMinus1); oldIdTMinus1Key != "" {
+							if err = pipeliner.HIncrByFloat(ctx, oldIdTMinus1Key, "balance_t2_pending", -balanceForTMinus1).Err(); err != nil {
+								return err
+							}
+						}
+						if newIdTMinus1Key := model.SerializedUsersKey(tMinus1Referral[0].ID); newIdTMinus1Key != "" {
+							if err = pipeliner.HIncrByFloat(ctx, newIdTMinus1Key, "balance_t2_pending", balanceForTMinus1).Err(); err != nil {
+								return err
+							}
+						}
+
+						return nil
+					})
+					if err4 != nil {
+						return errors.Wrapf(err4, "failed to move t2 balance from:%v to:%v", oldTMinus1, newPartialState.IDTMinus1)
+					}
+					errs := make([]error, 0, len(results))
+					for _, result := range results {
+						if err = result.Err(); err != nil {
+							errs = append(errs, errors.Wrapf(err, "failed to run `%#v`", result.FullName()))
+						}
+					}
+					if errs := multierror.Append(nil, errs...); errs.ErrorOrNil() != nil {
+						return errors.Wrapf(errs.ErrorOrNil(), "failed to move t2 balances for id:%v,id:%v", userID, id)
+					}
+				}
 			}
 		}
 	}

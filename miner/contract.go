@@ -59,6 +59,7 @@ type (
 		model.ExtraBonusStartedAtField
 		model.LatestDeviceField
 		model.UserIDField
+		model.UsernameField
 		UpdatedUser
 		model.BalanceSoloPendingField
 		model.BalanceT1PendingField
@@ -110,6 +111,7 @@ type (
 
 	backupUserUpdated struct {
 		model.DeserializedBackupUsersKey
+		model.UserIDField
 		model.BalanceT1Field
 		model.BalanceT2Field
 		model.SlashingRateT1Field
@@ -122,6 +124,7 @@ type (
 		model.FirstRecalculatedActiveT2ReferralsField
 		model.FirstRecalculatedSlashingRateT1Field
 		model.FirstRecalculatedSlashingRateT2Field
+		model.BalancesBackupUsedAtField
 	}
 
 	referral struct {

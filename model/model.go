@@ -96,6 +96,9 @@ type (
 	ExtraBonusLastClaimAvailableAtField struct {
 		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
 	}
+	BalancesBackupUsedAtField struct {
+		BalancesBackupUsedAt *time.Time `redis:"balance_backup_used_at,omitempty"`
+	}
 	UserIDField struct {
 		UserID string `redis:"user_id,omitempty"`
 	}
