@@ -467,6 +467,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 							t2ReferralsToIncrementActiveValue[t0Ref.ID] += usr.ActiveT1Referrals
 						}
 					}
+					if usr.IDTMinus1 != t0Ref.IDT0 {
+						updatedUser.IDTMinus1 = t0Ref.IDT0
+					}
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
