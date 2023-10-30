@@ -55,6 +55,12 @@ type (
 		BalanceT2Pending                   float64
 		BalanceT2PendingApplied            float64
 	}
+
+	historyData struct {
+		HistoryTimeRanges              map[int64][]*historyRangeTime
+		T1Referrals, T2Referrals       map[int64][]int64
+		T1ActiveCounts, T2ActiveCounts map[int64]int32
+	}
 )
 
 func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserCreated, error) {
@@ -95,14 +101,16 @@ func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserC
 	return result, nil
 }
 
-func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]int64, map[int64][]int64, map[int64]uint64, map[int64]uint64, error) {
+func (m *miner) collectTiers(ctx context.Context, users []*user) (
+	t1Referrals, t2Referrals map[int64][]int64, t1ActiveCounts, t2ActiveCounts map[int64]int32, err error,
+) {
 	var (
-		referredByIDs                  []string
-		offset                         int64 = 0
-		now                                  = time.Now()
-		t1ActiveCounts, t2ActiveCounts       = make(map[int64]uint64, len(users)), make(map[int64]uint64, len(users))
-		t1Referrals, t2Referrals             = make(map[int64][]int64), make(map[int64][]int64)
+		referredByIDs []string
+		offset        int64 = 0
+		now                 = time.Now()
 	)
+	t1ActiveCounts, t2ActiveCounts = make(map[int64]int32, len(users)), make(map[int64]int32, len(users))
+	t1Referrals, t2Referrals = make(map[int64][]int64), make(map[int64][]int64)
 	for _, val := range users {
 		referredByIDs = append(referredByIDs, val.UserID)
 	}
@@ -121,7 +129,7 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (map[int64][]in
 					WHERE referred_by = ANY($2)
 						AND referred_by != id
 						AND username != id
-					UNION
+					UNION ALL
 					SELECT
 						t2.id AS id,
 						t0.id AS referred_by,
@@ -265,11 +273,12 @@ func initializeEmptyUser(updatedUser, usr *user) *user {
 	return &newUser
 }
 
-func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMinus1Referrals map[int64]*referral, t0Referrals map[int64]*referral) (map[int64]*user, error) {
+func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users []*user) (history *historyData, err error) {
 	var (
 		needToBeRecalculatedUsers []*user
 		actualBalancesT1          = make(map[int64]float64)
 		actualBalancesT2          = make(map[int64]float64)
+		historyTimeRanges         = make(map[int64][]*historyRangeTime)
 	)
 	usrs, err := m.getUsers(ctx, users)
 	if err != nil {
@@ -298,16 +307,7 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 	if len(t1Referrals) == 0 && len(t2Referrals) == 0 {
 		return nil, nil
 	}
-
-	/******************************************************************************************************************************************************
-		1. Fetching users history time ranges & adoptions information.
-	******************************************************************************************************************************************************/
-	var (
-		now               = time.Now()
-		historyTimeRanges = make(map[int64][]*historyRangeTime)
-		usrIDs            = make(map[int64]struct{}, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
-		updatedUsers      = make(map[int64]*user, len(users))
-	)
+	usrIDs := make(map[int64]struct{}, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
 	for _, values := range t1Referrals {
 		for _, val := range values {
 			usrIDs[val] = struct{}{}
@@ -323,10 +323,6 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 	}
 	if len(usrIDs) == 0 {
 		return nil, nil
-	}
-	adoptions, err := tokenomics.GetAllAdoptions[float64](ctx, m.db)
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't get adoptions for users:%#v", needToBeRecalculatedUsers)
 	}
 	offset := int64(0)
 	for {
@@ -354,218 +350,228 @@ func (m *miner) recalculateTiersBalances(ctx context.Context, users []*user, tMi
 		}
 	}
 	if len(historyTimeRanges) == 0 {
-		log.Debug("empty history time ranges")
-
 		return nil, nil
 	}
-	for _, usr := range needToBeRecalculatedUsers {
+
+	return &historyData{
+		HistoryTimeRanges: historyTimeRanges,
+		T1Referrals:       t1Referrals,
+		T2Referrals:       t2Referrals,
+		T1ActiveCounts:    t1ActiveCounts,
+		T2ActiveCounts:    t2ActiveCounts,
+	}, nil
+}
+
+func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[float64], history *historyData) *user {
+	if history == nil || history.HistoryTimeRanges == nil || (history.T1Referrals == nil && history.T2Referrals == nil) || adoptions == nil {
+		return nil
+	}
+	if _, ok := history.HistoryTimeRanges[usr.ID]; ok {
+		var (
+			isResurrected                              bool
+			slashingLastEndedAt                        *time.Time
+			lastMiningSessionSoloEndedAt               *time.Time
+			previousUserStartedAt, previousUserEndedAt *time.Time
+			now                                        = time.Now()
+		)
 		clonedUser1 := *usr
 		updatedUser := &clonedUser1
 		updatedUser.BalanceT1 = 0
 		updatedUser.BalanceT2 = 0
 		updatedUser.BalanceLastUpdatedAt = nil
 
-		var (
-			isResurrected                bool
-			slashingLastEndedAt          *time.Time
-			lastMiningSessionSoloEndedAt *time.Time
-		)
-		if _, ok := historyTimeRanges[usr.ID]; ok {
-			var previousUserStartedAt, previousUserEndedAt *time.Time
-			for _, usrRange := range historyTimeRanges[usr.ID] {
-				if updatedUser == nil {
-					updatedUser = initializeEmptyUser(updatedUser, usr)
-				}
-				lastMiningSessionSoloEndedAt = usrRange.MiningSessionSoloEndedAt
+		for _, usrRange := range history.HistoryTimeRanges[usr.ID] {
+			if updatedUser == nil {
+				updatedUser = initializeEmptyUser(updatedUser, usr)
+			}
+			lastMiningSessionSoloEndedAt = usrRange.MiningSessionSoloEndedAt
 
-				updatedUser.BalanceT1Pending = usrRange.BalanceT1Pending
-				updatedUser.BalanceT1PendingApplied = usrRange.BalanceT1PendingApplied
-				updatedUser.BalanceT2Pending = usrRange.BalanceT2Pending
-				updatedUser.BalanceT2PendingApplied = usrRange.BalanceT2PendingApplied
-				/******************************************************************************************************************************************************
-					2. Resurrection check & handling.
-				******************************************************************************************************************************************************/
-				if !usrRange.ResurrectSoloUsedAt.IsNil() && usrRange.ResurrectSoloUsedAt.Unix() > 0 && !isResurrected {
-					var resurrectDelta float64
-					if timeSpent := usrRange.MiningSessionSoloStartedAt.Sub(*usrRange.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
-						resurrectDelta = timeSpent.Minutes()
-					} else {
-						resurrectDelta = timeSpent.Hours()
-					}
-					updatedUser.BalanceT1 += updatedUser.SlashingRateT1 * resurrectDelta
-					updatedUser.BalanceT2 += updatedUser.SlashingRateT2 * resurrectDelta
-					updatedUser.SlashingRateT1 = 0
-					updatedUser.SlashingRateT2 = 0
-
-					isResurrected = true
-				}
-				/******************************************************************************************************************************************************
-					3. Slashing calculations.
-				******************************************************************************************************************************************************/
-				if usrRange.SlashingRateSolo > 0 {
-					if slashingLastEndedAt.IsNil() {
-						slashingLastEndedAt = usrRange.MiningSessionSoloEndedAt
-					}
-					updatedUser.BalanceLastUpdatedAt = slashingLastEndedAt
-					updatedUser.ResurrectSoloUsedAt = nil
-					updatedUser, _, _ = mine(0., usrRange.CreatedAt, updatedUser, nil, nil)
-					slashingLastEndedAt = usrRange.CreatedAt
-
-					continue
-				}
-				if !slashingLastEndedAt.IsNil() && usrRange.MiningSessionSoloStartedAt.Sub(*slashingLastEndedAt.Time).Nanoseconds() > 0 {
-					updatedUser.BalanceLastUpdatedAt = slashingLastEndedAt
-					updatedUser.ResurrectSoloUsedAt = nil
-					now := usrRange.MiningSessionSoloStartedAt
-					updatedUser, _, _ = mine(0., now, updatedUser, nil, nil)
-					slashingLastEndedAt = nil
-				}
-				/******************************************************************************************************************************************************
-					4. Saving time range state for the next range for streaks case.
-				******************************************************************************************************************************************************/
-				if previousUserStartedAt != nil && previousUserStartedAt.Equal(*usrRange.MiningSessionSoloStartedAt.Time) &&
-					previousUserEndedAt != nil && (usrRange.MiningSessionSoloEndedAt.After(*previousUserEndedAt.Time) ||
-					usrRange.MiningSessionSoloEndedAt.Equal(*previousUserEndedAt.Time)) {
-
-					previousUserStartedAt = usrRange.MiningSessionSoloStartedAt
-
-					usrRange.MiningSessionSoloStartedAt = previousUserEndedAt
-					previousUserEndedAt = usrRange.MiningSessionSoloEndedAt
+			updatedUser.BalanceT1Pending = usrRange.BalanceT1Pending
+			updatedUser.BalanceT1PendingApplied = usrRange.BalanceT1PendingApplied
+			updatedUser.BalanceT2Pending = usrRange.BalanceT2Pending
+			updatedUser.BalanceT2PendingApplied = usrRange.BalanceT2PendingApplied
+			/******************************************************************************************************************************************************
+				1. Resurrection check & handling.
+			******************************************************************************************************************************************************/
+			if !usrRange.ResurrectSoloUsedAt.IsNil() && usrRange.ResurrectSoloUsedAt.Unix() > 0 && !isResurrected {
+				var resurrectDelta float64
+				if timeSpent := usrRange.MiningSessionSoloStartedAt.Sub(*usrRange.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
+					resurrectDelta = timeSpent.Minutes()
 				} else {
-					previousUserStartedAt = usrRange.MiningSessionSoloStartedAt
-					previousUserEndedAt = usrRange.MiningSessionSoloEndedAt
+					resurrectDelta = timeSpent.Hours()
 				}
-				/******************************************************************************************************************************************************
-					5. T1 Balance calculation for the current user time range.
-				******************************************************************************************************************************************************/
-				if _, ok := t1Referrals[usr.ID]; ok {
-					for _, refID := range t1Referrals[usr.ID] {
-						if _, ok := historyTimeRanges[refID]; ok {
-							var previousT1MiningSessionStartedAt, previousT1MiningSessionEndedAt *time.Time
-							for _, timeRange := range historyTimeRanges[refID] {
-								if timeRange.SlashingRateSolo > 0 {
-									continue
-								}
-								if previousT1MiningSessionStartedAt != nil && previousT1MiningSessionStartedAt.Equal(*timeRange.MiningSessionSoloStartedAt.Time) &&
-									previousT1MiningSessionEndedAt != nil && (timeRange.MiningSessionSoloEndedAt.After(*previousT1MiningSessionEndedAt.Time) ||
-									timeRange.MiningSessionSoloEndedAt.Equal(*previousT1MiningSessionEndedAt.Time)) {
+				updatedUser.BalanceT1 += updatedUser.SlashingRateT1 * resurrectDelta
+				updatedUser.BalanceT2 += updatedUser.SlashingRateT2 * resurrectDelta
+				updatedUser.SlashingRateT1 = 0
+				updatedUser.SlashingRateT2 = 0
 
-									previousT1MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
-									timeRange.MiningSessionSoloStartedAt = previousT1MiningSessionEndedAt
-									previousT1MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
-								} else {
-									previousT1MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
-									previousT1MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
-								}
-								startedAt, endedAt := calculateTimeBounds(timeRange, usrRange)
-								if startedAt == nil && endedAt == nil {
-									continue
-								}
+				isResurrected = true
+			}
+			/******************************************************************************************************************************************************
+				2. Slashing calculations.
+			******************************************************************************************************************************************************/
+			if usrRange.SlashingRateSolo > 0 {
+				if slashingLastEndedAt.IsNil() {
+					slashingLastEndedAt = usrRange.MiningSessionSoloEndedAt
+				}
+				updatedUser.BalanceLastUpdatedAt = slashingLastEndedAt
+				updatedUser.ResurrectSoloUsedAt = nil
+				updatedUser, _, _ = mine(0., usrRange.CreatedAt, updatedUser, nil, nil)
+				slashingLastEndedAt = usrRange.CreatedAt
 
-								adoptionRanges := splitByAdoptionTimeRanges(adoptions, startedAt, endedAt)
+				continue
+			}
+			if !slashingLastEndedAt.IsNil() && usrRange.MiningSessionSoloStartedAt.Sub(*slashingLastEndedAt.Time).Nanoseconds() > 0 {
+				updatedUser.BalanceLastUpdatedAt = slashingLastEndedAt
+				updatedUser.ResurrectSoloUsedAt = nil
+				now := usrRange.MiningSessionSoloStartedAt
+				updatedUser, _, _ = mine(0., now, updatedUser, nil, nil)
+				slashingLastEndedAt = nil
+			}
+			/******************************************************************************************************************************************************
+				3. Saving time range state for the next range for streaks case.
+			******************************************************************************************************************************************************/
+			if previousUserStartedAt != nil && previousUserStartedAt.Equal(*usrRange.MiningSessionSoloStartedAt.Time) &&
+				previousUserEndedAt != nil && (usrRange.MiningSessionSoloEndedAt.After(*previousUserEndedAt.Time) ||
+				usrRange.MiningSessionSoloEndedAt.Equal(*previousUserEndedAt.Time)) {
 
-								var previousTimePoint *time.Time
-								for _, adoptionRange := range adoptionRanges {
-									if previousTimePoint == nil {
-										previousTimePoint = adoptionRange.TimePoint
+				previousUserStartedAt = usrRange.MiningSessionSoloStartedAt
 
-										continue
-									}
-									if previousTimePoint.Equal(*adoptionRange.TimePoint.Time) {
-										continue
-									}
-									updatedUser.ActiveT1Referrals = 1
-									updatedUser.ActiveT2Referrals = 0
-									updatedUser.MiningSessionSoloStartedAt = previousTimePoint
-									updatedUser.MiningSessionSoloEndedAt = time.New(adoptionRange.TimePoint.Add(1 * stdlibtime.Nanosecond))
-									updatedUser.BalanceLastUpdatedAt = nil
-									updatedUser.ResurrectSoloUsedAt = nil
-									now := adoptionRange.TimePoint
-
-									updatedUser, _, _ = mine(adoptionRange.BaseMiningRate, now, updatedUser, nil, nil)
-
-									previousTimePoint = adoptionRange.TimePoint
-								}
+				usrRange.MiningSessionSoloStartedAt = previousUserEndedAt
+				previousUserEndedAt = usrRange.MiningSessionSoloEndedAt
+			} else {
+				previousUserStartedAt = usrRange.MiningSessionSoloStartedAt
+				previousUserEndedAt = usrRange.MiningSessionSoloEndedAt
+			}
+			/******************************************************************************************************************************************************
+				4. T1 Balance calculation for the current user time range.
+			******************************************************************************************************************************************************/
+			if _, ok := history.T1Referrals[usr.ID]; ok {
+				for _, refID := range history.T1Referrals[usr.ID] {
+					if _, ok := history.HistoryTimeRanges[refID]; ok {
+						var previousT1MiningSessionStartedAt, previousT1MiningSessionEndedAt *time.Time
+						for _, timeRange := range history.HistoryTimeRanges[refID] {
+							if timeRange.SlashingRateSolo > 0 {
+								continue
 							}
-						}
-					}
-				}
-				/******************************************************************************************************************************************************
-					6. T2 Balance calculation for the current user time range.
-				******************************************************************************************************************************************************/
-				if _, ok := t2Referrals[usr.ID]; ok {
-					for _, refID := range t2Referrals[usr.ID] {
-						if _, ok := historyTimeRanges[refID]; ok {
-							var previousT2MiningSessionStartedAt, previousT2MiningSessionEndedAt *time.Time
-							for _, timeRange := range historyTimeRanges[refID] {
-								if timeRange.SlashingRateSolo > 0 {
-									continue
-								}
-								if previousT2MiningSessionStartedAt != nil && previousT2MiningSessionStartedAt.Equal(*timeRange.MiningSessionSoloStartedAt.Time) &&
-									previousT2MiningSessionEndedAt != nil && (timeRange.MiningSessionSoloEndedAt.After(*previousT2MiningSessionEndedAt.Time) ||
-									timeRange.MiningSessionSoloEndedAt.Equal(*previousT2MiningSessionEndedAt.Time)) {
+							if previousT1MiningSessionStartedAt != nil && previousT1MiningSessionStartedAt.Equal(*timeRange.MiningSessionSoloStartedAt.Time) &&
+								previousT1MiningSessionEndedAt != nil && (timeRange.MiningSessionSoloEndedAt.After(*previousT1MiningSessionEndedAt.Time) ||
+								timeRange.MiningSessionSoloEndedAt.Equal(*previousT1MiningSessionEndedAt.Time)) {
 
-									previousT2MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
-									timeRange.MiningSessionSoloStartedAt = previousT2MiningSessionEndedAt
-									previousT2MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
-								} else {
-									previousT2MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
-									previousT2MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
-								}
-								startedAt, endedAt := calculateTimeBounds(timeRange, usrRange)
-								if startedAt == nil && endedAt == nil {
-									continue
-								}
+								previousT1MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
+								timeRange.MiningSessionSoloStartedAt = previousT1MiningSessionEndedAt
+								previousT1MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
+							} else {
+								previousT1MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
+								previousT1MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
+							}
+							startedAt, endedAt := calculateTimeBounds(timeRange, usrRange)
+							if startedAt == nil && endedAt == nil {
+								continue
+							}
 
-								adoptionRanges := splitByAdoptionTimeRanges(adoptions, startedAt, endedAt)
+							adoptionRanges := splitByAdoptionTimeRanges(adoptions, startedAt, endedAt)
 
-								var previousTimePoint *time.Time
-								for _, adoptionRange := range adoptionRanges {
-									if previousTimePoint == nil {
-										previousTimePoint = adoptionRange.TimePoint
-
-										continue
-									}
-									if previousTimePoint.Equal(*adoptionRange.TimePoint.Time) {
-										continue
-									}
-									updatedUser.ActiveT1Referrals = 0
-									updatedUser.ActiveT2Referrals = 1
-									updatedUser.MiningSessionSoloPreviouslyEndedAt = usr.MiningSessionSoloPreviouslyEndedAt
-									updatedUser.MiningSessionSoloStartedAt = previousTimePoint
-									updatedUser.MiningSessionSoloEndedAt = time.New(adoptionRange.TimePoint.Add(1 * stdlibtime.Nanosecond))
-									updatedUser.BalanceLastUpdatedAt = nil
-									updatedUser.ResurrectSoloUsedAt = nil
-									now := adoptionRange.TimePoint
-
-									updatedUser, _, _ = mine(adoptionRange.BaseMiningRate, now, updatedUser, nil, nil)
-
+							var previousTimePoint *time.Time
+							for _, adoptionRange := range adoptionRanges {
+								if previousTimePoint == nil {
 									previousTimePoint = adoptionRange.TimePoint
+
+									continue
 								}
+								if previousTimePoint.Equal(*adoptionRange.TimePoint.Time) {
+									continue
+								}
+								updatedUser.ActiveT1Referrals = 1
+								updatedUser.ActiveT2Referrals = 0
+								updatedUser.MiningSessionSoloStartedAt = previousTimePoint
+								updatedUser.MiningSessionSoloEndedAt = time.New(adoptionRange.TimePoint.Add(1 * stdlibtime.Nanosecond))
+								updatedUser.BalanceLastUpdatedAt = nil
+								updatedUser.ResurrectSoloUsedAt = nil
+								now := adoptionRange.TimePoint
+
+								updatedUser, _, _ = mine(adoptionRange.BaseMiningRate, now, updatedUser, nil, nil)
+
+								previousTimePoint = adoptionRange.TimePoint
 							}
 						}
 					}
 				}
 			}
-			if !lastMiningSessionSoloEndedAt.IsNil() {
-				if timeDiff := now.Sub(*lastMiningSessionSoloEndedAt.Time); cfg.Development {
-					if timeDiff >= 60*stdlibtime.Minute {
-						updatedUser = nil
+			/******************************************************************************************************************************************************
+				5. T2 Balance calculation for the current user time range.
+			******************************************************************************************************************************************************/
+			if _, ok := history.T2Referrals[usr.ID]; ok {
+				for _, refID := range history.T2Referrals[usr.ID] {
+					if _, ok := history.HistoryTimeRanges[refID]; ok {
+						var previousT2MiningSessionStartedAt, previousT2MiningSessionEndedAt *time.Time
+						for _, timeRange := range history.HistoryTimeRanges[refID] {
+							if timeRange.SlashingRateSolo > 0 {
+								continue
+							}
+							if previousT2MiningSessionStartedAt != nil && previousT2MiningSessionStartedAt.Equal(*timeRange.MiningSessionSoloStartedAt.Time) &&
+								previousT2MiningSessionEndedAt != nil && (timeRange.MiningSessionSoloEndedAt.After(*previousT2MiningSessionEndedAt.Time) ||
+								timeRange.MiningSessionSoloEndedAt.Equal(*previousT2MiningSessionEndedAt.Time)) {
+
+								previousT2MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
+								timeRange.MiningSessionSoloStartedAt = previousT2MiningSessionEndedAt
+								previousT2MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
+							} else {
+								previousT2MiningSessionEndedAt = timeRange.MiningSessionSoloEndedAt
+								previousT2MiningSessionStartedAt = timeRange.MiningSessionSoloStartedAt
+							}
+							startedAt, endedAt := calculateTimeBounds(timeRange, usrRange)
+							if startedAt == nil && endedAt == nil {
+								continue
+							}
+
+							adoptionRanges := splitByAdoptionTimeRanges(adoptions, startedAt, endedAt)
+
+							var previousTimePoint *time.Time
+							for _, adoptionRange := range adoptionRanges {
+								if previousTimePoint == nil {
+									previousTimePoint = adoptionRange.TimePoint
+
+									continue
+								}
+								if previousTimePoint.Equal(*adoptionRange.TimePoint.Time) {
+									continue
+								}
+								updatedUser.ActiveT1Referrals = 0
+								updatedUser.ActiveT2Referrals = 1
+								updatedUser.MiningSessionSoloPreviouslyEndedAt = usr.MiningSessionSoloPreviouslyEndedAt
+								updatedUser.MiningSessionSoloStartedAt = previousTimePoint
+								updatedUser.MiningSessionSoloEndedAt = time.New(adoptionRange.TimePoint.Add(1 * stdlibtime.Nanosecond))
+								updatedUser.BalanceLastUpdatedAt = nil
+								updatedUser.ResurrectSoloUsedAt = nil
+								now := adoptionRange.TimePoint
+
+								updatedUser, _, _ = mine(adoptionRange.BaseMiningRate, now, updatedUser, nil, nil)
+
+								previousTimePoint = adoptionRange.TimePoint
+							}
+						}
 					}
-				} else {
-					if timeDiff >= 60*stdlibtime.Hour*24 {
-						updatedUser = nil
-					}
+				}
+			}
+		}
+		if !lastMiningSessionSoloEndedAt.IsNil() {
+			if timeDiff := now.Sub(*lastMiningSessionSoloEndedAt.Time); cfg.Development {
+				if timeDiff >= 60*stdlibtime.Minute {
+					updatedUser = nil
+				}
+			} else {
+				if timeDiff >= 60*stdlibtime.Hour*24 {
+					updatedUser = nil
 				}
 			}
 		}
 		if updatedUser == nil {
 			updatedUser = initializeEmptyUser(updatedUser, usr)
 		}
-		updatedUser.ActiveT1Referrals = int32(t1ActiveCounts[usr.ID])
-		updatedUser.ActiveT2Referrals = int32(t2ActiveCounts[usr.ID])
-		updatedUsers[updatedUser.ID] = updatedUser
+
+		return updatedUser
 	}
 
-	return updatedUsers, nil
+	return nil
 }
