@@ -182,6 +182,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		recalculatedTiersBalancesUsers                                       = make(map[int64]*user, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
+		recalculationHistory                                                 *historyData
+		allAdoptions                                                         []*tokenomics.Adoption[float64]
 	)
 	resetVars := func(success bool) {
 		if success && len(userKeys) == int(batchSize) && len(userResults) == 0 {
@@ -212,6 +214,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		histories = histories[:0]
 		userGlobalRanks = userGlobalRanks[:0]
 		referralsThatStoppedMining = referralsThatStoppedMining[:0]
+		allAdoptions = allAdoptions[:0]
 		for k := range t0Referrals {
 			delete(t0Referrals, k)
 		}
@@ -270,9 +273,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
-		balanceBackupMode, err := mustGetBalancesBackupMode(ctx, m.db)
+		balanceBackupMode, err := mustGetBalancesBackupMode(reqCtx, m.db)
 		if err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to get backup flag for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			reqCancel()
 
 			continue
 		}
@@ -336,11 +340,18 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		if !balanceBackupMode {
-			var err error
-			recalculatedTiersBalancesUsers, err = m.recalculateTiersBalances(ctx, userResults, tMinus1Referrals, t0Referrals)
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			recalculationHistory, err = m.gatherHistoryAndReferralsInformation(ctx, userResults)
 			if err != nil {
 				log.Error(errors.New("tiers diff balances error"), err)
 			}
+			reqCancel()
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			allAdoptions, err = tokenomics.GetAllAdoptions[float64](ctx, m.db)
+			if err != nil {
+				log.Error(errors.New("can't get all adoptions"), err)
+			}
+			reqCancel()
 		}
 		shouldSynchronizeBalance := shouldSynchronizeBalanceFunc(uint64(batchNumber))
 		for _, usr := range userResults {
@@ -373,9 +384,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					})
 				}
 			} else {
-				if recalculatedUsr, ok := recalculatedTiersBalancesUsers[usr.ID]; ok {
-					diffT1ActiveValue := recalculatedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
-					diffT2ActiveValue := recalculatedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
+				if recalculatedUsr := m.recalculateUser(usr, allAdoptions, recalculationHistory); recalculatedUsr != nil {
+					diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.ID] - usr.ActiveT1Referrals
+					diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.ID] - usr.ActiveT2Referrals
+
 					if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
 						diffT1ActiveValue = -usr.ActiveT1Referrals
 					}

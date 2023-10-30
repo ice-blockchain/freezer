@@ -243,12 +243,19 @@ func (s *usersTableSource) updateReferredBy(ctx context.Context, id, oldIDT0, ol
 				newPartialState.IDTMinus1 = -tMinus1Referral[0].ID
 				if balanceForTMinus1 > 0.0 {
 					results, err4 := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+						if oldTMinus1 < 0 {
+							oldTMinus1 *= -1
+						}
 						if oldIdTMinus1Key := model.SerializedUsersKey(oldTMinus1); oldIdTMinus1Key != "" {
 							if err = pipeliner.HIncrByFloat(ctx, oldIdTMinus1Key, "balance_t2_pending", -balanceForTMinus1).Err(); err != nil {
 								return err
 							}
 						}
-						if newIdTMinus1Key := model.SerializedUsersKey(tMinus1Referral[0].ID); newIdTMinus1Key != "" {
+						newTMinus1 := tMinus1Referral[0].ID
+						if newTMinus1 < 0 {
+							newTMinus1 *= -1
+						}
+						if newIdTMinus1Key := model.SerializedUsersKey(newTMinus1); newIdTMinus1Key != "" {
 							if err = pipeliner.HIncrByFloat(ctx, newIdTMinus1Key, "balance_t2_pending", balanceForTMinus1).Err(); err != nil {
 								return err
 							}
