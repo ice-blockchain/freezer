@@ -449,9 +449,9 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 		maxIDCount = 25_000
 	)
 	var (
-		res = make([]*AdjustUserInfo, 0, len(userIDs))
+		res     = make([]*AdjustUserInfo, 0, len(userIDs))
+		counter = 0
 	)
-	counter := 0
 	var userIDArray []string
 	for userID, _ := range userIDs {
 		userIDArray = append(userIDArray, fmt.Sprint(userID))
@@ -495,10 +495,6 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 		balanceT2PendingApplied            = make(proto.ColFloat64, 0, len(userIDArray))
 		res                                = make([]*AdjustUserInfo, 0, len(userIDArray))
 	)
-	var offsetStr string
-	if offset > 0 {
-		offsetStr = fmt.Sprintf(", %v", offset)
-	}
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
 		Body: fmt.Sprintf(`SELECT id,
 									mining_session_solo_started_at, 
@@ -515,8 +511,8 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 							FROM %[1]v
 							WHERE id IN [%[2]v]
 							ORDER BY created_at ASC
-							LIMIT %[3]v %[4]v
-						`, tableName, strings.Join(userIDArray, ","), limit, offsetStr),
+							LIMIT %[3]v, %[4]v
+						`, tableName, strings.Join(userIDArray, ","), offset, limit),
 		Result: append(make(proto.Results, 0, 12),
 			proto.ResultColumn{Name: "id", Data: &id},
 			proto.ResultColumn{Name: "mining_session_solo_started_at", Data: &miningSessionSoloStartedAt},
