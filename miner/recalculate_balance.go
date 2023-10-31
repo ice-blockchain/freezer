@@ -8,10 +8,13 @@ import (
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/eskimo/users"
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -20,19 +23,14 @@ const (
 	maxLimit int64 = 10000
 )
 
-var (
-	errWrongInternalID = errors.New("can't get internal id")
-)
-
 type (
-	UserID string
 	pgUser struct {
 		Active         *users.NotExpired
-		ID, ReferredBy UserID
+		ID, ReferredBy string
 		ReferralType   string
 	}
 	pgUserCreated struct {
-		ID        UserID
+		ID        string
 		CreatedAt *time.Time
 	}
 
@@ -57,17 +55,18 @@ type (
 	}
 
 	historyData struct {
-		HistoryTimeRanges              map[int64][]*historyRangeTime
-		T1Referrals, T2Referrals       map[int64][]int64
-		T1ActiveCounts, T2ActiveCounts map[int64]int32
+		NeedToBeRecalculatedUsers      map[string]struct{}
+		HistoryTimeRanges              map[string][]*historyRangeTime
+		T1Referrals, T2Referrals       map[string][]string
+		T1ActiveCounts, T2ActiveCounts map[string]int32
 	}
 )
 
-func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserCreated, error) {
+func (m *miner) getUsers(ctx context.Context, users []*user) (map[string]*pgUserCreated, error) {
 	var (
 		userIDs []string
 		offset  int64 = 0
-		result        = make(map[int64]*pgUserCreated, len(users))
+		result        = make(map[string]*pgUserCreated, len(users))
 	)
 	for _, val := range users {
 		userIDs = append(userIDs, val.UserID)
@@ -88,32 +87,26 @@ func (m *miner) getUsers(ctx context.Context, users []*user) (map[int64]*pgUserC
 		}
 		offset += maxLimit
 		for _, row := range rows {
-			id, err := tokenomics.GetInternalID(ctx, m.db, string(row.ID))
-			if err != nil {
-				log.Error(errWrongInternalID, row.ID)
-
-				continue
-			}
-			result[id] = row
+			result[row.ID] = row
 		}
 	}
 
 	return result, nil
 }
 
-func (m *miner) collectTiers(ctx context.Context, users []*user) (
-	t1Referrals, t2Referrals map[int64][]int64, t1ActiveCounts, t2ActiveCounts map[int64]int32, err error,
+func (m *miner) collectTiers(ctx context.Context, needToBeRecalculatedUsers map[string]struct{}) (
+	t1Referrals, t2Referrals map[string][]string, t1ActiveCounts, t2ActiveCounts map[string]int32, err error,
 ) {
 	var (
-		referredByIDs []string
-		offset        int64 = 0
-		now                 = time.Now()
+		userIDs       = make([]string, 0, len(needToBeRecalculatedUsers))
+		offset  int64 = 0
+		now           = time.Now()
 	)
-	t1ActiveCounts, t2ActiveCounts = make(map[int64]int32, len(users)), make(map[int64]int32, len(users))
-	t1Referrals, t2Referrals = make(map[int64][]int64), make(map[int64][]int64)
-	for _, val := range users {
-		referredByIDs = append(referredByIDs, val.UserID)
+	for key := range needToBeRecalculatedUsers {
+		userIDs = append(userIDs, key)
 	}
+	t1ActiveCounts, t2ActiveCounts = make(map[string]int32, len(needToBeRecalculatedUsers)), make(map[string]int32, len(needToBeRecalculatedUsers))
+	t1Referrals, t2Referrals = make(map[string][]string), make(map[string][]string)
 	for {
 		sql := `SELECT * FROM(
 					SELECT
@@ -149,7 +142,7 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (
 						AND t2.username != t2.id
 				) X
 				LIMIT $3 OFFSET $4`
-		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, now.Time, referredByIDs, maxLimit, offset)
+		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, now.Time, userIDs, maxLimit, offset)
 		if err != nil {
 			return nil, nil, nil, nil, errors.Wrap(err, "can't get referrals from pg for showing actual data")
 		}
@@ -159,27 +152,15 @@ func (m *miner) collectTiers(ctx context.Context, users []*user) (
 		offset += maxLimit
 		for _, row := range rows {
 			if row.ReferredBy != "bogus" && row.ReferredBy != "icenetwork" && row.ID != "bogus" && row.ID != "icenetwork" {
-				referredByID, err := tokenomics.GetInternalID(ctx, m.db, string(row.ReferredBy))
-				if err != nil {
-					log.Error(errWrongInternalID, referredByID)
-
-					continue
-				}
-				id, err := tokenomics.GetInternalID(ctx, m.db, string(row.ID))
-				if err != nil {
-					log.Error(errWrongInternalID, row.ID)
-
-					continue
-				}
 				if row.ReferralType == "T1" {
-					t1Referrals[referredByID] = append(t1Referrals[referredByID], id)
+					t1Referrals[row.ReferredBy] = append(t1Referrals[row.ReferredBy], row.ID)
 					if row.Active != nil && *row.Active {
-						t1ActiveCounts[referredByID]++
+						t1ActiveCounts[row.ReferredBy]++
 					}
 				} else if row.ReferralType == "T2" {
-					t2Referrals[referredByID] = append(t2Referrals[referredByID], id)
+					t2Referrals[row.ReferredBy] = append(t2Referrals[row.ReferredBy], row.ID)
 					if row.Active != nil && *row.Active {
-						t2ActiveCounts[referredByID]++
+						t2ActiveCounts[row.ReferredBy]++
 					}
 				} else {
 					log.Panic("wrong tier type")
@@ -273,12 +254,38 @@ func initializeEmptyUser(updatedUser, usr *user) *user {
 	return &newUser
 }
 
+func getInternalIDs(ctx context.Context, db storage.DB, keys ...string) ([]string, error) {
+	if cmdResults, err := db.Pipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		if err := pipeliner.MGet(ctx, keys...).Err(); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	} else {
+		results := make([]string, 0, len(cmdResults))
+		for _, cmdResult := range cmdResults {
+			sliceResult := cmdResult.(*redis.SliceCmd)
+			for _, val := range sliceResult.Val() {
+				if val == nil {
+					continue
+				}
+				results = append(results, val.(string))
+			}
+		}
+
+		return results, nil
+	}
+}
+
 func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users []*user) (history *historyData, err error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
 	var (
-		needToBeRecalculatedUsers []*user
-		actualBalancesT1          = make(map[int64]float64)
-		actualBalancesT2          = make(map[int64]float64)
-		historyTimeRanges         = make(map[int64][]*historyRangeTime)
+		needToBeRecalculatedUsers = make(map[string]struct{}, len(users))
+		historyTimeRanges         = make(map[string][]*historyRangeTime)
 	)
 	usrs, err := m.getUsers(ctx, users)
 	if err != nil {
@@ -288,16 +295,14 @@ func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users 
 		if usr.UserID == "" || usr.Username == "" {
 			continue
 		}
-		if _, ok := usrs[usr.ID]; ok {
-			if usrs[usr.ID].CreatedAt == nil || usrs[usr.ID].CreatedAt.After(*m.recalculationBalanceStartDate.Time) {
+		if _, ok := usrs[usr.UserID]; ok {
+			if usrs[usr.UserID].CreatedAt == nil || usrs[usr.UserID].CreatedAt.After(*m.recalculationBalanceStartDate.Time) {
 				continue
 			}
 		}
-		needToBeRecalculatedUsers = append(needToBeRecalculatedUsers, usr)
-		actualBalancesT1[usr.ID] = usr.BalanceT1
-		actualBalancesT2[usr.ID] = usr.BalanceT2
+		needToBeRecalculatedUsers[usr.UserID] = struct{}{}
 	}
-	if len(users) == 0 {
+	if len(needToBeRecalculatedUsers) == 0 {
 		return nil, nil
 	}
 	t1Referrals, t2Referrals, t1ActiveCounts, t2ActiveCounts, err := m.collectTiers(ctx, needToBeRecalculatedUsers)
@@ -307,35 +312,36 @@ func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users 
 	if len(t1Referrals) == 0 && len(t2Referrals) == 0 {
 		return nil, nil
 	}
-	usrIDs := make(map[int64]struct{}, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
+	userKeys := make([]string, 0, len(t1Referrals)+len(t2Referrals)+len(needToBeRecalculatedUsers))
 	for _, values := range t1Referrals {
 		for _, val := range values {
-			usrIDs[val] = struct{}{}
+			userKeys = append(userKeys, model.SerializedUsersKey(val))
 		}
 	}
 	for _, values := range t2Referrals {
 		for _, val := range values {
-			usrIDs[val] = struct{}{}
+			userKeys = append(userKeys, model.SerializedUsersKey(val))
 		}
 	}
-	for _, usr := range needToBeRecalculatedUsers {
-		usrIDs[usr.ID] = struct{}{}
+	for key, _ := range needToBeRecalculatedUsers {
+		userKeys = append(userKeys, model.SerializedUsersKey(key))
 	}
-	if len(usrIDs) == 0 {
-		return nil, nil
+	userResults, err := getInternalIDs(ctx, m.db, userKeys...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get internal ids for:%v", userKeys)
 	}
 	offset := int64(0)
 	for {
-		historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, usrIDs, maxLimit, offset)
+		historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, userResults, maxLimit, offset)
 		if err != nil {
-			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", usrIDs)
+			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", userResults)
 		}
 		if len(historyInformation) == 0 {
 			break
 		}
 		offset += maxLimit
 		for _, info := range historyInformation {
-			historyTimeRanges[info.ID] = append(historyTimeRanges[info.ID], &historyRangeTime{
+			historyTimeRanges[info.UserID] = append(historyTimeRanges[info.UserID], &historyRangeTime{
 				MiningSessionSoloPreviouslyEndedAt: info.MiningSessionSoloPreviouslyEndedAt,
 				MiningSessionSoloStartedAt:         info.MiningSessionSoloStartedAt,
 				MiningSessionSoloEndedAt:           info.MiningSessionSoloEndedAt,
@@ -354,11 +360,12 @@ func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users 
 	}
 
 	return &historyData{
-		HistoryTimeRanges: historyTimeRanges,
-		T1Referrals:       t1Referrals,
-		T2Referrals:       t2Referrals,
-		T1ActiveCounts:    t1ActiveCounts,
-		T2ActiveCounts:    t2ActiveCounts,
+		NeedToBeRecalculatedUsers: needToBeRecalculatedUsers,
+		HistoryTimeRanges:         historyTimeRanges,
+		T1Referrals:               t1Referrals,
+		T2Referrals:               t2Referrals,
+		T1ActiveCounts:            t1ActiveCounts,
+		T2ActiveCounts:            t2ActiveCounts,
 	}, nil
 }
 
@@ -366,7 +373,10 @@ func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[floa
 	if history == nil || history.HistoryTimeRanges == nil || (history.T1Referrals == nil && history.T2Referrals == nil) || adoptions == nil {
 		return nil
 	}
-	if _, ok := history.HistoryTimeRanges[usr.ID]; ok {
+	if _, ok := history.NeedToBeRecalculatedUsers[usr.UserID]; !ok {
+		return nil
+	}
+	if _, ok := history.HistoryTimeRanges[usr.UserID]; ok {
 		var (
 			isResurrected                              bool
 			slashingLastEndedAt                        *time.Time
@@ -380,7 +390,7 @@ func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[floa
 		updatedUser.BalanceT2 = 0
 		updatedUser.BalanceLastUpdatedAt = nil
 
-		for _, usrRange := range history.HistoryTimeRanges[usr.ID] {
+		for _, usrRange := range history.HistoryTimeRanges[usr.UserID] {
 			if updatedUser == nil {
 				updatedUser = initializeEmptyUser(updatedUser, usr)
 			}
@@ -446,8 +456,8 @@ func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[floa
 			/******************************************************************************************************************************************************
 				4. T1 Balance calculation for the current user time range.
 			******************************************************************************************************************************************************/
-			if _, ok := history.T1Referrals[usr.ID]; ok {
-				for _, refID := range history.T1Referrals[usr.ID] {
+			if _, ok := history.T1Referrals[usr.UserID]; ok {
+				for _, refID := range history.T1Referrals[usr.UserID] {
 					if _, ok := history.HistoryTimeRanges[refID]; ok {
 						var previousT1MiningSessionStartedAt, previousT1MiningSessionEndedAt *time.Time
 						for _, timeRange := range history.HistoryTimeRanges[refID] {
@@ -501,8 +511,8 @@ func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[floa
 			/******************************************************************************************************************************************************
 				5. T2 Balance calculation for the current user time range.
 			******************************************************************************************************************************************************/
-			if _, ok := history.T2Referrals[usr.ID]; ok {
-				for _, refID := range history.T2Referrals[usr.ID] {
+			if _, ok := history.T2Referrals[usr.UserID]; ok {
+				for _, refID := range history.T2Referrals[usr.UserID] {
 					if _, ok := history.HistoryTimeRanges[refID]; ok {
 						var previousT2MiningSessionStartedAt, previousT2MiningSessionEndedAt *time.Time
 						for _, timeRange := range history.HistoryTimeRanges[refID] {
