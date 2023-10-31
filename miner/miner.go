@@ -215,6 +215,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		userGlobalRanks = userGlobalRanks[:0]
 		referralsThatStoppedMining = referralsThatStoppedMining[:0]
 		allAdoptions = allAdoptions[:0]
+		backupUsersUpdated = backupUsersUpdated[:0]
 		for k := range t0Referrals {
 			delete(t0Referrals, k)
 		}
@@ -378,15 +379,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					usr.SlashingRateT1 = backupedUsr.SlashingRateT1
 					usr.SlashingRateT2 = backupedUsr.SlashingRateT2
 
-					backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
-						DeserializedBackupUsersKey: model.DeserializedBackupUsersKey{ID: usr.ID},
-						BalancesBackupUsedAtField:  model.BalancesBackupUsedAtField{BalancesBackupUsedAt: time.Now()},
-					})
+					backupedUsr.BalancesBackupUsedAt = time.Now()
+					backupUsersUpdated = append(backupUsersUpdated, backupedUsr)
 				}
 			} else {
 				if recalculatedUsr := m.recalculateUser(usr, allAdoptions, recalculationHistory); recalculatedUsr != nil {
-					diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.ID] - usr.ActiveT1Referrals
-					diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.ID] - usr.ActiveT2Referrals
+					diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
+					diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
 
 					if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
 						diffT1ActiveValue = -usr.ActiveT1Referrals

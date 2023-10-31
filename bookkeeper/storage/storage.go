@@ -444,7 +444,7 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 	return res, nil
 }
 
-func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]struct{}, limit, offset int64) ([]*AdjustUserInfo, error) {
+func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs []string, limit, offset int64) ([]*AdjustUserInfo, error) {
 	const (
 		maxIDCount = 25_000
 	)
@@ -453,8 +453,8 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 		counter = 0
 	)
 	var userIDArray []string
-	for userID, _ := range userIDs {
-		userIDArray = append(userIDArray, fmt.Sprint(userID))
+	for _, id := range userIDs {
+		userIDArray = append(userIDArray, id)
 		counter++
 		if counter >= maxIDCount { // Hack not to have 'Max query size exceeded' error.
 			result, err := db.getAdjustUserInformation(ctx, userIDArray, limit, offset)
@@ -462,7 +462,7 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 				return nil, errors.Wrapf(err, "can't get adjust user information for userIDs:%#v", userIDArray)
 			}
 			res = append(res, result...)
-			userIDArray = nil
+			userIDArray = userIDArray[:0]
 			counter = 0
 
 			continue
@@ -482,6 +482,7 @@ func (db *db) GetAdjustUserInformation(ctx context.Context, userIDs map[int64]st
 func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string, limit, offset int64) ([]*AdjustUserInfo, error) {
 	var (
 		id                                 = make(proto.ColInt64, 0, len(userIDArray))
+		userID                             = &proto.ColStr{Buf: make([]byte, 0, 40*len(userIDArray)), Pos: make([]proto.Position, 0, len(userIDArray))}
 		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
 		miningSessionSoloEndedAt           = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
 		miningSessionSoloPreviouslyEndedAt = proto.ColDateTime64{Data: make([]proto.DateTime64, 0, len(userIDArray)), Location: stdlibtime.UTC}
@@ -496,7 +497,8 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 		res                                = make([]*AdjustUserInfo, 0, len(userIDArray))
 	)
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
-		Body: fmt.Sprintf(`SELECT id,
+		Body: fmt.Sprintf(`SELECT   id,
+									user_id,
 									mining_session_solo_started_at, 
 									mining_session_solo_ended_at,
 									mining_session_solo_previously_ended_at,
@@ -513,8 +515,9 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 							ORDER BY created_at ASC
 							LIMIT %[3]v, %[4]v
 						`, tableName, strings.Join(userIDArray, ","), offset, limit),
-		Result: append(make(proto.Results, 0, 12),
+		Result: append(make(proto.Results, 0, 13),
 			proto.ResultColumn{Name: "id", Data: &id},
+			proto.ResultColumn{Name: "user_id", Data: userID},
 			proto.ResultColumn{Name: "mining_session_solo_started_at", Data: &miningSessionSoloStartedAt},
 			proto.ResultColumn{Name: "mining_session_solo_ended_at", Data: &miningSessionSoloEndedAt},
 			proto.ResultColumn{Name: "mining_session_solo_previously_ended_at", Data: &miningSessionSoloPreviouslyEndedAt},
@@ -531,6 +534,7 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 			for ix := 0; ix < block.Rows; ix++ {
 				res = append(res, &AdjustUserInfo{
 					ID:                                 (&id).Row(ix),
+					UserID:                             userID.Row(ix),
 					MiningSessionSoloStartedAt:         time.New((&miningSessionSoloStartedAt).Row(ix)),
 					MiningSessionSoloEndedAt:           time.New((&miningSessionSoloEndedAt).Row(ix)),
 					MiningSessionSoloPreviouslyEndedAt: time.New((&miningSessionSoloPreviouslyEndedAt).Row(ix)),
@@ -545,6 +549,7 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 				})
 			}
 			(&id).Reset()
+			userID.Reset()
 			(&miningSessionSoloStartedAt).Reset()
 			(&miningSessionSoloEndedAt).Reset()
 			(&miningSessionSoloPreviouslyEndedAt).Reset()
