@@ -73,9 +73,9 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		return err
 	}
 	if skipKYCStep != nil && *skipKYCStep == users.NoneKYCStep { // TODO implement this properly.
-		if rand.Intn(3) == 0 {
+		if rand.Intn(2) == 0 {
 			return terror.New(ErrKYCRequired, map[string]any{
-				"kycStep": users.QuizKYCStep,
+				"kycStep": []users.KYCStep{users.Social1KYCStep, users.QuizKYCStep, users.QuizKYCStep, users.Social2KYCStep}[rand.Intn(4)],
 			})
 		}
 	}
