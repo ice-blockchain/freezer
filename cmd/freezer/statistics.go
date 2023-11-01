@@ -4,20 +4,25 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
 	"strconv"
+	stdlibtime "time"
 
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/tokenomics"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/server"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (s *service) setupStatisticsRoutes(router *server.Router) {
 	router.
 		Group("/v1r").
 		GET("/tokenomics-statistics/top-miners", server.RootHandler(s.GetTopMiners)).
-		GET("/tokenomics-statistics/adoption", server.RootHandler(s.GetAdoption))
+		GET("/tokenomics-statistics/adoption", server.RootHandler(s.GetAdoption)).
+		GET("/tokenomics-statistics/total-coins", server.RootHandler(s.GetTotalCoins))
 }
 
 // GetTopMiners godoc
@@ -83,6 +88,74 @@ func (s *service) GetAdoption( //nolint:gocritic // False negative.
 	resp, err := s.tokenomicsRepository.GetAdoptionSummary(ctx)
 	if err != nil {
 		return nil, server.Unexpected(errors.Wrapf(err, "failed to get adoption summary for userID:%v", req.AuthenticatedUser.UserID))
+	}
+
+	return server.OK(resp), nil
+}
+
+// GetTotalCoins godoc
+//
+//	@Schemes
+//	@Description	Returns statistics about total coins, with an usecase breakdown.
+//	@Tags			Statistics
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization		header		string	true	"Insert your access token"		default(Bearer <Add access token here>)
+//	@Param			X-Account-Metadata	header		string	false	"Insert your metadata token"	default(<Add metadata token here>)
+//	@Param			days				query		uint64	false	"number of days in the past to look for. Defaults to 3. Max is 90."
+//	@Param			tz					query		string	false	"Timezone in format +04:30 or -03:45"
+//	@Success		200					{object}	tokenomics.TotalCoinsSummary
+//	@Failure		400					{object}	server.ErrorResponse	"if validations failed"
+//	@Failure		401					{object}	server.ErrorResponse	"if not authorized"
+//	@Failure		422					{object}	server.ErrorResponse	"if syntax fails"
+//	@Failure		500					{object}	server.ErrorResponse
+//	@Failure		504					{object}	server.ErrorResponse	"if request times out"
+//	@Router			/tokenomics-statistics/total-coins [GET].
+func (s *service) GetTotalCoins( //nolint:gocritic // False negative.
+	_ context.Context,
+	req *server.Request[GetTotalCoinsArg, tokenomics.TotalCoinsSummary],
+) (*server.Response[tokenomics.TotalCoinsSummary], *server.Response[server.ErrorResponse]) {
+	const defaultDays, maxDays = 3, 90
+	if req.Data.Days == 0 {
+		req.Data.Days = defaultDays
+	}
+	if req.Data.Days > maxDays {
+		req.Data.Days = maxDays
+	}
+	tz := stdlibtime.UTC
+	if req.Data.TZ != "" {
+		var invertedTZ string
+		if req.Data.TZ[0] == '-' {
+			invertedTZ = "+" + req.Data.TZ[1:]
+		} else {
+			invertedTZ = "-" + req.Data.TZ[1:]
+		}
+		if t, err := stdlibtime.Parse("-07:00", invertedTZ); err == nil {
+			tz = t.Location()
+		}
+	}
+	if false { // TODO remove this and use it.
+		log.Info(tz.String())
+	}
+	resp := &tokenomics.TotalCoinsSummary{
+		TimeSeries: make([]*tokenomics.TotalCoinsTimeSeriesDataPoint, 0, req.Data.Days),
+		TotalCoins: tokenomics.TotalCoins{
+			Total:      float64(rand.Intn(10_000_000_000)),
+			Blockchain: float64(rand.Intn(10_000_000_000)),
+			Standard:   float64(rand.Intn(10_000_000_000)),
+			PreStaking: float64(rand.Intn(10_000_000_000)),
+		},
+	}
+	for ix := stdlibtime.Duration(0); ix < stdlibtime.Duration(req.Data.Days); ix++ {
+		resp.TimeSeries = append(resp.TimeSeries, &tokenomics.TotalCoinsTimeSeriesDataPoint{
+			Date: time.New(stdlibtime.Now().Add(-1 * ix * 24 * stdlibtime.Hour)),
+			TotalCoins: tokenomics.TotalCoins{
+				Total:      float64(rand.Intn(10_000_000_000)),
+				Blockchain: float64(rand.Intn(10_000_000_000)),
+				Standard:   float64(rand.Intn(10_000_000_000)),
+				PreStaking: float64(rand.Intn(10_000_000_000)),
+			},
+		})
 	}
 
 	return server.OK(resp), nil

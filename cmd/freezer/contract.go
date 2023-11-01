@@ -40,7 +40,11 @@ type (
 		Limit  uint64 `form:"limit" maximum:"1000" example:"10"`
 		Offset uint64 `form:"offset" example:"0"`
 	}
-	GetAdoptionArg struct{}
+	GetAdoptionArg   struct{}
+	GetTotalCoinsArg struct {
+		TZ   string `form:"tz" example:"+4:30"`
+		Days uint64 `form:"days" example:"7"`
+	}
 )
 
 // Private API.

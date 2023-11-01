@@ -92,6 +92,20 @@ type (
 		Balance    *BalanceHistoryBalanceDiff `json:"balance"`
 		TimeSeries []*BalanceHistoryEntry     `json:"timeSeries"`
 	}
+	TotalCoins struct {
+		Total      float64 `json:"total" example:"111111.2423"`
+		Blockchain float64 `json:"blockchain" example:"111111.2423"`
+		Standard   float64 `json:"standard" example:"111111.2423"`
+		PreStaking float64 `json:"preStaking" example:"111111.2423"`
+	}
+	TotalCoinsTimeSeriesDataPoint struct {
+		Date *time.Time `json:"date" example:"2022-01-03T16:20:52.156534Z"`
+		TotalCoins
+	}
+	TotalCoinsSummary struct {
+		TimeSeries []*TotalCoinsTimeSeriesDataPoint `json:"timeSeries"`
+		TotalCoins
+	}
 	AdoptionSummary struct {
 		Milestones       []*Adoption[string] `json:"milestones"`
 		TotalActiveUsers uint64              `json:"totalActiveUsers" example:"11"`

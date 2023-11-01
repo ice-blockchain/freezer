@@ -208,6 +208,43 @@ definitions:
         example: 12333
         type: integer
     type: object
+  tokenomics.TotalCoinsSummary:
+    properties:
+      blockchain:
+        example: 111111.2423
+        type: number
+      preStaking:
+        example: 111111.2423
+        type: number
+      standard:
+        example: 111111.2423
+        type: number
+      timeSeries:
+        items:
+          $ref: '#/definitions/tokenomics.TotalCoinsTimeSeriesDataPoint'
+        type: array
+      total:
+        example: 111111.2423
+        type: number
+    type: object
+  tokenomics.TotalCoinsTimeSeriesDataPoint:
+    properties:
+      blockchain:
+        example: 111111.2423
+        type: number
+      date:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+      preStaking:
+        example: 111111.2423
+        type: number
+      standard:
+        example: 111111.2423
+        type: number
+      total:
+        example: 111111.2423
+        type: number
+    type: object
 info:
   contact:
     name: ice.io
@@ -294,6 +331,61 @@ paths:
             type: array
         "400":
           description: if validations fail
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - Statistics
+  /tokenomics-statistics/total-coins:
+    get:
+      consumes:
+      - application/json
+      description: Returns statistics about total coins, with an usecase breakdown.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: <Add metadata token here>
+        description: Insert your metadata token
+        in: header
+        name: X-Account-Metadata
+        type: string
+      - description: number of days in the past to look for. Defaults to 3. Max is
+          90.
+        in: query
+        name: days
+        type: integer
+      - description: Timezone in format +04:30 or -03:45
+        in: query
+        name: tz
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tokenomics.TotalCoinsSummary'
+        "400":
+          description: if validations failed
           schema:
             $ref: '#/definitions/server.ErrorResponse'
         "401":

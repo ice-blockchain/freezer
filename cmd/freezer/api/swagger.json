@@ -159,6 +159,87 @@
                 }
             }
         },
+        "/tokenomics-statistics/total-coins": {
+            "get": {
+                "description": "Returns statistics about total coins, with an usecase breakdown.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "\u003cAdd metadata token here\u003e",
+                        "description": "Insert your metadata token",
+                        "name": "X-Account-Metadata",
+                        "in": "header"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "number of days in the past to look for. Defaults to 3. Max is 90.",
+                        "name": "days",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Timezone in format +04:30 or -03:45",
+                        "name": "tz",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tokenomics.TotalCoinsSummary"
+                        }
+                    },
+                    "400": {
+                        "description": "if validations failed",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/tokenomics/{userId}/balance-history": {
             "get": {
                 "description": "Returns the balance history for the provided params.\nIf `startDate` is after `endDate`, we go backwards in time: I.E. today, yesterday, etc.\nIf `startDate` is before `endDate`, we go forwards in time: I.E. today, tomorrow, etc.",
@@ -871,6 +952,58 @@
                 "globalRank": {
                     "type": "integer",
                     "example": 12333
+                }
+            }
+        },
+        "tokenomics.TotalCoinsSummary": {
+            "type": "object",
+            "properties": {
+                "blockchain": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "preStaking": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "standard": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "timeSeries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tokenomics.TotalCoinsTimeSeriesDataPoint"
+                    }
+                },
+                "total": {
+                    "type": "number",
+                    "example": 111111.2423
+                }
+            }
+        },
+        "tokenomics.TotalCoinsTimeSeriesDataPoint": {
+            "type": "object",
+            "properties": {
+                "blockchain": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2022-01-03T16:20:52.156534Z"
+                },
+                "preStaking": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "standard": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
+                "total": {
+                    "type": "number",
+                    "example": 111111.2423
                 }
             }
         }
