@@ -176,6 +176,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			model.IDT0Field
 			model.IDTMinus1Field
 			model.HideRankingField
+			model.BalanceForTMinus1Field
 		}
 	)
 	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
