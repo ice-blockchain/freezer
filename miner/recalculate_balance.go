@@ -638,3 +638,18 @@ func (m *miner) insertBalanceRecalculationMetrics(ctx context.Context, brm *bala
 
 	return errors.Wrapf(err, "failed to insert metrics for worker:%v, params:%#v", brm.Worker, brm)
 }
+
+func (b *balanceRecalculationMetrics) reset() {
+	b.EndedAt = nil
+	b.AffectedUsers = 0
+	b.IterationsNum = 0
+	b.T1BalancePositive = 0
+	b.T1BalanceNegative = 0
+	b.T2BalancePositive = 0
+	b.T2BalanceNegative = 0
+	b.T1ActiveCountsPositive = 0
+	b.T1ActiveCountsNegative = 0
+	b.T2ActiveCountsPositive = 0
+	b.T2ActiveCountsNegative = 0
+	b.StartedAt = time.Now()
+}

@@ -163,7 +163,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		currentAdoption                                                      = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                              = cfg.Workers
 		batchSize                                                            = cfg.BatchSize
-		metrics                                                              balanceRecalculationMetrics
+		metrics                                                              = new(balanceRecalculationMetrics)
 		userKeys, userBackupKeys, userHistoryKeys, referralKeys              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
 		userResults, backupUserResults, referralResults                      = make([]*user, 0, batchSize), make([]*backupUserUpdated, 0, batchSize), make([]*referral, 0, 2*batchSize)
 		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
@@ -203,9 +203,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				metrics.IterationsNum = int64(totalBatches)
 				metrics.EndedAt = time.Now()
 				metrics.Worker = workerNumber
-				if err := m.insertBalanceRecalculationMetrics(ctx, &metrics); err != nil {
+				if err := m.insertBalanceRecalculationMetrics(ctx, metrics); err != nil {
 					log.Error(err, "can't insert balance recalculation metrics for worker:", workerNumber)
 				}
+				metrics.reset()
 			}
 			if totalBatches != 0 && iteration > 2 {
 				shouldSynchronizeBalanceFunc = m.telemetry.shouldSynchronizeBalanceFunc(uint64(workerNumber), totalBatches, iteration)
