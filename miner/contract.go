@@ -48,6 +48,9 @@ const (
 var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
+
+	//go:embed .testdata/DDL.sql
+	eskimoDDL string
 )
 
 type (

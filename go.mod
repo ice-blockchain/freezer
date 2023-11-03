@@ -12,7 +12,7 @@ require (
 	github.com/ice-blockchain/wintr v1.125.0
 	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
-	github.com/redis/go-redis/v9 v9.2.1
+	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/swag v1.16.2
 	github.com/testcontainers/testcontainers-go v0.26.0
@@ -21,12 +21,12 @@ require (
 
 require (
 	cloud.google.com/go v0.110.10 // indirect
-	cloud.google.com/go/compute v1.23.2 // indirect
+	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/firestore v1.14.0 // indirect
-	cloud.google.com/go/iam v1.1.4 // indirect
-	cloud.google.com/go/longrunning v0.5.3 // indirect
-	cloud.google.com/go/storage v1.34.0 // indirect
+	cloud.google.com/go/iam v1.1.5 // indirect
+	cloud.google.com/go/longrunning v0.5.4 // indirect
+	cloud.google.com/go/storage v1.34.1 // indirect
 	cosmossdk.io/math v1.1.2 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	firebase.google.com/go/v4 v4.12.1 // indirect
@@ -34,12 +34,12 @@ require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/Microsoft/hcsshim v0.11.2 // indirect
+	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/bytedance/sonic v1.10.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
-	github.com/chenzhuoyu/iasm v0.9.0 // indirect
+	github.com/chenzhuoyu/iasm v0.9.1 // indirect
 	github.com/cloudflare/circl v1.3.6 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/containerd v1.7.8 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/pprof v0.0.0-20231023181126-ff6d637d2a7b // indirect
+	github.com/google/pprof v0.0.0-20231101202521-4ca4178f5c7a // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
@@ -134,7 +134,7 @@ require (
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/swaggo/gin-swagger v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/twmb/franz-go v1.15.1 // indirect
+	github.com/twmb/franz-go v1.15.2 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.10.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.7.0 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect

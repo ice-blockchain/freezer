@@ -39,7 +39,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi := &miner{
 		mb:        messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 		db:        storage.MustConnect(context.Background(), parentApplicationYamlKey, int(cfg.Workers)),
-		dbPG:      storagePG.MustConnect(ctx, "", applicationYamlKey),
+		dbPG:      storagePG.MustConnect(ctx, eskimoDDL, applicationYamlKey),
 		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:        new(sync.WaitGroup),
 		telemetry: new(telemetry).mustInit(cfg),
@@ -163,6 +163,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		currentAdoption                                                      = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                              = cfg.Workers
 		batchSize                                                            = cfg.BatchSize
+		metrics                                                              balanceRecalculationMetrics
 		userKeys, userBackupKeys, userHistoryKeys, referralKeys              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
 		userResults, backupUserResults, referralResults                      = make([]*user, 0, batchSize), make([]*backupUserUpdated, 0, batchSize), make([]*referral, 0, 2*batchSize)
 		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
@@ -194,6 +195,18 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				panic("unexpected batch number: " + fmt.Sprint(batchNumber))
 			}
 			totalBatches = uint64(batchNumber - 1)
+			metricsExists, err := m.getBalanceRecalculationMetrics(ctx, workerNumber)
+			if err != nil {
+				log.Error(err, "can't get balance recalculation metrics for worker:", workerNumber)
+			}
+			if metricsExists == nil && err == nil {
+				metrics.IterationsNum = int64(totalBatches)
+				metrics.EndedAt = time.Now()
+				metrics.Worker = workerNumber
+				if err := m.insertBalanceRecalculationMetrics(ctx, &metrics); err != nil {
+					log.Error(err, "can't insert balance recalculation metrics for worker:", workerNumber)
+				}
+			}
 			if totalBatches != 0 && iteration > 2 {
 				shouldSynchronizeBalanceFunc = m.telemetry.shouldSynchronizeBalanceFunc(uint64(workerNumber), totalBatches, iteration)
 			}
@@ -241,6 +254,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			delete(recalculatedTiersBalancesUsers, k)
 		}
 	}
+	metrics.StartedAt = time.Now()
 	for ctx.Err() == nil {
 		/******************************************************************************************************************************************************
 			1. Fetching a new batch of users.
@@ -370,22 +384,49 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
 						diffT2ActiveValue = -usr.ActiveT2Referrals
 					}
-					t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
-					t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
+					if false {
+						t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+						t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-					usr.BalanceT1 = backupedUsr.BalanceT1
-					usr.BalanceT2 = backupedUsr.BalanceT2
+						usr.BalanceT1 = backupedUsr.BalanceT1
+						usr.BalanceT2 = backupedUsr.BalanceT2
 
-					usr.SlashingRateT1 = backupedUsr.SlashingRateT1
-					usr.SlashingRateT2 = backupedUsr.SlashingRateT2
+						usr.SlashingRateT1 = backupedUsr.SlashingRateT1
+						usr.SlashingRateT2 = backupedUsr.SlashingRateT2
 
-					backupedUsr.BalancesBackupUsedAt = time.Now()
-					backupUsersUpdated = append(backupUsersUpdated, backupedUsr)
+						backupedUsr.BalancesBackupUsedAt = time.Now()
+						backupUsersUpdated = append(backupUsersUpdated, backupedUsr)
+					}
 				}
 			} else {
 				if recalculatedUsr := m.recalculateUser(usr, allAdoptions, recalculationHistory); recalculatedUsr != nil {
 					diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
 					diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
+
+					if diffT1ActiveValue < 0 {
+						metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
+					} else {
+						metrics.T1ActiveCountsPositive += int64(diffT1ActiveValue)
+					}
+					if diffT2ActiveValue < 0 {
+						metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
+					} else {
+						metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
+					}
+
+					oldBalanceT1 := usr.BalanceT1
+					oldBalanceT2 := usr.BalanceT2
+
+					if recalculatedUsr.BalanceT1-oldBalanceT1 >= 0 {
+						metrics.T1BalancePositive += recalculatedUsr.BalanceT1 - oldBalanceT1
+					} else {
+						metrics.T1BalanceNegative += recalculatedUsr.BalanceT1 - oldBalanceT1
+					}
+					if recalculatedUsr.BalanceT2-oldBalanceT2 >= 0 {
+						metrics.T2BalancePositive += recalculatedUsr.BalanceT2 - oldBalanceT2
+					} else {
+						metrics.T2BalanceNegative += recalculatedUsr.BalanceT2 - oldBalanceT2
+					}
 
 					if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
 						diffT1ActiveValue = -usr.ActiveT1Referrals
@@ -393,22 +434,23 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
 						diffT2ActiveValue = -usr.ActiveT2Referrals
 					}
-					t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
-					t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
-
-					oldBalanceT1 := usr.BalanceT1
-					oldBalanceT2 := usr.BalanceT2
-
-					usr.BalanceT1 = recalculatedUsr.BalanceT1
-					usr.BalanceT2 = recalculatedUsr.BalanceT2
 
 					oldSlashingT1Rate := usr.SlashingRateT1
 					oldSlashingT2Rate := usr.SlashingRateT2
 
-					usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
-					usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
+					if false {
+						t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+						t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
+						usr.BalanceT1 = recalculatedUsr.BalanceT1
+						usr.BalanceT2 = recalculatedUsr.BalanceT2
+
+						usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
+						usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
+					}
 					if !backupExists {
+						metrics.AffectedUsers += 1
+
 						backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
 							DeserializedBackupUsersKey:              model.DeserializedBackupUsersKey{ID: usr.ID},
 							UserIDField:                             usr.UserIDField,
