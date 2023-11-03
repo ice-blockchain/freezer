@@ -60,6 +60,22 @@ type (
 		T1Referrals, T2Referrals       map[string][]string
 		T1ActiveCounts, T2ActiveCounts map[string]int32
 	}
+
+	balanceRecalculationMetrics struct {
+		StartedAt              *time.Time
+		EndedAt                *time.Time
+		T1BalancePositive      float64
+		T1BalanceNegative      float64
+		T2BalancePositive      float64
+		T2BalanceNegative      float64
+		T1ActiveCountsPositive int64
+		T1ActiveCountsNegative int64
+		T2ActiveCountsPositive int64
+		T2ActiveCountsNegative int64
+		IterationsNum          int64
+		AffectedUsers          int64
+		Worker                 int64
+	}
 )
 
 func (m *miner) getUsers(ctx context.Context, users []*user) (map[string]*pgUserCreated, error) {
@@ -584,4 +600,41 @@ func (m *miner) recalculateUser(usr *user, adoptions []*tokenomics.Adoption[floa
 	}
 
 	return nil
+}
+
+func (m *miner) getBalanceRecalculationMetrics(ctx context.Context, workerNumber int64) (brm *balanceRecalculationMetrics, err error) {
+	sql := `SELECT * FROM balance_recalculation_metrics WHERE worker = $1`
+	res, err := storagePG.Get[balanceRecalculationMetrics](ctx, m.dbPG, sql, workerNumber)
+	if err != nil {
+		if err == storagePG.ErrNotFound {
+			return nil, nil
+		}
+
+		return nil, errors.Wrapf(err, "failed to get balance recalculation metrics:%v", res)
+	}
+
+	return res, nil
+}
+
+func (m *miner) insertBalanceRecalculationMetrics(ctx context.Context, brm *balanceRecalculationMetrics) error {
+	sql := `INSERT INTO balance_recalculation_metrics(
+						worker,
+						started_at,
+						ended_at,
+						t1_balance_positive,
+						t1_balance_negative,
+						t2_balance_positive,
+						t2_balance_negative,
+						t1_active_counts_positive,
+						t1_active_counts_negative,
+						t2_active_counts_positive,
+						t2_active_counts_negative,
+						iterations_num,
+						affected_users
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+	_, err := storagePG.Exec(ctx, m.dbPG, sql, brm.Worker, brm.StartedAt.Time, brm.EndedAt.Time, brm.T1BalancePositive, brm.T1BalanceNegative, brm.T2BalancePositive, brm.T2BalanceNegative,
+		brm.T1ActiveCountsPositive, brm.T1ActiveCountsNegative, brm.T2ActiveCountsPositive, brm.T2ActiveCountsNegative, brm.IterationsNum, brm.AffectedUsers)
+
+	return errors.Wrapf(err, "failed to insert metrics for worker:%v, params:%#v", brm.Worker, brm)
 }
