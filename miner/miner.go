@@ -403,30 +403,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
 					diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
 
-					if diffT1ActiveValue < 0 {
-						metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
-					} else {
-						metrics.T1ActiveCountsPositive += int64(diffT1ActiveValue)
-					}
-					if diffT2ActiveValue < 0 {
-						metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
-					} else {
-						metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
-					}
-
 					oldBalanceT1 := usr.BalanceT1
 					oldBalanceT2 := usr.BalanceT2
-
-					if recalculatedUsr.BalanceT1-oldBalanceT1 >= 0 {
-						metrics.T1BalancePositive += recalculatedUsr.BalanceT1 - oldBalanceT1
-					} else {
-						metrics.T1BalanceNegative += recalculatedUsr.BalanceT1 - oldBalanceT1
-					}
-					if recalculatedUsr.BalanceT2-oldBalanceT2 >= 0 {
-						metrics.T2BalancePositive += recalculatedUsr.BalanceT2 - oldBalanceT2
-					} else {
-						metrics.T2BalanceNegative += recalculatedUsr.BalanceT2 - oldBalanceT2
-					}
 
 					if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
 						diffT1ActiveValue = -usr.ActiveT1Referrals
@@ -450,6 +428,26 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					}
 					if !backupExists {
 						metrics.AffectedUsers += 1
+						if recalculatedUsr.BalanceT1-oldBalanceT1 >= 0 {
+							metrics.T1BalancePositive += recalculatedUsr.BalanceT1 - oldBalanceT1
+						} else {
+							metrics.T1BalanceNegative += recalculatedUsr.BalanceT1 - oldBalanceT1
+						}
+						if recalculatedUsr.BalanceT2-oldBalanceT2 >= 0 {
+							metrics.T2BalancePositive += recalculatedUsr.BalanceT2 - oldBalanceT2
+						} else {
+							metrics.T2BalanceNegative += recalculatedUsr.BalanceT2 - oldBalanceT2
+						}
+						if diffT1ActiveValue < 0 {
+							metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
+						} else {
+							metrics.T1ActiveCountsPositive += int64(diffT1ActiveValue)
+						}
+						if diffT2ActiveValue < 0 {
+							metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
+						} else {
+							metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
+						}
 
 						backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
 							DeserializedBackupUsersKey:              model.DeserializedBackupUsersKey{ID: usr.ID},

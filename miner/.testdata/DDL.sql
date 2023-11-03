@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: ice License 1.0
 --************************************************************************************************************************************
--- badge_progress
+-- balance_recalculation_metrics
+DROP TABLE IF EXISTS balance_recalculation_metrics;
 CREATE TABLE IF NOT EXISTS balance_recalculation_metrics (
                         started_at                  timestamp NOT NULL,
                         ended_at                    timestamp NOT NULL,
