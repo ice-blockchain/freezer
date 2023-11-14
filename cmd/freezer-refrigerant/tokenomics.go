@@ -46,8 +46,11 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 	req *server.Request[StartNewMiningSessionRequestBody, tokenomics.MiningSummary],
 ) (*server.Response[tokenomics.MiningSummary], *server.Response[server.ErrorResponse]) {
 	ms := &tokenomics.MiningSummary{MiningSession: &tokenomics.MiningSession{UserID: &req.Data.UserID}}
-	enhancedCtx := tokenomics.ContextWithClientType(contextWithHashCode(ctx, req), req.Data.XClientType)
-	if err := s.tokenomicsProcessor.StartNewMiningSession(enhancedCtx, ms, req.Data.Resurrect, req.Data.SkipKYCSteps); err != nil {
+	ctx = contextWithHashCode(ctx, req)
+	ctx = tokenomics.ContextWithClientType(ctx, req.Data.XClientType)
+	ctx = tokenomics.ContextWithAuthorization(ctx, req.Data.Authorization)
+	ctx = tokenomics.ContextWithXAccountMetadata(ctx, req.Data.XAccountMetadata)
+	if err := s.tokenomicsProcessor.StartNewMiningSession(ctx, ms, req.Data.Resurrect, req.Data.SkipKYCSteps); err != nil {
 		err = errors.Wrapf(err, "failed to start a new mining session for userID:%v, data:%#v", req.Data.UserID, req.Data)
 		switch {
 		case errors.Is(err, tokenomics.ErrNegativeMiningProgressDecisionRequired):

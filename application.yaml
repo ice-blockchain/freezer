@@ -32,6 +32,7 @@ cmd/freezer-refrigerant:
     jwtSecret: bogus
 tokenomics: &tokenomics
   kyc:
+    get-eskimo-user-state-url: https://something.example.com
     config-json-url: https://ice-staging.b-cdn.net/something/somebogus.json
     liveness-delay: 5m
   bookkeeper/storage: &bookkeeperStorage

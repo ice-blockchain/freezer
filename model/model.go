@@ -4,6 +4,7 @@ package model
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strconv"
 	stdlibtime "time"
@@ -252,16 +253,16 @@ type (
 		HideRanking bool `redis:"hide_ranking"`
 	}
 	KYCStepsCreatedAtField struct {
-		KYCStepsCreatedAt *TimeSlice `redis:"kyc_steps_created_at"`
+		KYCStepsCreatedAt *TimeSlice `json:"kycStepsCreatedAt" redis:"kyc_steps_created_at"`
 	}
 	KYCStepsLastUpdatedAtField struct {
-		KYCStepsLastUpdatedAt *TimeSlice `redis:"kyc_steps_last_updated_at"`
+		KYCStepsLastUpdatedAt *TimeSlice `json:"kycStepsLastUpdatedAt" redis:"kyc_steps_last_updated_at"`
 	}
 	KYCStepPassedField struct {
-		KYCStepPassed users.KYCStep `redis:"kyc_step_passed"`
+		KYCStepPassed users.KYCStep `json:"kycStepPassed" redis:"kyc_step_passed"`
 	}
 	KYCStepBlockedField struct {
-		KYCStepBlocked users.KYCStep `redis:"kyc_step_blocked"`
+		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
 	DeserializedBackupUsersKey struct {
 		ID int64 `redis:"-"`
@@ -369,14 +370,37 @@ func (t *TimeSlice) UnmarshalBinary(text []byte) error {
 	return t.UnmarshalText(text)
 }
 
+func (t *TimeSlice) UnmarshalJSON(text []byte) error {
+	if len(text) == 0 || (len(text) == 2 && string(text) == "[]") {
+		return nil
+	}
+	sep := make([]byte, 1)
+	sep[0] = ','
+	elems := bytes.Split(text[1:len(text)-1], sep)
+	timeSlice := make(TimeSlice, 0, len(elems))
+	for _, val := range elems {
+		unmarshalledTime := new(time.Time)
+		if err := unmarshalledTime.UnmarshalJSON(context.Background(), val); err != nil {
+			return errors.Wrapf(err, "failed to UnmarshalJSON %#v:%v", unmarshalledTime, string(val))
+		}
+		if !unmarshalledTime.IsNil() {
+			timeSlice = append(timeSlice, unmarshalledTime)
+		}
+	}
+	*t = timeSlice
+
+	return nil
+}
+
 func (t *TimeSlice) UnmarshalText(text []byte) error {
 	if len(text) == 0 || (len(text) == 1 && string(text) == "") {
 		return nil
 	}
-	timeSlice := *t
 	sep := make([]byte, 1)
 	sep[0] = ','
-	for _, val := range bytes.Split(text, sep) {
+	elems := bytes.Split(text, sep)
+	timeSlice := make(TimeSlice, 0, len(elems))
+	for _, val := range elems {
 		unmarshalledTime := new(time.Time)
 		if err := unmarshalledTime.UnmarshalText(val); err != nil {
 			return errors.Wrapf(err, "failed to unmarshall %#v:%v", unmarshalledTime, string(val))

@@ -243,6 +243,34 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 	return
 }
 
+func ContextWithAuthorization(ctx context.Context, authorization string) context.Context {
+	if authorization == "" {
+		return ctx
+	}
+
+	return context.WithValue(ctx, authorizationCtxValueKey, authorization) //nolint:revive,staticcheck // Not an issue.
+}
+
+func ContextWithXAccountMetadata(ctx context.Context, xAccountMetadata string) context.Context {
+	if xAccountMetadata == "" {
+		return ctx
+	}
+
+	return context.WithValue(ctx, xAccountMetadataCtxValueKey, xAccountMetadata) //nolint:revive,staticcheck // Not an issue.
+}
+
+func authorization(ctx context.Context) (authorization string) {
+	authorization, _ = ctx.Value(authorizationCtxValueKey).(string) //nolint:errcheck // Not needed.
+
+	return
+}
+
+func xAccountMetadata(ctx context.Context) (xAccountMetadata string) {
+	xAccountMetadata, _ = ctx.Value(xAccountMetadataCtxValueKey).(string) //nolint:errcheck // Not needed.
+
+	return
+}
+
 func ContextWithClientType(ctx context.Context, clientType string) context.Context {
 	if clientType == "" {
 		return ctx

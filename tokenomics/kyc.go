@@ -4,6 +4,7 @@ package tokenomics
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -108,7 +109,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	case users.NoneKYCStep:
 		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
 			if doFallbackRecursion {
-				if err := r.overrideKYCStateWithEskimoKYCState(ctx, &state.KYCState); err != nil {
+				if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
 					return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 				}
 
@@ -159,10 +160,37 @@ func (r *repository) isKYCEnabled(ctx context.Context, _ users.KYCStep) bool {
 Because existing users have empty KYCState in dragonfly cuz usersTableSource might not have updated it yet.
 So we need to query Eskimo for the valid kyc state of the user to be sure.
 */
-func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, state *KYCState) error {
-	// TODO impl this or remove it if not needed.
-
-	return nil
+func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *KYCState) error {
+	if resp, err := req.
+		SetContext(ctx).
+		SetRetryCount(25).
+		SetRetryBackoffInterval(10*stdlibtime.Millisecond, 1*stdlibtime.Second).
+		SetRetryHook(func(resp *req.Response, err error) {
+			if err != nil {
+				log.Error(errors.Wrap(err, "failed to fetch eskimo user's state, retrying..."))
+			} else {
+				body, bErr := resp.ToString()
+				log.Error(errors.Wrapf(bErr, "failed to parse negative response body for eskimo user's state"))
+				log.Error(errors.Errorf("failed to fetch eskimo user's state with status code:%v, body:%v, retrying...", resp.GetStatusCode(), body))
+			}
+		}).
+		SetRetryCondition(func(resp *req.Response, err error) bool {
+			return err != nil || (resp.GetStatusCode() != http.StatusOK && resp.GetStatusCode() != http.StatusUnauthorized)
+		}).
+		AddQueryParam("caller", "freezer-refrigerant").
+		SetHeader("Authorization", authorization(ctx)).
+		SetHeader("X-Account-Metadata", xAccountMetadata(ctx)).
+		SetHeader("Accept", "application/json").
+		SetHeader("Cache-Control", "no-cache, no-store, must-revalidate").
+		SetHeader("Pragma", "no-cache").
+		SetHeader("Expires", "0").
+		Get(fmt.Sprintf("%v/users/%v", r.cfg.KYC.GetEskimoUserStateURL, userID)); err != nil {
+		return errors.Wrapf(err, "failed to fetch eskimo user state for userID:%v", userID)
+	} else if data, err2 := resp.ToBytes(); err2 != nil {
+		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v", userID)
+	} else {
+		return errors.Wrapf(json.Unmarshal(data, state), "failed to unmarshal into %#v, data: %v", state, string(data))
+	}
 }
 
 func mustGetLivenessLoadDistributionStartDate(ctx context.Context, db storage.DB) (livenessLoadDistributionStartDate *time.Time) {

@@ -13,9 +13,11 @@ type (
 	StartNewMiningSessionRequestBody struct {
 		// Specify this if you want to resurrect the user.
 		// `true` recovers all the lost balance, `false` deletes it forever, `null/undefined` does nothing. Default is `null/undefined`.
-		Resurrect   *bool  `json:"resurrect" example:"true"`
-		UserID      string `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		XClientType string `form:"x_client_type" swaggerignore:"true" required:"false" example:"web"`
+		Resurrect        *bool  `json:"resurrect" example:"true"`
+		UserID           string `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		XClientType      string `form:"x_client_type" swaggerignore:"true" required:"false" example:"web"`
+		Authorization    string `header:"Authorization" swaggerignore:"true" required:"true" example:"some token"`
+		XAccountMetadata string `header:"X-Account-Metadata" swaggerignore:"true" required:"false" example:"some token"`
 		// Specify this if you want to skip one or more specific KYC steps before starting a new mining session or extending an existing one.
 		// Some KYC steps are not skippable.
 		SkipKYCSteps []users.KYCStep `json:"skipKYCSteps" example:"0,1"`

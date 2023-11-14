@@ -7,8 +7,10 @@ import (
 	"testing"
 	stdlibtime "time"
 
+	"github.com/goccy/go-json"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -102,4 +104,37 @@ func TestTimeSliceEquals(t *testing.T) {
 	assert.False(t, (&TimeSlice{now}).Equals(&TimeSlice{now, now}))
 	assert.False(t, (&TimeSlice{now, now}).Equals(&TimeSlice{now}))
 	assert.False(t, (&TimeSlice{nil, now}).Equals(&TimeSlice{now, nil}))
+}
+
+func TestEskimoToFreezerKYCStateDeserialization(t *testing.T) {
+	t.Parallel()
+	stepA := users.LivenessDetectionKYCStep
+	stepB := users.Social2KYCStep
+	usr := &users.User{
+		KYCStepsCreatedAt:     &[]*time.Time{time.Now()},
+		KYCStepsLastUpdatedAt: &[]*time.Time{time.Now(), time.Now()},
+		KYCStepPassed:         &stepB,
+		KYCStepBlocked:        &stepA,
+	}
+	serializedUser, err := json.Marshal(usr)
+	require.NoError(t, err)
+
+	type (
+		KYCState struct {
+			KYCStepsCreatedAtField
+			KYCStepsLastUpdatedAtField
+			KYCStepPassedField
+			KYCStepBlockedField
+		}
+	)
+	var deserializedUser KYCState
+	err = json.Unmarshal(serializedUser, &deserializedUser)
+	require.NoError(t, err)
+	assert.EqualValues(t, stepA, deserializedUser.KYCStepBlocked)
+	assert.EqualValues(t, stepB, deserializedUser.KYCStepPassed)
+	assert.EqualValues(t, 1, len(*usr.KYCStepsCreatedAt))
+	assert.EqualValues(t, (*usr.KYCStepsCreatedAt)[0], (*deserializedUser.KYCStepsCreatedAt)[0])
+	assert.EqualValues(t, 2, len(*usr.KYCStepsLastUpdatedAt))
+	assert.EqualValues(t, (*usr.KYCStepsLastUpdatedAt)[0], (*deserializedUser.KYCStepsLastUpdatedAt)[0])
+	assert.EqualValues(t, (*usr.KYCStepsLastUpdatedAt)[1], (*deserializedUser.KYCStepsLastUpdatedAt)[1])
 }

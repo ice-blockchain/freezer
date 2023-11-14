@@ -213,6 +213,8 @@ const (
 	requestingUserIDCtxValueKey         = "requestingUserIDCtxValueKey"
 	clientTypeCtxValueKey               = "clientTypeCtxValueKey"
 	userHashCodeCtxValueKey             = "userHashCodeCtxValueKey"
+	authorizationCtxValueKey            = "authorizationCtxValueKey"
+	xAccountMetadataCtxValueKey         = "xAccountMetadataCtxValueKey"
 	requestDeadline                     = 25 * stdlibtime.Second
 
 	floatToStringFormatter = "%.2f"
@@ -268,8 +270,9 @@ type (
 		disableAdvancedTeam *atomic.Pointer[[]string]
 		kycConfigJSON       *atomic.Pointer[kycConfigJSON]
 		KYC                 struct {
-			ConfigJSONURL string              `yaml:"config-json-url" mapstructure:"config-json-url"`
-			LivenessDelay stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
+			GetEskimoUserStateURL string              `yaml:"get-eskimo-user-state-url" mapstructure:"get-eskimo-user-state-url"`
+			ConfigJSONURL         string              `yaml:"config-json-url" mapstructure:"config-json-url"`
+			LivenessDelay         stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
 		} `yaml:"kyc" mapstructure:"kyc"`
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
