@@ -29,6 +29,7 @@ func (s *service) setupTokenomicsRoutes(router *server.Router) {
 //	@Produce		json
 //	@Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
 //	@Param			userId			path		string								true	"ID of the user"
+//	@Param			x_client_type	query		string								false	"the type of the client calling this API. I.E. `web`"
 //	@Param			request			body		StartNewMiningSessionRequestBody	true	"Request params"
 //	@Success		201				{object}	tokenomics.MiningSummary
 //	@Failure		400				{object}	server.ErrorResponse	"if validations fail"
@@ -45,7 +46,8 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 	req *server.Request[StartNewMiningSessionRequestBody, tokenomics.MiningSummary],
 ) (*server.Response[tokenomics.MiningSummary], *server.Response[server.ErrorResponse]) {
 	ms := &tokenomics.MiningSummary{MiningSession: &tokenomics.MiningSession{UserID: &req.Data.UserID}}
-	if err := s.tokenomicsProcessor.StartNewMiningSession(contextWithHashCode(ctx, req), ms, req.Data.Resurrect, req.Data.SkipKYCStep); err != nil {
+	enhancedCtx := tokenomics.ContextWithClientType(contextWithHashCode(ctx, req), req.Data.XClientType)
+	if err := s.tokenomicsProcessor.StartNewMiningSession(enhancedCtx, ms, req.Data.Resurrect, req.Data.SkipKYCStep); err != nil {
 		err = errors.Wrapf(err, "failed to start a new mining session for userID:%v, data:%#v", req.Data.UserID, req.Data)
 		switch {
 		case errors.Is(err, tokenomics.ErrNegativeMiningProgressDecisionRequired):
@@ -57,6 +59,12 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 		case errors.Is(err, tokenomics.ErrKYCRequired):
 			if tErr := terror.As(err); tErr != nil {
 				return nil, server.Conflict(err, kycStepRequiredErrorCode, tErr.Data)
+			}
+
+			fallthrough
+		case errors.Is(err, tokenomics.ErrMiningDisabled):
+			if tErr := terror.As(err); tErr != nil {
+				return nil, server.ForbiddenWithCode(err, miningDisabledErrorCode, tErr.Data)
 			}
 
 			fallthrough

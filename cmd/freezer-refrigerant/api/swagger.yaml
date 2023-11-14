@@ -250,6 +250,10 @@ paths:
         name: userId
         required: true
         type: string
+      - description: the type of the client calling this API. I.E. `web`
+        in: query
+        name: x_client_type
+        type: string
       - description: Request params
         in: body
         name: request

@@ -136,6 +136,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "the type of the client calling this API. I.E. ` + "`" + `web` + "`" + `",
+                        "name": "x_client_type",
+                        "in": "query"
+                    },
+                    {
                         "description": "Request params",
                         "name": "request",
                         "in": "body",

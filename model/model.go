@@ -3,9 +3,14 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
+	stdlibtime "time"
 
+	"github.com/pkg/errors"
+
+	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -246,6 +251,18 @@ type (
 	HideRankingField struct {
 		HideRanking bool `redis:"hide_ranking"`
 	}
+	KYCStepsCreatedAtField struct {
+		KYCStepsCreatedAt *TimeSlice `redis:"kyc_steps_created_at"`
+	}
+	KYCStepsLastUpdatedAtField struct {
+		KYCStepsLastUpdatedAt *TimeSlice `redis:"kyc_steps_last_updated_at"`
+	}
+	KYCStepPassedField struct {
+		KYCStepPassed users.KYCStep `redis:"kyc_step_passed"`
+	}
+	KYCStepBlockedField struct {
+		KYCStepBlocked users.KYCStep `redis:"kyc_step_blocked"`
+	}
 	DeserializedBackupUsersKey struct {
 		ID int64 `redis:"-"`
 	}
@@ -327,4 +344,78 @@ func SerializedBackupUsersKey(val any) string {
 	default:
 		panic(fmt.Sprintf("%#v cannot be used as backup key", val))
 	}
+}
+
+type (
+	TimeSlice []*time.Time
+)
+
+func (t *TimeSlice) Equals(other *TimeSlice) bool {
+	if t != nil && other != nil && len(*t) == (len(*other)) {
+		var equals int
+		for ix, thisVal := range *t {
+			if otherVal := (*other)[ix]; (thisVal.IsNil() && otherVal.IsNil()) || (!thisVal.IsNil() && !otherVal.IsNil() && thisVal.Equal(*otherVal.Time)) {
+				equals++
+			}
+		}
+
+		return equals == len(*t)
+	}
+
+	return t == nil && other == nil
+}
+
+func (t *TimeSlice) UnmarshalBinary(text []byte) error {
+	return t.UnmarshalText(text)
+}
+
+func (t *TimeSlice) UnmarshalText(text []byte) error {
+	if len(text) == 0 || (len(text) == 1 && string(text) == "") {
+		return nil
+	}
+	timeSlice := *t
+	sep := make([]byte, 1)
+	sep[0] = ','
+	for _, val := range bytes.Split(text, sep) {
+		unmarshalledTime := new(time.Time)
+		if err := unmarshalledTime.UnmarshalText(val); err != nil {
+			return errors.Wrapf(err, "failed to unmarshall %#v:%v", unmarshalledTime, string(val))
+		}
+		if !unmarshalledTime.IsNil() {
+			timeSlice = append(timeSlice, unmarshalledTime)
+		}
+	}
+	*t = timeSlice
+
+	return nil
+}
+
+func (t *TimeSlice) MarshalText() ([]byte, error) {
+	return t.MarshalBinary()
+}
+
+func (t *TimeSlice) MarshalBinary() ([]byte, error) {
+	if t == nil || len(*t) == 0 {
+		return nil, nil
+	}
+	timeSlice := *t
+	text := make([]byte, 0, len(timeSlice)*(len(stdlibtime.RFC3339Nano)+1))
+	for ix, val := range timeSlice {
+		marshalledTime, err := val.MarshalText()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshall: %#v", val)
+		}
+		if len(marshalledTime) == 0 {
+			continue
+		}
+		text = append(text, marshalledTime...)
+		if ix != len(timeSlice)-1 {
+			text = append(text, ',')
+		}
+	}
+	if len(text) == 0 {
+		return nil, nil
+	}
+
+	return text, nil
 }

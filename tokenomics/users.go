@@ -175,6 +175,10 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			model.IDTMinus1Field
 			model.HideRankingField
 			model.BalanceForTMinus1Field
+			model.KYCStepPassedField
+			model.KYCStepBlockedField
+			model.KYCStepsCreatedAtField
+			model.KYCStepsLastUpdatedAtField
 		}
 	)
 	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
@@ -191,12 +195,30 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	newPartialState.Username = usr.Username
 	newPartialState.MiningBlockchainAccountAddress = usr.MiningBlockchainAccountAddress
 	newPartialState.BlockchainAccountAddress = usr.BlockchainAccountAddress
+	if usr.KYCStepPassed != nil {
+		newPartialState.KYCStepPassed = *usr.KYCStepPassed
+	}
+	if usr.KYCStepBlocked != nil {
+		newPartialState.KYCStepBlocked = *usr.KYCStepBlocked
+	}
+	if usr.KYCStepsLastUpdatedAt != nil {
+		val := model.TimeSlice(*usr.KYCStepsLastUpdatedAt)
+		newPartialState.KYCStepsLastUpdatedAt = &val
+	}
+	if usr.KYCStepsCreatedAt != nil {
+		val := model.TimeSlice(*usr.KYCStepsCreatedAt)
+		newPartialState.KYCStepsCreatedAt = &val
+	}
 	newPartialState.HideRanking = s.hideRanking(usr)
 	if newPartialState.ProfilePictureName != dbUser[0].ProfilePictureName ||
 		newPartialState.Username != dbUser[0].Username ||
 		newPartialState.MiningBlockchainAccountAddress != dbUser[0].MiningBlockchainAccountAddress ||
 		newPartialState.BlockchainAccountAddress != dbUser[0].BlockchainAccountAddress ||
-		newPartialState.HideRanking != dbUser[0].HideRanking {
+		newPartialState.HideRanking != dbUser[0].HideRanking ||
+		!newPartialState.KYCStepsCreatedAt.Equals(dbUser[0].KYCStepsCreatedAt) ||
+		!newPartialState.KYCStepsLastUpdatedAt.Equals(dbUser[0].KYCStepsLastUpdatedAt) ||
+		newPartialState.KYCStepBlocked != dbUser[0].KYCStepBlocked ||
+		newPartialState.KYCStepPassed != dbUser[0].KYCStepPassed {
 		err = storage.Set(ctx, s.db, newPartialState)
 	}
 

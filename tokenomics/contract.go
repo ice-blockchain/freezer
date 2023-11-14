@@ -38,6 +38,7 @@ var (
 	ErrDuplicate                                       = errors.New("duplicate")
 	ErrNegativeMiningProgressDecisionRequired          = errors.New("you have negative mining progress, please decide what to do with it")
 	ErrKYCRequired                                     = errors.New("user needs to complete a kyc step or skip it(if allowed)")
+	ErrMiningDisabled                                  = errors.New("mining is disabled")
 	ErrRaceCondition                                   = errors.New("race condition")
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
 	ErrDecreasingPreStakingAllocationOrYearsNotAllowed = errors.New("decreasing pre-staking allocation or years not allowed")
@@ -210,6 +211,7 @@ const (
 	dayFormat, hourFormat, minuteFormat = "2006-01-02", "2006-01-02T15", "2006-01-02T15:04"
 	totalActiveUsersGlobalKey           = "TOTAL_ACTIVE_USERS"
 	requestingUserIDCtxValueKey         = "requestingUserIDCtxValueKey"
+	clientTypeCtxValueKey               = "clientTypeCtxValueKey"
 	userHashCodeCtxValueKey             = "userHashCodeCtxValueKey"
 	requestDeadline                     = 25 * stdlibtime.Second
 
@@ -238,22 +240,33 @@ type (
 	}
 
 	repository struct {
-		cfg                           *Config
-		extraBonusStartDate           *time.Time
-		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
-		shutdown                      func() error
-		db                            storage.DB
-		dwh                           dwh.Client
-		mb                            messagebroker.Client
-		pictureClient                 picture.Client
+		cfg                               *Config
+		extraBonusStartDate               *time.Time
+		livenessLoadDistributionStartDate *time.Time
+		extraBonusIndicesDistribution     map[uint16]map[uint16]uint16
+		shutdown                          func() error
+		db                                storage.DB
+		dwh                               dwh.Client
+		mb                                messagebroker.Client
+		pictureClient                     picture.Client
 	}
 
 	processor struct {
 		*repository
 	}
 
+	kycConfigJSON struct {
+		FaceAuth struct {
+			Enabled bool `json:"enabled"`
+		} `json:"face-auth"`
+		WebFaceAuth struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-face-auth"`
+	}
+
 	Config struct {
 		disableAdvancedTeam     *atomic.Pointer[[]string]
+		kycConfigJSON           *atomic.Pointer[kycConfigJSON]
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
 				Users          uint64  `yaml:"users"`
@@ -288,5 +301,9 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
+		KYC struct {
+			ConfigJSONURL string              `yaml:"config-json-url" mapstructure:"config-json-url"`
+			LivenessDelay stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
+		} `yaml:"kyc" mapstructure:"kyc"`
 	}
 )

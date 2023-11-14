@@ -18,6 +18,7 @@ type (
 		// Some KYC steps are not skippable.
 		SkipKYCStep *users.KYCStep `json:"skipKYCStep" example:"0"`
 		UserID      string         `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		XClientType string         `form:"x_client_type" swaggerignore:"true" required:"false" example:"web"`
 	}
 	ClaimExtraBonusRequestBody struct {
 		UserID string `uri:"userId" swaggerignore:"true" required:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
@@ -44,6 +45,7 @@ const (
 	raceConditionErrorCode                                   = "RACE_CONDITION"
 	resurrectionDecisionRequiredErrorCode                    = "RESURRECTION_DECISION_REQUIRED"
 	kycStepRequiredErrorCode                                 = "KYC_STEP_REQUIRED"
+	miningDisabledErrorCode                                  = "MINING_DISABLED"
 	noExtraBonusAvailableErrorCode                           = "NO_EXTRA_BONUS_AVAILABLE"
 	extraBonusAlreadyClaimedErrorCode                        = "EXTRA_BONUS_ALREADY_CLAIMED"
 )

@@ -31,6 +31,9 @@ cmd/freezer-refrigerant:
   wintr/auth/ice:
     jwtSecret: bogus
 tokenomics: &tokenomics
+  kyc:
+    config-json-url: https://ice-staging.b-cdn.net/something/somebogus.json
+    liveness-delay: 5m
   bookkeeper/storage: &bookkeeperStorage
     runDDL: true
     urls:

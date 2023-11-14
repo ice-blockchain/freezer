@@ -68,10 +68,12 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	prc.shutdown = closeAll(mbConsumer, prc.mb, prc.db)
 
 	go prc.startDisableAdvancedTeamCfgSyncer(ctx)
+	go prc.startKYCConfigJSONSyncer(ctx)
 	prc.mustInitAdoptions(ctx)
 	prc.mustNotifyCurrentAdoption(ctx)
 	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
 	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
+	prc.livenessLoadDistributionStartDate = mustGetLivenessLoadDistributionStartDate(ctx, prc.db)
 
 	return prc
 }
@@ -239,6 +241,20 @@ func requestingUserID(ctx context.Context) (requestingUserID string) {
 	requestingUserID, _ = ctx.Value(requestingUserIDCtxValueKey).(string) //nolint:errcheck // Not needed.
 
 	return
+}
+
+func ContextWithClientType(ctx context.Context, clientType string) context.Context {
+	if clientType == "" {
+		return ctx
+	}
+
+	return context.WithValue(ctx, clientTypeCtxValueKey, clientType) //nolint:revive,staticcheck // Not an issue.
+}
+
+func isWebClientType(ctx context.Context) bool {
+	clientType, _ := ctx.Value(clientTypeCtxValueKey).(string) //nolint:errcheck // Not needed.
+
+	return strings.EqualFold(strings.TrimSpace(clientType), "web")
 }
 
 func (c *Config) totalActiveUsersAggregationIntervalDateFormat() string {

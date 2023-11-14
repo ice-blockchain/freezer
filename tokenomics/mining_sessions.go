@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	stdlibtime "time"
 
 	"github.com/goccy/go-json"
@@ -42,6 +41,10 @@ type (
 		model.IDTMinus1Field
 		model.PreStakingAllocationField
 		model.PreStakingBonusField
+		model.KYCStepPassedField
+		model.KYCStepBlockedField
+		model.KYCStepsCreatedAtField
+		model.KYCStepsLastUpdatedAtField
 	}
 )
 
@@ -72,12 +75,8 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err != nil {
 		return err
 	}
-	if skipKYCStep != nil && *skipKYCStep == users.NoneKYCStep { // TODO implement this properly.
-		if rand.Intn(2) == 0 {
-			return terror.New(ErrKYCRequired, map[string]any{
-				"kycStep": []users.KYCStep{users.Social1KYCStep, users.QuizKYCStep, users.QuizKYCStep, users.Social2KYCStep}[rand.Intn(4)],
-			})
-		}
+	if err = r.validateKYC(ctx, old[0], skipKYCStep); err != nil {
+		return err
 	}
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
 		return errors.Wrapf(err, "failed to updateTMinus1 for id:%v", id)
