@@ -289,19 +289,21 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	if err != nil {
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}
-	backupUsr, err := storage.Get[struct {
-		model.UserIDField
-		model.DeserializedBackupUsersKey
-	}](ctx, s.db, model.SerializedBackupUsersKey(id))
-	if err != nil {
-		return errors.Wrapf(err, "failed to get backupUser for id:%v, userID:%v", id, *ms.UserID)
-	}
-	balanceBackupMode, err := mustGetBalancesBackupMode(ctx, s.db)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get backup flag for id:%v", id)
-	}
-	if !balanceBackupMode && backupUsr != nil {
-		return nil
+	if false {
+		backupUsr, err := storage.Get[struct {
+			model.UserIDField
+			model.DeserializedBackupUsersKey
+		}](ctx, s.db, model.SerializedBackupUsersKey(id))
+		if err != nil {
+			return errors.Wrapf(err, "failed to get backupUser for id:%v, userID:%v", id, *ms.UserID)
+		}
+		balanceBackupMode, err := mustGetBalancesBackupMode(ctx, s.db)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get backup flag for id:%v", id)
+		}
+		if !balanceBackupMode && backupUsr != nil {
+			return nil
+		}
 	}
 	referees, err := storage.Get[struct {
 		model.UserIDField

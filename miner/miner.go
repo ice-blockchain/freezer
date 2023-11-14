@@ -357,15 +357,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		if !balanceBackupMode {
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-			recalculationHistory, err = m.gatherHistoryAndReferralsInformation(ctx, userResults)
+			recalculationHistory, err = m.gatherHistoryAndReferralsInformation(reqCtx, userResults)
 			if err != nil {
-				log.Error(errors.New("tiers diff balances error"), err)
+				log.Error(errors.New("tiers diff balances error"), workerNumber, err)
 			}
 			reqCancel()
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-			allAdoptions, err = tokenomics.GetAllAdoptions[float64](ctx, m.db)
+			allAdoptions, err = tokenomics.GetAllAdoptions[float64](reqCtx, m.db)
 			if err != nil {
-				log.Error(errors.New("can't get all adoptions"), err)
+				log.Error(errors.New("can't get all adoptions"), workerNumber, err)
 			}
 			reqCancel()
 		}
@@ -499,11 +499,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
 					updatedUser.ExtraBonusLastClaimAvailableAt = nil
 				}
-				if balanceBackupMode || !backupExists {
+				if true || balanceBackupMode || !backupExists {
 					if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 						referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
 					}
 				}
+
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
 				}
