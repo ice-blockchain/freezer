@@ -30,8 +30,8 @@ type (
 		ReferralType   string
 	}
 	pgUserCreated struct {
-		ID        string
 		CreatedAt *time.Time
+		ID        string
 	}
 
 	splittedAdoptionByRange struct {

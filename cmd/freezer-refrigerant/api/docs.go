@@ -309,14 +309,16 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "skipKYCStep": {
-                    "description": "Specify this if you want to skip a specific KYC step before starting a new mining session or extending an existing one.\nSome KYC steps are not skippable.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/users.KYCStep"
-                        }
-                    ],
-                    "example": 0
+                "skipKYCSteps": {
+                    "description": "Specify this if you want to skip one or more specific KYC steps before starting a new mining session or extending an existing one.\nSome KYC steps are not skippable.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/users.KYCStep"
+                    },
+                    "example": [
+                        0,
+                        1
+                    ]
                 }
             }
         },

@@ -30,7 +30,14 @@ type (
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.DeserializedUsersKey
 	}
+	KYCState struct {
+		model.KYCStepsCreatedAtField
+		model.KYCStepsLastUpdatedAtField
+		model.KYCStepPassedField
+		model.KYCStepBlockedField
+	}
 	getCurrentMiningSession struct {
+		KYCState
 		StartOrExtendMiningSession
 		model.UserIDField
 		model.SlashingRateSoloField
@@ -41,15 +48,11 @@ type (
 		model.IDTMinus1Field
 		model.PreStakingAllocationField
 		model.PreStakingBonusField
-		model.KYCStepPassedField
-		model.KYCStepBlockedField
-		model.KYCStepsCreatedAtField
-		model.KYCStepsLastUpdatedAtField
 	}
 )
 
 func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of handling.
-	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool, skipKYCStep *users.KYCStep,
+	ctx context.Context, ms *MiningSummary, rollbackNegativeMiningProgress *bool, skipKYCSteps []users.KYCStep,
 ) error {
 	userID := *ms.MiningSession.UserID
 	id, err := GetOrInitInternalID(ctx, r.db, userID)
@@ -75,7 +78,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err != nil {
 		return err
 	}
-	if err = r.validateKYC(ctx, old[0], skipKYCStep); err != nil {
+	if err = r.validateKYC(ctx, old[0], skipKYCSteps, true); err != nil {
 		return err
 	}
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
@@ -287,8 +290,8 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 		return errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", *ms.UserID)
 	}
 	backupUsr, err := storage.Get[struct {
-		model.DeserializedBackupUsersKey
 		model.UserIDField
+		model.DeserializedBackupUsersKey
 	}](ctx, s.db, model.SerializedBackupUsersKey(id))
 	if err != nil {
 		return errors.Wrapf(err, "failed to get backupUser for id:%v, userID:%v", id, *ms.UserID)

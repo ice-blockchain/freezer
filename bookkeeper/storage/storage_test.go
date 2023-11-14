@@ -4,6 +4,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 	stdlibtime "time"
@@ -86,7 +87,8 @@ func TestStorage(t *testing.T) {
 			BalanceLastUpdatedAtField: model.BalanceLastUpdatedAtField{BalanceLastUpdatedAt: time.New(t1)},
 			BalanceTotalMintedField:   model.BalanceTotalMintedField{BalanceTotalMinted: 33},
 			BalanceTotalSlashedField:  model.BalanceTotalSlashedField{BalanceTotalSlashed: 44},
-		}}
+		},
+	}
 	require.NoError(t, cl.Insert(context.Background(), columns, input, usrs))
 
 	usrs = []*model.User{
@@ -101,7 +103,8 @@ func TestStorage(t *testing.T) {
 			BalanceLastUpdatedAtField: model.BalanceLastUpdatedAtField{BalanceLastUpdatedAt: time.New(t2)},
 			BalanceTotalMintedField:   model.BalanceTotalMintedField{BalanceTotalMinted: 3333},
 			BalanceTotalSlashedField:  model.BalanceTotalSlashedField{BalanceTotalSlashed: 4444},
-		}}
+		},
+	}
 	require.NoError(t, cl.Insert(context.Background(), columns, input, usrs))
 
 	h1, err := cl.SelectBalanceHistory(context.Background(), id1, []stdlibtime.Time{t1, t2})
@@ -127,25 +130,25 @@ func TestStorage_SelectAdjustUserInformation_NoError_On_LongValues(t *testing.T)
 
 	limit := int64(1000)
 	offset := int64(0)
-	userIDs := make(map[int64]struct{}, 1_000_000)
+	userIDs := make([]string, 0, 1_000_000)
 	for ix := 1_000_000; ix < 2_000_000; ix++ {
-		userIDs[int64(ix)] = struct{}{}
+		userIDs = append(userIDs, fmt.Sprint(ix))
 	}
 	_, err := cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
 	require.NoError(t, err)
 
 	userIDs = nil
-	userIDs = make(map[int64]struct{}, 1_000_000)
+	userIDs = make([]string, 0, 1_000_000)
 	for ix := 10_000_000; ix < 11_000_000; ix++ {
-		userIDs[int64(ix)] = struct{}{}
+		userIDs = append(userIDs, fmt.Sprint(ix))
 	}
 	_, err = cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
 	require.NoError(t, err)
 
 	userIDs = nil
-	userIDs = make(map[int64]struct{}, 1_000_000)
+	userIDs = make([]string, 0, 1_000_000)
 	for ix := 54_000_000; ix < 55_000_000; ix++ {
-		userIDs[int64(ix)] = struct{}{}
+		userIDs = append(userIDs, fmt.Sprint(ix))
 	}
 	_, err = cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
 	require.NoError(t, err)

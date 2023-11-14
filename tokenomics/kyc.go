@@ -86,15 +86,15 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 	}
 }
 
-func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCStep *users.KYCStep) error { //nolint:funlen // .
-	if skipKYCStep != nil {
-		if *skipKYCStep == users.FacialRecognitionKYCStep || *skipKYCStep == users.LivenessDetectionKYCStep {
-			return errors.Errorf("you can't skip kycStep:%v", *skipKYCStep)
+func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep, doFallbackRecursion bool) error { //nolint:funlen,lll // .
+	for _, skipKYCStep := range skipKYCSteps {
+		if skipKYCStep == users.FacialRecognitionKYCStep || skipKYCStep == users.LivenessDetectionKYCStep {
+			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
 		}
-		if *skipKYCStep == users.NoneKYCStep { // TODO implement this properly. This is used for mocking atm.
+		if skipKYCStep == users.NoneKYCStep { // TODO implement this properly. This is used for mocking atm.
 			if rand.Intn(2) == 0 {
 				return terror.New(ErrKYCRequired, map[string]any{
-					"kycStep": []users.KYCStep{users.Social1KYCStep, users.QuizKYCStep, users.QuizKYCStep, users.Social2KYCStep}[rand.Intn(4)],
+					"kycSteps": []users.KYCStep{[]users.KYCStep{users.Social1KYCStep, users.QuizKYCStep, users.QuizKYCStep, users.Social2KYCStep}[rand.Intn(4)]},
 				})
 			}
 		}
@@ -107,14 +107,22 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	switch state.KYCStepPassed {
 	case users.NoneKYCStep:
 		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
+			if doFallbackRecursion {
+				if err := r.overrideKYCStateWithEskimoKYCState(ctx, &state.KYCState); err != nil {
+					return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
+				}
+
+				return r.validateKYC(ctx, state, skipKYCSteps, false)
+			}
+
 			return terror.New(ErrKYCRequired, map[string]any{
-				"kycStep": users.FacialRecognitionKYCStep,
+				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
 		}
 	case users.FacialRecognitionKYCStep:
 		if r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
-				"kycStep": users.LivenessDetectionKYCStep,
+				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
 		}
 	default:
@@ -122,7 +130,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		isReservedForToday := int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		if (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
-				"kycStep": users.LivenessDetectionKYCStep,
+				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
 		}
 	}
@@ -145,6 +153,16 @@ func (r *repository) isKYCEnabled(ctx context.Context, _ users.KYCStep) bool {
 	}
 
 	return true
+}
+
+/*
+Because existing users have empty KYCState in dragonfly cuz usersTableSource might not have updated it yet.
+So we need to query Eskimo for the valid kyc state of the user to be sure.
+*/
+func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, state *KYCState) error {
+	// TODO impl this or remove it if not needed.
+
+	return nil
 }
 
 func mustGetLivenessLoadDistributionStartDate(ctx context.Context, db storage.DB) (livenessLoadDistributionStartDate *time.Time) {

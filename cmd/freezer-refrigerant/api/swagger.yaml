@@ -10,13 +10,16 @@ definitions:
           `true` recovers all the lost balance, `false` deletes it forever, `null/undefined` does nothing. Default is `null/undefined`.
         example: true
         type: boolean
-      skipKYCStep:
-        allOf:
-        - $ref: '#/definitions/users.KYCStep'
+      skipKYCSteps:
         description: |-
-          Specify this if you want to skip a specific KYC step before starting a new mining session or extending an existing one.
+          Specify this if you want to skip one or more specific KYC steps before starting a new mining session or extending an existing one.
           Some KYC steps are not skippable.
-        example: 0
+        example:
+        - 0
+        - 1
+        items:
+          $ref: '#/definitions/users.KYCStep'
+        type: array
     type: object
   main.StartOrUpdatePreStakingRequestBody:
     properties:

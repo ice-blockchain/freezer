@@ -47,7 +47,7 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 ) (*server.Response[tokenomics.MiningSummary], *server.Response[server.ErrorResponse]) {
 	ms := &tokenomics.MiningSummary{MiningSession: &tokenomics.MiningSession{UserID: &req.Data.UserID}}
 	enhancedCtx := tokenomics.ContextWithClientType(contextWithHashCode(ctx, req), req.Data.XClientType)
-	if err := s.tokenomicsProcessor.StartNewMiningSession(enhancedCtx, ms, req.Data.Resurrect, req.Data.SkipKYCStep); err != nil {
+	if err := s.tokenomicsProcessor.StartNewMiningSession(enhancedCtx, ms, req.Data.Resurrect, req.Data.SkipKYCSteps); err != nil {
 		err = errors.Wrapf(err, "failed to start a new mining session for userID:%v, data:%#v", req.Data.UserID, req.Data)
 		switch {
 		case errors.Is(err, tokenomics.ErrNegativeMiningProgressDecisionRequired):
@@ -58,7 +58,7 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 			fallthrough
 		case errors.Is(err, tokenomics.ErrKYCRequired):
 			if tErr := terror.As(err); tErr != nil {
-				return nil, server.Conflict(err, kycStepRequiredErrorCode, tErr.Data)
+				return nil, server.Conflict(err, kycStepsRequiredErrorCode, tErr.Data)
 			}
 
 			fallthrough

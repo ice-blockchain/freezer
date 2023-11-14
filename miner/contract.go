@@ -113,21 +113,21 @@ type (
 	}
 
 	backupUserUpdated struct {
-		model.DeserializedBackupUsersKey
+		model.BalancesBackupUsedAtField
 		model.UserIDField
 		model.BalanceT1Field
 		model.BalanceT2Field
 		model.SlashingRateT1Field
 		model.SlashingRateT2Field
-		model.ActiveT1ReferralsField
-		model.ActiveT2ReferralsField
 		model.FirstRecalculatedBalanceT1Field
 		model.FirstRecalculatedBalanceT2Field
-		model.FirstRecalculatedActiveT1ReferralsField
-		model.FirstRecalculatedActiveT2ReferralsField
 		model.FirstRecalculatedSlashingRateT1Field
 		model.FirstRecalculatedSlashingRateT2Field
-		model.BalancesBackupUsedAtField
+		model.DeserializedBackupUsersKey
+		model.ActiveT1ReferralsField
+		model.ActiveT2ReferralsField
+		model.FirstRecalculatedActiveT1ReferralsField
+		model.FirstRecalculatedActiveT2ReferralsField
 	}
 
 	referral struct {

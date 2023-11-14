@@ -165,20 +165,17 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	}
 	type (
 		user struct {
+			KYCState
 			model.UserIDField
 			model.ProfilePictureNameField
 			model.UsernameField
 			model.MiningBlockchainAccountAddressField
 			model.BlockchainAccountAddressField
+			model.BalanceForTMinus1Field
 			model.DeserializedUsersKey
 			model.IDT0Field
 			model.IDTMinus1Field
 			model.HideRankingField
-			model.BalanceForTMinus1Field
-			model.KYCStepPassedField
-			model.KYCStepBlockedField
-			model.KYCStepsCreatedAtField
-			model.KYCStepsLastUpdatedAtField
 		}
 	)
 	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
