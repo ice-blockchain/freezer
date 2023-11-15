@@ -123,7 +123,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		}
 	default:
 		isAfterDelay := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.KYC.LivenessDelay
-  isNetworkDelayAdjusted := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
+		isNetworkDelayAdjusted := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
 		var isReservedForToday bool
 		if r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max {
 			isReservedForToday = int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
