@@ -87,7 +87,7 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 	}
 }
 
-func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep, doFallbackRecursion bool) error { //nolint:funlen,lll // .
+func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep) error { //nolint:funlen // .
 	for _, skipKYCStep := range skipKYCSteps {
 		if skipKYCStep == users.FacialRecognitionKYCStep || skipKYCStep == users.LivenessDetectionKYCStep {
 			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
@@ -100,6 +100,9 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			}
 		}
 	}
+	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
+		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
+	}
 	if state.KYCStepBlocked > 0 {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
@@ -108,14 +111,6 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	switch state.KYCStepPassed {
 	case users.NoneKYCStep:
 		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
-			if doFallbackRecursion {
-				if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
-					return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
-				}
-
-				return r.validateKYC(ctx, state, skipKYCSteps, false)
-			}
-
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
@@ -128,7 +123,10 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		}
 	default:
 		isAfterDelay := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.KYC.LivenessDelay
-		isReservedForToday := int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+		var isReservedForToday bool
+		if r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max {
+			isReservedForToday = int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+		}
 		if (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},

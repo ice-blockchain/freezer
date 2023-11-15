@@ -78,7 +78,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err != nil {
 		return err
 	}
-	if err = r.validateKYC(ctx, old[0], skipKYCSteps, true); err != nil {
+	if err = r.validateKYC(ctx, old[0], skipKYCSteps); err != nil {
 		return err
 	}
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {
