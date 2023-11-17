@@ -110,7 +110,11 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	}
 	switch state.KYCStepPassed {
 	case users.NoneKYCStep:
-		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
+		var (
+			atLeastOneMiningStarted = !state.MiningSessionSoloLastStartedAt.IsNil()
+			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+		)
+		if atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
@@ -122,12 +126,12 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			})
 		}
 	default:
-		isAfterDelay := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.KYC.LivenessDelay
-		isNetworkDelayAdjusted := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
-		var isReservedForToday bool
-		if r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max {
-			isReservedForToday = int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
-		}
+		var (
+			timeSinceLivenessLastFinished = time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time)
+			isAfterDelay                  = timeSinceLivenessLastFinished >= r.cfg.KYC.LivenessDelay
+			isNetworkDelayAdjusted        = timeSinceLivenessLastFinished >= r.cfg.MiningSessionDuration.Min
+			isReservedForToday            = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+		)
 		if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
