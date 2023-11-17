@@ -161,7 +161,8 @@ func (r *repository) isKYCEnabled(ctx context.Context, _ users.KYCStep) bool {
 
 /*
 Because existing users have empty KYCState in dragonfly cuz usersTableSource might not have updated it yet.
-So we need to query Eskimo for the valid kyc state of the user to be sure.
+And because we might need to reset any kyc steps for the user prior to starting to mine.
+So we need to call Eskimo for that, to be sure we have the valid kyc state for the user before starting to mine.
 */
 func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *KYCState) error {
 	if resp, err := req.
@@ -187,7 +188,7 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 		SetHeader("Cache-Control", "no-cache, no-store, must-revalidate").
 		SetHeader("Pragma", "no-cache").
 		SetHeader("Expires", "0").
-		Get(fmt.Sprintf("%v/users/%v", r.cfg.KYC.GetEskimoUserStateURL, userID)); err != nil {
+		Post(fmt.Sprintf("%v/users/%v", r.cfg.KYC.TryResetKYCStepsURL, userID)); err != nil {
 		return errors.Wrapf(err, "failed to fetch eskimo user state for userID:%v", userID)
 	} else if data, err2 := resp.ToBytes(); err2 != nil {
 		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v", userID)
