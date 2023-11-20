@@ -103,7 +103,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
-	if state.KYCStepBlocked > 0 {
+	if state.KYCStepBlocked > 0 && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
 		})
@@ -112,7 +112,8 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	case users.NoneKYCStep:
 		var (
 			atLeastOneMiningStarted = !state.MiningSessionSoloLastStartedAt.IsNil()
-			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.LivenessDelay
+			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
 		if atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
