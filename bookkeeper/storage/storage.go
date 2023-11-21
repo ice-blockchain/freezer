@@ -512,7 +512,7 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 									balance_t2_pending_applied
 							FROM %[1]v
 							WHERE id IN [%[2]v]
-							ORDER BY created_at ASC
+							ORDER BY id ASC, created_at ASC
 							LIMIT %[3]v, %[4]v
 						`, tableName, strings.Join(userIDArray, ","), offset, limit),
 		Result: append(make(proto.Results, 0, 13),
