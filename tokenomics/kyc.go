@@ -204,7 +204,7 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 			}
 		}).
 		SetRetryCondition(func(resp *req.Response, err error) bool {
-			return err != nil || (resp.GetStatusCode() != http.StatusOK && resp.GetStatusCode() != http.StatusUnauthorized)
+			return err != nil || (resp.GetStatusCode() != http.StatusOK && resp.GetStatusCode() != http.StatusUnauthorized && resp.GetStatusCode() != http.StatusForbidden) //nolint:lll // .
 		}).
 		AddQueryParam("caller", "freezer-refrigerant").
 		SetHeader("Authorization", authorization(ctx)).
@@ -215,6 +215,8 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 		SetHeader("Expires", "0").
 		Post(fmt.Sprintf("%v/users/%v", r.cfg.KYC.TryResetKYCStepsURL, userID)); err != nil {
 		return errors.Wrapf(err, "failed to fetch eskimo user state for userID:%v", userID)
+	} else if statusCode := resp.GetStatusCode(); statusCode != http.StatusOK {
+		return errors.Errorf("[%v]failed to fetch eskimo user state for userID:%v", statusCode, userID)
 	} else if data, err2 := resp.ToBytes(); err2 != nil {
 		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v", userID)
 	} else {
