@@ -39,6 +39,7 @@ type (
 	getCurrentMiningSession struct {
 		KYCState
 		StartOrExtendMiningSession
+		model.LatestDeviceField
 		model.UserIDField
 		model.SlashingRateSoloField
 		model.SlashingRateT0Field

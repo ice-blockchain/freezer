@@ -76,7 +76,7 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 		if err = json.UnmarshalContext(ctx, data, &kycConfig); err != nil {
 			return errors.Wrapf(err, "failed to unmarshal into %#v, data: %v", kycConfig, string(data))
 		}
-		if kycConfig == (kycConfigJSON{}) {
+		if !kycConfig.FaceAuth.Enabled && len(kycConfig.FaceAuth.DisabledVersions) == 0 && !kycConfig.WebFaceAuth.Enabled {
 			if body := string(data); !strings.Contains(body, "face-auth") && !strings.Contains(body, "web-face-auth") {
 				return errors.Errorf("there's something wrong with the KYCConfigJSON body: %v", body)
 			}
@@ -103,7 +103,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
-	if state.KYCStepBlocked > 0 && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
+	if state.KYCStepBlocked > 0 && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
 		})
@@ -115,13 +115,13 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.LivenessDelay
 			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
-		if atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, users.FacialRecognitionKYCStep) {
+		if atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
 		}
 	case users.FacialRecognitionKYCStep:
-		if r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
+		if r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
@@ -133,7 +133,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			isNetworkDelayAdjusted        = timeSinceLivenessLastFinished >= r.cfg.MiningSessionDuration.Min
 			isReservedForToday            = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
-		if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, users.LivenessDetectionKYCStep) {
+		if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
@@ -143,7 +143,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	return nil
 }
 
-func (r *repository) isKYCEnabled(ctx context.Context, _ users.KYCStep) bool {
+func (r *repository) isKYCEnabled(ctx context.Context, latestDevice string, _ users.KYCStep) bool {
 	var (
 		kycConfig = r.cfg.kycConfigJSON.Load()
 		isWeb     = isWebClientType(ctx)
@@ -155,6 +155,30 @@ func (r *repository) isKYCEnabled(ctx context.Context, _ users.KYCStep) bool {
 
 	if !isWeb && !kycConfig.FaceAuth.Enabled {
 		return false
+	}
+
+	if !isWeb && kycConfig.FaceAuth.Enabled && !r.isFaceAuthEnabledForDevice(latestDevice) {
+		return false
+	}
+
+	return true
+}
+
+func (r *repository) isFaceAuthEnabledForDevice(device string) bool {
+	if device == "" {
+		return true
+	}
+	var disableFaceAuthFor []string
+	if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+		disableFaceAuthFor = cfgVal.FaceAuth.DisabledVersions
+	}
+	if len(disableFaceAuthFor) == 0 {
+		return true
+	}
+	for _, disabled := range disableFaceAuthFor {
+		if strings.EqualFold(device, disabled) {
+			return false
+		}
 	}
 
 	return true
