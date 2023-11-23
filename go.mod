@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.186.0
+	github.com/ice-blockchain/eskimo v1.188.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
 	github.com/ice-blockchain/wintr v1.125.0
 	github.com/imroc/req/v3 v3.42.2
@@ -30,7 +30,7 @@ require (
 	cloud.google.com/go/storage v1.35.1 // indirect
 	cosmossdk.io/math v1.2.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
-	firebase.google.com/go/v4 v4.12.1 // indirect
+	firebase.google.com/go/v4 v4.13.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
