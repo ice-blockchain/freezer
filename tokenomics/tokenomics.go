@@ -74,8 +74,13 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
 	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
 	prc.livenessLoadDistributionStartDate = mustGetLivenessLoadDistributionStartDate(ctx, prc.db)
-	log.Info(fmt.Sprintf("configuration loaded: %#v", cfg))
 	log.Info(fmt.Sprintf("configuration loaded[livenessLoadDistributionStartDate]: %#v", prc.livenessLoadDistributionStartDate))
+	log.Info(fmt.Sprintf("configuration loaded[LivenessDelay]: %#v", cfg.KYC.LivenessDelay))
+	log.Info(fmt.Sprintf("configuration loaded[AdoptionMilestoneSwitch]: %#v", cfg.AdoptionMilestoneSwitch))
+	log.Info(fmt.Sprintf("configuration loaded[ExtraBonuses]: %#v", cfg.ExtraBonuses))
+	log.Info(fmt.Sprintf("configuration loaded[RollbackNegativeMining]: %#v", cfg.RollbackNegativeMining))
+	log.Info(fmt.Sprintf("configuration loaded[MiningSessionDuration]: %#v", cfg.MiningSessionDuration))
+	log.Info(fmt.Sprintf("configuration loaded[GlobalAggregationInterval]: %#v", cfg.GlobalAggregationInterval))
 
 	return prc
 }
