@@ -74,6 +74,8 @@ func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
 	prc.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, prc.db)
 	prc.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, prc.db)
 	prc.livenessLoadDistributionStartDate = mustGetLivenessLoadDistributionStartDate(ctx, prc.db)
+	log.Info(fmt.Sprintf("configuration loaded: %#v", cfg))
+	log.Info(fmt.Sprintf("configuration loaded[livenessLoadDistributionStartDate]: %#v", prc.livenessLoadDistributionStartDate))
 
 	return prc
 }
