@@ -76,7 +76,7 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 		if err = json.UnmarshalContext(ctx, data, &kycConfig); err != nil {
 			return errors.Wrapf(err, "failed to unmarshal into %#v, data: %v", kycConfig, string(data))
 		}
-		if !kycConfig.FaceAuth.Enabled && len(kycConfig.FaceAuth.DisabledVersions) == 0 && !kycConfig.WebFaceAuth.Enabled {
+		if !kycConfig.FaceAuth.Enabled && len(kycConfig.FaceAuth.DisabledVersions) == 0 && len(kycConfig.FaceAuth.ForceKYCForUserIds) == 0 && !kycConfig.WebFaceAuth.Enabled {
 			if body := string(data); !strings.Contains(body, "face-auth") && !strings.Contains(body, "web-face-auth") {
 				return errors.Errorf("there's something wrong with the KYCConfigJSON body: %v", body)
 			}
@@ -115,7 +115,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.LivenessDelay
 			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) >= state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
-		if atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
+		if r.isFaceAuthForced(state.UserID) || (atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
@@ -182,6 +182,26 @@ func (r *repository) isFaceAuthEnabledForDevice(device string) bool {
 	}
 
 	return true
+}
+
+func (r *repository) isFaceAuthForced(userID string) bool {
+	if userID == "" {
+		return false
+	}
+	var forceKYCForUserIds []string
+	if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+		forceKYCForUserIds = cfgVal.FaceAuth.ForceKYCForUserIds
+	}
+	if len(forceKYCForUserIds) == 0 {
+		return false
+	}
+	for _, uID := range forceKYCForUserIds {
+		if strings.EqualFold(userID, strings.TrimSpace(uID)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 /*

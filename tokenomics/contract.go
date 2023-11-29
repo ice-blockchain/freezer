@@ -259,8 +259,9 @@ type (
 
 	kycConfigJSON struct {
 		FaceAuth struct {
-			DisabledVersions []string `json:"disabledVersions"`
-			Enabled          bool     `json:"enabled"`
+			DisabledVersions   []string `json:"disabledVersions"`
+			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
+			Enabled            bool     `json:"enabled"`
 		} `json:"face-auth"`
 		WebFaceAuth struct {
 			Enabled bool `json:"enabled"`
