@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	stdlibtime "time"
@@ -100,7 +101,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			}
 		}
 	}
-	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState); err != nil {
+	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState, skipKYCSteps); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
 	if state.KYCStepBlocked > 0 && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
@@ -209,8 +210,8 @@ Because existing users have empty KYCState in dragonfly cuz usersTableSource mig
 And because we might need to reset any kyc steps for the user prior to starting to mine.
 So we need to call Eskimo for that, to be sure we have the valid kyc state for the user before starting to mine.
 */
-func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *KYCState) error {
-	if resp, err := req.
+func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *KYCState, skipKYCSteps []users.KYCStep) error {
+	request := req.
 		SetContext(ctx).
 		SetRetryCount(25).
 		SetRetryBackoffInterval(10*stdlibtime.Millisecond, 1*stdlibtime.Second).
@@ -232,15 +233,22 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 		SetHeader("Accept", "application/json").
 		SetHeader("Cache-Control", "no-cache, no-store, must-revalidate").
 		SetHeader("Pragma", "no-cache").
-		SetHeader("Expires", "0").
-		Post(fmt.Sprintf("%v/users/%v", r.cfg.KYC.TryResetKYCStepsURL, userID)); err != nil {
-		return errors.Wrapf(err, "failed to fetch eskimo user state for userID:%v", userID)
+		SetHeader("Expires", "0")
+	if len(skipKYCSteps) > 0 {
+		skipKYCStepsQParamValues := make([]string, 0, len(skipKYCSteps))
+		for _, kycStep := range skipKYCSteps {
+			skipKYCStepsQParamValues = append(skipKYCStepsQParamValues, strconv.Itoa(int(kycStep)))
+		}
+		request = request.AddQueryParams("skipKYCSteps", skipKYCStepsQParamValues...)
+	}
+	if resp, err := request.Post(fmt.Sprintf("%v/users/%v", r.cfg.KYC.TryResetKYCStepsURL, userID)); err != nil {
+		return errors.Wrapf(err, "failed to fetch eskimo user state for userID:%v, skipKYCSteps:%#v", userID, skipKYCSteps)
 	} else if statusCode := resp.GetStatusCode(); statusCode != http.StatusOK {
-		return errors.Errorf("[%v]failed to fetch eskimo user state for userID:%v", statusCode, userID)
+		return errors.Errorf("[%v]failed to fetch eskimo user state for userID:%v, skipKYCSteps:%#v", statusCode, userID, skipKYCSteps)
 	} else if data, err2 := resp.ToBytes(); err2 != nil {
-		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v", userID)
+		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v, skipKYCSteps:%#v", userID, skipKYCSteps)
 	} else {
-		return errors.Wrapf(json.Unmarshal(data, state), "failed to unmarshal into %#v, data: %v", state, string(data))
+		return errors.Wrapf(json.Unmarshal(data, state), "failed to unmarshal into %#v, data: %v, skipKYCSteps:%#v", state, string(data), skipKYCSteps)
 	}
 }
 
