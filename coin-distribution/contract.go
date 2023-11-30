@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"io"
 	"sync"
+	stdlibtime "time"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
@@ -24,6 +25,7 @@ type (
 
 const (
 	applicationYamlKey = "coin-distribution"
+	requestDeadline    = 25 * stdlibtime.Second
 )
 
 // .
@@ -41,6 +43,8 @@ type (
 		wg     *sync.WaitGroup
 	}
 	config struct {
+		StartHours  int   `yaml:"startHours"`
+		EndHours    int   `yaml:"endHours"`
 		Workers     int64 `yaml:"workers"`
 		BatchSize   int64 `yaml:"batchSize"`
 		Development bool  `yaml:"development"`

@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS pending_coin_distributions  (
 
 CREATE INDEX IF NOT EXISTS pending_coin_distributions_worker_number_ix ON pending_coin_distributions ((internal_id % 10), created_at ASC);
 
+CREATE TABLE IF NOT EXISTS pending_coin_distribution_configurations (
+                    key       text NOT NULL primary key,
+                    value     text NOT NULL );
+INSERT INTO pending_coin_distribution_configurations(key,value) VALUES ('enabled','true') ON CONFLICT(key) DO NOTHING;
+
 --- Flow:
 --infinite loop: -- with 30 sec sleep between iterations if 0 rows returned
 --do in transaction:
@@ -17,7 +22,5 @@ CREATE INDEX IF NOT EXISTS pending_coin_distributions_worker_number_ix ON pendin
 --        ORDER BY created_at ASC
 --        LIMIT $2
 --        FOR UPDATE
---2.      call ERC-20 smart contract method to airdrop coins
---3.      delete from pending_coin_distributions WHERE user_id = ANY($1)
--- if transaction fails you retry infinitely
--- log.info every successful transaction, log every error
+--2.      delete from pending_coin_distributions WHERE user_id = ANY($1)
+--3.      call ERC-20 smart contract method to airdrop coins

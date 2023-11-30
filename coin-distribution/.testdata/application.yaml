@@ -5,6 +5,8 @@ logger:
   encoder: console
   level: debug
 coin-distribution:
+  startHours: 12
+  endHours: 17
   development: true
   workers: 10
   batchSize: 100
