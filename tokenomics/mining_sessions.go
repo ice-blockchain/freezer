@@ -45,6 +45,7 @@ type (
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
 		model.SlashingRateT2Field
+		model.UTCOffsetField
 		model.IDT0Field
 		model.IDTMinus1Field
 		model.PreStakingAllocationField

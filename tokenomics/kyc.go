@@ -5,7 +5,6 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,21 +89,14 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 
 func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep) error { //nolint:funlen // .
 	for _, skipKYCStep := range skipKYCSteps {
-		if skipKYCStep == users.FacialRecognitionKYCStep || skipKYCStep == users.LivenessDetectionKYCStep {
+		if skipKYCStep == users.FacialRecognitionKYCStep || skipKYCStep == users.LivenessDetectionKYCStep || skipKYCStep == users.NoneKYCStep {
 			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
-		}
-		if skipKYCStep == users.NoneKYCStep { // TODO implement this properly. This is used for mocking atm.
-			if rand.Intn(2) == 0 {
-				return terror.New(ErrKYCRequired, map[string]any{
-					"kycSteps": []users.KYCStep{[]users.KYCStep{users.Social1KYCStep, users.QuizKYCStep, users.QuizKYCStep, users.Social2KYCStep}[rand.Intn(4)]},
-				})
-			}
 		}
 	}
 	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState, skipKYCSteps); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
-	if state.KYCStepBlocked > 0 && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
+	if state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
 		})
@@ -122,63 +114,190 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			})
 		}
 	case users.FacialRecognitionKYCStep:
-		if r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
+		if r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) && state.KYCStepBlocked != users.LivenessDetectionKYCStep {
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
 		}
-	default:
-		var (
-			timeSinceLivenessLastFinished = time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time)
-			isAfterDelay                  = timeSinceLivenessLastFinished >= r.cfg.KYC.LivenessDelay
-			isNetworkDelayAdjusted        = timeSinceLivenessLastFinished >= r.cfg.MiningSessionDuration.Max
-			isReservedForToday            = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
-		)
-		if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
+	case users.LivenessDetectionKYCStep:
+		if err := r.verifyLivenessKYC(ctx, state); err != nil {
+			return err
+		}
+		social1Required := len(*state.KYCStepsLastUpdatedAt) == int(users.Social1KYCStep)-1 ||
+			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social1KYCStep-1].Time) >= r.cfg.KYC.Social1Delay
+
+		if !state.MiningSessionSoloLastStartedAt.IsNil() && social1Required && r.isKYCEnabled(ctx, state.LatestDevice, users.Social1KYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
-				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
+				"kycSteps": []users.KYCStep{users.Social1KYCStep},
 			})
+		}
+	case users.Social1KYCStep:
+		if err := r.verifyLivenessKYC(ctx, state); err != nil {
+			return err
+		}
+		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isQuizRequired(state) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep) {
+			return terror.New(ErrKYCRequired, map[string]any{
+				"kycSteps": []users.KYCStep{users.QuizKYCStep},
+			})
+		}
+	case users.QuizKYCStep:
+		if err := r.verifyLivenessKYC(ctx, state); err != nil {
+			return err
+		}
+		social2Required := len(*state.KYCStepsLastUpdatedAt) == int(users.Social2KYCStep)-1 ||
+			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social2KYCStep-1].Time) >= r.cfg.KYC.Social2Delay
+
+		if !state.MiningSessionSoloLastStartedAt.IsNil() && social2Required && r.isKYCEnabled(ctx, state.LatestDevice, users.Social2KYCStep) {
+			return terror.New(ErrKYCRequired, map[string]any{
+				"kycSteps": []users.KYCStep{users.Social2KYCStep},
+			})
+		}
+	default:
+		if err := r.verifyLivenessKYC(ctx, state); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (r *repository) isKYCEnabled(ctx context.Context, latestDevice string, _ users.KYCStep) bool {
+func (r *repository) verifyLivenessKYC(ctx context.Context, state *getCurrentMiningSession) error {
+	var (
+		timeSinceLivenessLastFinished = time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time)
+		isAfterDelay                  = timeSinceLivenessLastFinished >= r.cfg.KYC.LivenessDelay
+		isNetworkDelayAdjusted        = timeSinceLivenessLastFinished >= r.cfg.MiningSessionDuration.Max
+		isReservedForToday            = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+	)
+	if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
+		return terror.New(ErrKYCRequired, map[string]any{
+			"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
+		})
+	}
+
+	return nil
+}
+
+func (r *repository) isQuizRequired(state *getCurrentMiningSession) bool {
+	requireQuiz := len(*state.KYCStepsLastUpdatedAt) == int(users.QuizKYCStep)-1 ||
+		time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.QuizKYCStep-1].Time) >= r.cfg.KYC.QuizDelay
+	if r.cfg.KYC.RequireQuizOnlyOnSpecificDayOfWeek != nil {
+		offset := stdlibtime.Duration(state.UTCOffset) * stdlibtime.Minute
+		requireQuiz = (len(*state.KYCStepsLastUpdatedAt) == int(users.QuizKYCStep)-1 ||
+			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.QuizKYCStep-1].Time) >= 2*r.cfg.MiningSessionDuration.Max) &&
+			int(time.Now().In(stdlibtime.FixedZone(offset.String(), int(offset.Seconds()))).Weekday()) == *r.cfg.KYC.RequireQuizOnlyOnSpecificDayOfWeek
+	}
+
+	return requireQuiz
+}
+
+func (r *repository) isKYCEnabled(ctx context.Context, latestDevice string, kycStep users.KYCStep) bool {
 	var (
 		kycConfig = r.cfg.kycConfigJSON.Load()
 		isWeb     = isWebClientType(ctx)
 	)
 
-	if isWeb && !kycConfig.WebFaceAuth.Enabled {
-		return false
-	}
-
-	if !isWeb && !kycConfig.FaceAuth.Enabled {
-		return false
-	}
-
-	if !isWeb && kycConfig.FaceAuth.Enabled && !r.isFaceAuthEnabledForDevice(latestDevice) {
-		return false
+	switch kycStep {
+	case users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep:
+		if isWeb && !kycConfig.WebFaceAuth.Enabled {
+			return false
+		}
+		if !isWeb && !kycConfig.FaceAuth.Enabled {
+			return false
+		}
+		if !isWeb && kycConfig.FaceAuth.Enabled && !r.isKycStepEnabledForDevice(users.FacialRecognitionKYCStep, latestDevice) {
+			return false
+		}
+	case users.Social1KYCStep:
+		if isWeb && !kycConfig.WebSocial1KYC.Enabled {
+			return false
+		}
+		if !isWeb && !kycConfig.Social1KYC.Enabled {
+			return false
+		}
+		if !isWeb && kycConfig.Social1KYC.Enabled && !r.isKycStepEnabledForDevice(users.Social1KYCStep, latestDevice) {
+			return false
+		}
+	case users.QuizKYCStep:
+		if isWeb && !kycConfig.WebQuizKYC.Enabled {
+			return false
+		}
+		if !isWeb && !kycConfig.QuizKYC.Enabled {
+			return false
+		}
+		if !isWeb && kycConfig.QuizKYC.Enabled && !r.isKycStepEnabledForDevice(users.QuizKYCStep, latestDevice) {
+			return false
+		}
+	case users.Social2KYCStep:
+		if isWeb && !kycConfig.WebSocial2KYC.Enabled {
+			return false
+		}
+		if !isWeb && !kycConfig.Social2KYC.Enabled {
+			return false
+		}
+		if !isWeb && kycConfig.Social2KYC.Enabled && !r.isKycStepEnabledForDevice(users.Social2KYCStep, latestDevice) {
+			return false
+		}
 	}
 
 	return true
 }
 
-func (r *repository) isFaceAuthEnabledForDevice(device string) bool {
+func (r *repository) isKycStepEnabledForDevice(kycStep users.KYCStep, device string) bool {
 	if device == "" {
 		return true
 	}
-	var disableFaceAuthFor []string
-	if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
-		disableFaceAuthFor = cfgVal.FaceAuth.DisabledVersions
-	}
-	if len(disableFaceAuthFor) == 0 {
-		return true
-	}
-	for _, disabled := range disableFaceAuthFor {
-		if strings.EqualFold(device, disabled) {
-			return false
+	switch kycStep {
+	case users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep:
+		var disableFaceAuthFor []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			disableFaceAuthFor = cfgVal.FaceAuth.DisabledVersions
+		}
+		if len(disableFaceAuthFor) == 0 {
+			return true
+		}
+		for _, disabled := range disableFaceAuthFor {
+			if strings.EqualFold(device, disabled) {
+				return false
+			}
+		}
+	case users.Social1KYCStep:
+		var disableSocial1KYCFor []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			disableSocial1KYCFor = cfgVal.Social1KYC.DisabledVersions
+		}
+		if len(disableSocial1KYCFor) == 0 {
+			return true
+		}
+		for _, disabled := range disableSocial1KYCFor {
+			if strings.EqualFold(device, disabled) {
+				return false
+			}
+		}
+	case users.QuizKYCStep:
+		var disableQuizKYCFor []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			disableQuizKYCFor = cfgVal.QuizKYC.DisabledVersions
+		}
+		if len(disableQuizKYCFor) == 0 {
+			return true
+		}
+		for _, disabled := range disableQuizKYCFor {
+			if strings.EqualFold(device, disabled) {
+				return false
+			}
+		}
+	case users.Social2KYCStep:
+		var disableSocial2KYCFor []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			disableSocial2KYCFor = cfgVal.Social2KYC.DisabledVersions
+		}
+		if len(disableSocial2KYCFor) == 0 {
+			return true
+		}
+		for _, disabled := range disableSocial2KYCFor {
+			if strings.EqualFold(device, disabled) {
+				return false
+			}
 		}
 	}
 

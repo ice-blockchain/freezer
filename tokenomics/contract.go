@@ -266,16 +266,41 @@ type (
 		WebFaceAuth struct {
 			Enabled bool `json:"enabled"`
 		} `json:"web-face-auth"`
+		Social1KYC struct {
+			DisabledVersions []string `json:"disabledVersions"`
+			Enabled          bool     `json:"enabled"`
+		} `json:"social1-kyc"`
+		WebSocial1KYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-social1-kyc"`
+		QuizKYC struct {
+			DisabledVersions []string `json:"disabledVersions"`
+			Enabled          bool     `json:"enabled"`
+		} `json:"quiz-kyc"`
+		WebQuizKYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-quiz-kyc"`
+		Social2KYC struct {
+			DisabledVersions []string `json:"disabledVersions"`
+			Enabled          bool     `json:"enabled"`
+		} `json:"social2-kyc"`
+		WebSocial2KYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-social2-kyc"`
 	}
 
 	Config struct {
 		disableAdvancedTeam *atomic.Pointer[[]string]
 		kycConfigJSON       *atomic.Pointer[kycConfigJSON]
 		KYC                 struct {
-			TryResetKYCStepsURL  string              `yaml:"try-reset-kyc-steps-url" mapstructure:"try-reset-kyc-steps-url"`
-			ConfigJSONURL        string              `yaml:"config-json-url" mapstructure:"config-json-url"`
-			FaceRecognitionDelay stdlibtime.Duration `yaml:"face-recognition-delay" mapstructure:"face-recognition-delay"`
-			LivenessDelay        stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
+			RequireQuizOnlyOnSpecificDayOfWeek *int                `yaml:"require-quiz-only-on-specific-day-of-week" mapstructure:"require-quiz-only-on-specific-day-of-week"` //nolint:lll // .
+			TryResetKYCStepsURL                string              `yaml:"try-reset-kyc-steps-url" mapstructure:"try-reset-kyc-steps-url"`
+			ConfigJSONURL                      string              `yaml:"config-json-url" mapstructure:"config-json-url"`
+			FaceRecognitionDelay               stdlibtime.Duration `yaml:"face-recognition-delay" mapstructure:"face-recognition-delay"`
+			LivenessDelay                      stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
+			Social1Delay                       stdlibtime.Duration `yaml:"social1-delay" mapstructure:"social1-delay"`
+			Social2Delay                       stdlibtime.Duration `yaml:"social2-delay" mapstructure:"social2-delay"`
+			QuizDelay                          stdlibtime.Duration `yaml:"quiz-delay" mapstructure:"quiz-delay"`
 		} `yaml:"kyc" mapstructure:"kyc"`
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {

@@ -35,6 +35,11 @@ tokenomics: &tokenomics
     try-reset-kyc-steps-url: https://something.example.com
     config-json-url: https://ice-staging.b-cdn.net/something/somebogus.json
     liveness-delay: 5m
+    face-recognition-delay: 5m
+    social1-delay: 3m
+    quiz-delay: 3m
+    social2-delay: 3m
+    #    require-quiz-only-on-specific-day-of-week: 1
   bookkeeper/storage: &bookkeeperStorage
     runDDL: true
     urls:
