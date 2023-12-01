@@ -113,8 +113,8 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	case users.NoneKYCStep:
 		var (
 			atLeastOneMiningStarted = !state.MiningSessionSoloLastStartedAt.IsNil()
-			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.LivenessDelay
-			isReservedForToday      = r.cfg.KYC.LivenessDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) >= state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.FaceRecognitionDelay
+			isReservedForToday      = r.cfg.KYC.FaceRecognitionDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.FaceRecognitionDelay)/r.cfg.MiningSessionDuration.Max) >= state.ID%int64(r.cfg.KYC.FaceRecognitionDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
 		if r.isFaceAuthForced(state.UserID) || (atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) {
 			return terror.New(ErrKYCRequired, map[string]any{

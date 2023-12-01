@@ -272,9 +272,10 @@ type (
 		disableAdvancedTeam *atomic.Pointer[[]string]
 		kycConfigJSON       *atomic.Pointer[kycConfigJSON]
 		KYC                 struct {
-			TryResetKYCStepsURL string              `yaml:"try-reset-kyc-steps-url" mapstructure:"try-reset-kyc-steps-url"`
-			ConfigJSONURL       string              `yaml:"config-json-url" mapstructure:"config-json-url"`
-			LivenessDelay       stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
+			TryResetKYCStepsURL  string              `yaml:"try-reset-kyc-steps-url" mapstructure:"try-reset-kyc-steps-url"`
+			ConfigJSONURL        string              `yaml:"config-json-url" mapstructure:"config-json-url"`
+			FaceRecognitionDelay stdlibtime.Duration `yaml:"face-recognition-delay" mapstructure:"face-recognition-delay"`
+			LivenessDelay        stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
 		} `yaml:"kyc" mapstructure:"kyc"`
 		AdoptionMilestoneSwitch struct {
 			ActiveUserMilestones []struct {
