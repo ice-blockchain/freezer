@@ -123,8 +123,8 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
 		}
-		social1Required := len(*state.KYCStepsLastUpdatedAt) == int(users.Social1KYCStep)-1 ||
-			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social1KYCStep-1].Time) >= r.cfg.KYC.Social1Delay
+		social1Required := (len(*state.KYCStepsLastUpdatedAt) == int(users.Social1KYCStep)-1 && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social1Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social1Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
+			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social1KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social1KYCStep-1].Time) >= r.cfg.KYC.Social1Delay) //nolint:lll // .
 
 		if !state.MiningSessionSoloLastStartedAt.IsNil() && social1Required && r.isKYCEnabled(ctx, state.LatestDevice, users.Social1KYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
@@ -144,8 +144,8 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
 		}
-		social2Required := len(*state.KYCStepsLastUpdatedAt) == int(users.Social2KYCStep)-1 ||
-			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social2KYCStep-1].Time) >= r.cfg.KYC.Social2Delay
+		social2Required := (len(*state.KYCStepsLastUpdatedAt) == int(users.Social2KYCStep)-1 && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social2Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social2Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
+			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social2KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social2KYCStep-1].Time) >= r.cfg.KYC.Social2Delay) //nolint:lll // .
 
 		if !state.MiningSessionSoloLastStartedAt.IsNil() && social2Required && r.isKYCEnabled(ctx, state.LatestDevice, users.Social2KYCStep) {
 			return terror.New(ErrKYCRequired, map[string]any{
