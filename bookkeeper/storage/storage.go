@@ -392,9 +392,6 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 		format := date.UTC().Format(stdlibtime.RFC3339)
 		createdAtArray = append(createdAtArray, format[0:len(format)-1])
 	}
-	params := make(map[string]any, 2)
-	params["userId"] = id
-	params["createdAtArray"] = createdAtArray
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
 		Body: fmt.Sprintf(`SELECT created_at,
 								  balance_total_minted, 
@@ -569,6 +566,72 @@ func (db *db) getAdjustUserInformation(ctx context.Context, userIDArray []string
 	}); err != nil {
 		return nil, err
 	}
+
+	return res, nil
+}
+
+func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error) {
+	var (
+		createdAt              = proto.ColDateTime{Data: make([]proto.DateTime, 0, len(createdAts)), Location: stdlibtime.UTC}
+		balanceTotalStandard   = make(proto.ColFloat64, 0, len(createdAts))
+		balanceTotalPreStaking = make(proto.ColFloat64, 0, len(createdAts))
+		balanceTotalEthereum   = make(proto.ColFloat64, 0, len(createdAts))
+		res                    = make([]*TotalCoins, 0, len(createdAts))
+	)
+	createdAtArray := make([]string, 0, len(createdAts))
+	for _, date := range createdAts {
+		format := date.UTC().Format(stdlibtime.RFC3339)
+		createdAtArray = append(createdAtArray, format[0:len(format)-1])
+	}
+	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
+		Body: fmt.Sprintf(`SELECT created_at,
+								  sum(balance_total_standard) AS balance_total_standard,
+								  sum(balance_total_pre_staking) AS balance_total_pre_staking, 
+								  0 AS balance_total_ethereum
+						   FROM %[1]v
+						   WHERE created_at IN ['%[2]v']
+						   GROUP BY created_at`, tableName, strings.Join(createdAtArray, "','")),
+		Result: append(make(proto.Results, 0, 4),
+			proto.ResultColumn{Name: "created_at", Data: &createdAt},
+			proto.ResultColumn{Name: "balance_total_standard", Data: &balanceTotalStandard},
+			proto.ResultColumn{Name: "balance_total_pre_staking", Data: &balanceTotalPreStaking},
+			proto.ResultColumn{Name: "balance_total_ethereum", Data: &balanceTotalEthereum}),
+		OnResult: func(_ context.Context, block proto.Block) error {
+			for ix := 0; ix < block.Rows; ix++ {
+				res = append(res, &TotalCoins{
+					CreatedAt:              time.New((&createdAt).Row(ix)),
+					BalanceTotalStandard:   (&balanceTotalStandard).Row(ix),
+					BalanceTotalPreStaking: (&balanceTotalPreStaking).Row(ix),
+					BalanceTotalEthereum:   (&balanceTotalEthereum).Row(ix),
+				})
+			}
+			(&createdAt).Reset()
+			(&balanceTotalStandard).Reset()
+			(&balanceTotalPreStaking).Reset()
+			(&balanceTotalEthereum).Reset()
+
+			return nil
+		},
+		Secret:      "",
+		InitialUser: "",
+	}); err != nil {
+		return nil, err
+	}
+	dedupedRes := make([]*TotalCoins, 0, len(createdAts))
+	for _, rowA := range res {
+		found := false
+		for _, rowB := range dedupedRes {
+			if rowA.CreatedAt.Equal(*rowB.CreatedAt.Time) {
+				found = true
+
+				break
+			}
+		}
+		if !found {
+			dedupedRes = append(dedupedRes, rowA)
+		}
+	}
+	res = dedupedRes
 
 	return res, nil
 }

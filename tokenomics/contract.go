@@ -180,6 +180,7 @@ type (
 	}
 	ReadRepository interface {
 		GetBalanceSummary(ctx context.Context, userID string) (*BalanceSummary, error)
+		GetTotalCoinsSummary(ctx context.Context, days uint64, utcOffset stdlibtime.Duration) (*TotalCoinsSummary, error)
 		GetRankingSummary(ctx context.Context, userID string) (*RankingSummary, error)
 		GetTopMiners(ctx context.Context, keyword string, limit, offset uint64) (topMiners []*Miner, nextOffset uint64, err error)
 		GetMiningSummary(ctx context.Context, userID string) (*MiningSummary, error)

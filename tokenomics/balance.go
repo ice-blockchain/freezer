@@ -21,6 +21,42 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
+func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcOffset stdlibtime.Duration) (*TotalCoinsSummary, error) {
+	var (
+		dates                             = make([]stdlibtime.Time, 0, days)
+		res                               = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
+		now                               = time.Now()
+		location                          = stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
+		adjustForLatencyToProcessAllUsers = -(r.cfg.GlobalAggregationInterval.Child / 4)
+		truncationInterval                = r.cfg.GlobalAggregationInterval.Child
+		dayInterval                       = r.cfg.GlobalAggregationInterval.Parent
+	)
+	for day := uint64(0); day < days; day++ {
+		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(adjustForLatencyToProcessAllUsers).Truncate(truncationInterval)
+		dates = append(dates, date)
+		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: time.New(date)})
+	}
+	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to SelectTotalCoins for createdAts:%#v", dates)
+	}
+	for _, child := range res.TimeSeries {
+		for _, stats := range totalCoins {
+			if stats.CreatedAt.Equal(*child.Date.Time) {
+				child.Standard = stats.BalanceTotalStandard
+				child.PreStaking = stats.BalanceTotalPreStaking
+				child.Blockchain = stats.BalanceTotalEthereum
+				child.Total = child.Standard + child.PreStaking + child.Blockchain
+				break
+			}
+		}
+		child.Date = time.New(child.Date.In(location))
+	}
+	res.TotalCoins = res.TimeSeries[0].TotalCoins
+
+	return res, nil
+}
+
 func (r *repository) GetBalanceSummary( //nolint:lll // .
 	ctx context.Context, userID string,
 ) (*BalanceSummary, error) {

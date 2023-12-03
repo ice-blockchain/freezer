@@ -4,17 +4,15 @@ package main
 
 import (
 	"context"
-	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/tokenomics"
-	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/server"
-	"github.com/ice-blockchain/wintr/time"
 )
 
 func (s *service) setupStatisticsRoutes(router *server.Router) {
@@ -112,7 +110,7 @@ func (s *service) GetAdoption( //nolint:gocritic // False negative.
 //	@Failure		504					{object}	server.ErrorResponse	"if request times out"
 //	@Router			/tokenomics-statistics/total-coins [GET].
 func (s *service) GetTotalCoins( //nolint:gocritic // False negative.
-	_ context.Context,
+	ctx context.Context,
 	req *server.Request[GetTotalCoinsArg, tokenomics.TotalCoinsSummary],
 ) (*server.Response[tokenomics.TotalCoinsSummary], *server.Response[server.ErrorResponse]) {
 	const defaultDays, maxDays = 3, 90
@@ -122,40 +120,16 @@ func (s *service) GetTotalCoins( //nolint:gocritic // False negative.
 	if req.Data.Days > maxDays {
 		req.Data.Days = maxDays
 	}
-	tz := stdlibtime.UTC
-	if req.Data.TZ != "" {
-		var invertedTZ string
-		if req.Data.TZ[0] == '-' {
-			invertedTZ = "+" + req.Data.TZ[1:]
-		} else {
-			invertedTZ = "-" + req.Data.TZ[1:]
-		}
-		if t, err := stdlibtime.Parse("-07:00", invertedTZ); err == nil {
-			tz = t.Location()
-		}
+	if req.Data.TZ == "" {
+		req.Data.TZ = "+00:00"
 	}
-	if false { // TODO remove this and use it.
-		log.Info(tz.String())
+	utcOffset, err := stdlibtime.ParseDuration(strings.Replace(req.Data.TZ+"m", ":", "h", 1))
+	if err != nil {
+		return nil, server.UnprocessableEntity(errors.Wrapf(err, "invalid timezone:`%v`", req.Data.TZ), invalidPropertiesErrorCode)
 	}
-	resp := &tokenomics.TotalCoinsSummary{
-		TimeSeries: make([]*tokenomics.TotalCoinsTimeSeriesDataPoint, 0, req.Data.Days),
-		TotalCoins: tokenomics.TotalCoins{
-			Total:      float64(rand.Intn(10_000_000_000)),
-			Blockchain: float64(rand.Intn(10_000_000_000)),
-			Standard:   float64(rand.Intn(10_000_000_000)),
-			PreStaking: float64(rand.Intn(10_000_000_000)),
-		},
-	}
-	for ix := stdlibtime.Duration(0); ix < stdlibtime.Duration(req.Data.Days); ix++ {
-		resp.TimeSeries = append(resp.TimeSeries, &tokenomics.TotalCoinsTimeSeriesDataPoint{
-			Date: time.New(stdlibtime.Now().Add(-1 * ix * 24 * stdlibtime.Hour)),
-			TotalCoins: tokenomics.TotalCoins{
-				Total:      float64(rand.Intn(10_000_000_000)),
-				Blockchain: float64(rand.Intn(10_000_000_000)),
-				Standard:   float64(rand.Intn(10_000_000_000)),
-				PreStaking: float64(rand.Intn(10_000_000_000)),
-			},
-		})
+	resp, err := s.tokenomicsRepository.GetTotalCoinsSummary(ctx, req.Data.Days, utcOffset)
+	if err != nil {
+		return nil, server.Unexpected(errors.Wrapf(err, "failed to GetTotalCoinsSummary for userID:%v,req:%#v", req.AuthenticatedUser.UserID, req.Data))
 	}
 
 	return server.OK(resp), nil

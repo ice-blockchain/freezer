@@ -24,6 +24,7 @@ type (
 		Ping(ctx context.Context) error
 		Insert(ctx context.Context, columns *Columns, input InsertMetadata, usrs []*model.User) error
 		SelectBalanceHistory(ctx context.Context, id int64, createdAts []stdlibtime.Time) ([]*BalanceHistory, error)
+		SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error)
 		GetAdjustUserInformation(ctx context.Context, userIDs []string, limit, offset int64) ([]*AdjustUserInfo, error)
 	}
 	AdjustUserInfo struct {
@@ -50,6 +51,10 @@ type (
 	BalanceHistory struct {
 		CreatedAt                               *time.Time
 		BalanceTotalMinted, BalanceTotalSlashed float64
+	}
+	TotalCoins struct {
+		CreatedAt                                                          *time.Time
+		BalanceTotalStandard, BalanceTotalPreStaking, BalanceTotalEthereum float64
 	}
 	InsertMetadata = proto.Input
 	Columns        struct {
