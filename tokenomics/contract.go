@@ -100,7 +100,7 @@ type (
 		PreStaking float64 `json:"preStaking" example:"111111.2423"`
 	}
 	TotalCoinsTimeSeriesDataPoint struct {
-		Date *time.Time `json:"date" example:"2022-01-03T16:20:52.156534Z"`
+		Date stdlibtime.Time `json:"date" example:"2022-01-03T16:20:52.156534Z"`
 		TotalCoins
 	}
 	TotalCoinsSummary struct {

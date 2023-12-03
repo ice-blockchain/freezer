@@ -34,7 +34,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 	for day := uint64(0); day < days; day++ {
 		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(adjustForLatencyToProcessAllUsers).Truncate(truncationInterval)
 		dates = append(dates, date)
-		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: time.New(date)})
+		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
 	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
 	if err != nil {
@@ -42,7 +42,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 	}
 	for _, child := range res.TimeSeries {
 		for _, stats := range totalCoins {
-			if stats.CreatedAt.Equal(*child.Date.Time) {
+			if stats.CreatedAt.Equal(child.Date) {
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
@@ -50,7 +50,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 				break
 			}
 		}
-		child.Date = time.New(child.Date.In(location))
+		child.Date = child.Date.In(location)
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
 
