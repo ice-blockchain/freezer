@@ -587,7 +587,7 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		Body: fmt.Sprintf(`SELECT created_at,
 								  sum(balance_total_standard) AS balance_total_standard,
 								  sum(balance_total_pre_staking) AS balance_total_pre_staking, 
-								  0 AS balance_total_ethereum
+								  toFloat64(0) AS balance_total_ethereum
 						   FROM %[1]v
 						   WHERE created_at IN ['%[2]v']
 						   GROUP BY created_at`, tableName, strings.Join(createdAtArray, "','")),
