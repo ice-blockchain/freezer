@@ -108,13 +108,13 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			isAfterFirstWindow      = time.Now().Sub(*r.livenessLoadDistributionStartDate.Time) > r.cfg.KYC.FaceRecognitionDelay
 			isReservedForToday      = r.cfg.KYC.FaceRecognitionDelay <= r.cfg.MiningSessionDuration.Max || isAfterFirstWindow || int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.FaceRecognitionDelay)/r.cfg.MiningSessionDuration.Max) >= state.ID%int64(r.cfg.KYC.FaceRecognitionDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 		)
-		if r.isFaceAuthForced(state.UserID) || (atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) {
+		if r.isKYCStepForced(users.FacialRecognitionKYCStep, state.UserID) || (atLeastOneMiningStarted && isReservedForToday && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep},
 			})
 		}
 	case users.FacialRecognitionKYCStep:
-		if r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) && state.KYCStepBlocked != users.LivenessDetectionKYCStep {
+		if r.isKYCStepForced(users.LivenessDetectionKYCStep, state.UserID) || (r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) && state.KYCStepBlocked != users.LivenessDetectionKYCStep) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.LivenessDetectionKYCStep},
 			})
@@ -127,7 +127,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social1KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social1KYCStep-1].Time) >= r.cfg.KYC.Social1Delay) //nolint:lll // .
 		minDelaySinceLastLiveness := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
 
-		if !state.MiningSessionSoloLastStartedAt.IsNil() && social1Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social1KYCStep) {
+		if r.isKYCStepForced(users.Social1KYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && social1Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social1KYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.Social1KYCStep},
 			})
@@ -136,7 +136,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
 		}
-		if !state.MiningSessionSoloLastStartedAt.IsNil() && r.isQuizRequired(state) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep) {
+		if r.isKYCStepForced(users.QuizKYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && r.isQuizRequired(state) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.QuizKYCStep},
 			})
@@ -149,7 +149,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social2KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social2KYCStep-1].Time) >= r.cfg.KYC.Social2Delay) //nolint:lll // .
 		minDelaySinceLastLiveness := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
 
-		if !state.MiningSessionSoloLastStartedAt.IsNil() && social2Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social2KYCStep) {
+		if r.isKYCStepForced(users.Social2KYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && social2Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social2KYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
 				"kycSteps": []users.KYCStep{users.Social2KYCStep},
 			})
@@ -306,20 +306,62 @@ func (r *repository) isKycStepEnabledForDevice(kycStep users.KYCStep, device str
 	return true
 }
 
-func (r *repository) isFaceAuthForced(userID string) bool {
+func (r *repository) isKYCStepForced(state users.KYCStep, userID string) bool {
 	if userID == "" {
 		return false
 	}
-	var forceKYCForUserIds []string
-	if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
-		forceKYCForUserIds = cfgVal.FaceAuth.ForceKYCForUserIds
-	}
-	if len(forceKYCForUserIds) == 0 {
-		return false
-	}
-	for _, uID := range forceKYCForUserIds {
-		if strings.EqualFold(userID, strings.TrimSpace(uID)) {
-			return true
+	switch state {
+	case users.FacialRecognitionKYCStep, users.LivenessDetectionKYCStep:
+		var forceKYCForUserIds []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			forceKYCForUserIds = cfgVal.FaceAuth.ForceKYCForUserIds
+		}
+		if len(forceKYCForUserIds) == 0 {
+			return false
+		}
+		for _, uID := range forceKYCForUserIds {
+			if strings.EqualFold(userID, strings.TrimSpace(uID)) {
+				return true
+			}
+		}
+	case users.Social1KYCStep:
+		var forceKYCForUserIds []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			forceKYCForUserIds = cfgVal.Social1KYC.ForceKYCForUserIds
+		}
+		if len(forceKYCForUserIds) == 0 {
+			return false
+		}
+		for _, uID := range forceKYCForUserIds {
+			if strings.EqualFold(userID, strings.TrimSpace(uID)) {
+				return true
+			}
+		}
+	case users.QuizKYCStep:
+		var forceKYCForUserIds []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			forceKYCForUserIds = cfgVal.QuizKYC.ForceKYCForUserIds
+		}
+		if len(forceKYCForUserIds) == 0 {
+			return false
+		}
+		for _, uID := range forceKYCForUserIds {
+			if strings.EqualFold(userID, strings.TrimSpace(uID)) {
+				return true
+			}
+		}
+	case users.Social2KYCStep:
+		var forceKYCForUserIds []string
+		if cfgVal := r.cfg.kycConfigJSON.Load(); cfgVal != nil {
+			forceKYCForUserIds = cfgVal.Social2KYC.ForceKYCForUserIds
+		}
+		if len(forceKYCForUserIds) == 0 {
+			return false
+		}
+		for _, uID := range forceKYCForUserIds {
+			if strings.EqualFold(userID, strings.TrimSpace(uID)) {
+				return true
+			}
 		}
 	}
 

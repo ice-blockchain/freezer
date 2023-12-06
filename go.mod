@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.214.0
+	github.com/ice-blockchain/eskimo v1.218.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
 	github.com/ice-blockchain/wintr v1.125.0
 	github.com/imroc/req/v3 v3.42.2
@@ -134,7 +134,7 @@ require (
 	github.com/swaggo/files v1.0.1 // indirect
 	github.com/swaggo/gin-swagger v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/twmb/franz-go v1.15.2 // indirect
+	github.com/twmb/franz-go v1.15.3 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.10.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.7.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
@@ -158,7 +158,7 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
-	google.golang.org/api v0.152.0 // indirect
+	google.golang.org/api v0.153.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/appengine/v2 v2.0.5 // indirect
 	google.golang.org/genproto v0.0.0-20231127180814-3a041ad873d4 // indirect
