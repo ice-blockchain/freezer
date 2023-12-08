@@ -383,9 +383,10 @@ func (t *TimeSlice) UnmarshalJSON(text []byte) error {
 		if err := unmarshalledTime.UnmarshalJSON(context.Background(), val); err != nil {
 			return errors.Wrapf(err, "failed to UnmarshalJSON %#v:%v", unmarshalledTime, string(val))
 		}
-		if !unmarshalledTime.IsNil() {
-			timeSlice = append(timeSlice, unmarshalledTime)
+		if unmarshalledTime.IsNil() {
+			unmarshalledTime = nil
 		}
+		timeSlice = append(timeSlice, unmarshalledTime)
 	}
 	*t = timeSlice
 
@@ -405,13 +406,37 @@ func (t *TimeSlice) UnmarshalText(text []byte) error {
 		if err := unmarshalledTime.UnmarshalText(val); err != nil {
 			return errors.Wrapf(err, "failed to unmarshall %#v:%v", unmarshalledTime, string(val))
 		}
-		if !unmarshalledTime.IsNil() {
-			timeSlice = append(timeSlice, unmarshalledTime)
+		if unmarshalledTime.IsNil() {
+			unmarshalledTime = nil
 		}
+		timeSlice = append(timeSlice, unmarshalledTime)
 	}
 	*t = timeSlice
 
 	return nil
+}
+func (t *TimeSlice) MarshalJSON() ([]byte, error) {
+	if t == nil || *t == nil {
+		return []byte("null"), nil
+	} else if len(*t) == 0 {
+		return []byte("[]"), nil
+	}
+	timeSlice := *t
+	data := make([]byte, 0, (len(timeSlice)*(len(stdlibtime.RFC3339Nano)+len(`""`)+1))+2)
+	data = append(data, '[')
+	for ix, elem := range timeSlice {
+		marshalled, err := elem.MarshalJSON(context.Background())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshall %#v", elem)
+		}
+		data = append(data, marshalled...)
+		if ix != len(timeSlice)-1 {
+			data = append(data, ',')
+		}
+	}
+	data = append(data, ']')
+
+	return data, nil
 }
 
 func (t *TimeSlice) MarshalText() ([]byte, error) {
@@ -428,9 +453,6 @@ func (t *TimeSlice) MarshalBinary() ([]byte, error) {
 		marshalledTime, err := val.MarshalText()
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to marshall: %#v", val)
-		}
-		if len(marshalledTime) == 0 {
-			continue
 		}
 		text = append(text, marshalledTime...)
 		if ix != len(timeSlice)-1 {

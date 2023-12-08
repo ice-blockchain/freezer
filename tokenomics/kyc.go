@@ -123,9 +123,9 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
 		}
-		social1Required := (len(*state.KYCStepsLastUpdatedAt) == int(users.Social1KYCStep)-1 && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social1Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social1Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
-			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social1KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social1KYCStep-1].Time) >= r.cfg.KYC.Social1Delay) //nolint:lll // .
-		minDelaySinceLastLiveness := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
+		social1Required := (state.KYCStepAttempted(users.Social1KYCStep-1) && state.KYCStepNotAttempted(users.Social1KYCStep) && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social1Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social1Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
+			state.DelayPassedSinceLastKYCStepAttempt(users.Social1KYCStep, r.cfg.KYC.Social1Delay)
+		minDelaySinceLastLiveness := state.DelayPassedSinceLastKYCStepAttempt(users.LivenessDetectionKYCStep, r.cfg.MiningSessionDuration.Min)
 
 		if r.isKYCStepForced(users.Social1KYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && social1Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social1KYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
@@ -145,9 +145,9 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
 		}
-		social2Required := (len(*state.KYCStepsLastUpdatedAt) == int(users.Social2KYCStep)-1 && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social2Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social2Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
-			(len(*state.KYCStepsLastUpdatedAt) >= int(users.Social2KYCStep) && time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.Social2KYCStep-1].Time) >= r.cfg.KYC.Social2Delay) //nolint:lll // .
-		minDelaySinceLastLiveness := time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time) >= r.cfg.MiningSessionDuration.Min
+		social2Required := (state.KYCStepAttempted(users.Social2KYCStep-1) && state.KYCStepNotAttempted(users.Social2KYCStep) && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%(2*r.cfg.KYC.Social2Delay))/r.cfg.MiningSessionDuration.Max) >= state.ID%int64((2*r.cfg.KYC.Social2Delay)/r.cfg.MiningSessionDuration.Max)) || //nolint:lll // .
+			state.DelayPassedSinceLastKYCStepAttempt(users.Social2KYCStep, r.cfg.KYC.Social2Delay)
+		minDelaySinceLastLiveness := state.DelayPassedSinceLastKYCStepAttempt(users.LivenessDetectionKYCStep, r.cfg.MiningSessionDuration.Min)
 
 		if r.isKYCStepForced(users.Social2KYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && social2Required && minDelaySinceLastLiveness && r.isKYCEnabled(ctx, state.LatestDevice, users.Social2KYCStep)) { //nolint:lll // .
 			return terror.New(ErrKYCRequired, map[string]any{
@@ -165,10 +165,9 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 
 func (r *repository) verifyLivenessKYC(ctx context.Context, state *getCurrentMiningSession) error {
 	var (
-		timeSinceLivenessLastFinished = time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.LivenessDetectionKYCStep-1].Time)
-		isAfterDelay                  = timeSinceLivenessLastFinished >= r.cfg.KYC.LivenessDelay
-		isNetworkDelayAdjusted        = timeSinceLivenessLastFinished >= r.cfg.MiningSessionDuration.Max
-		isReservedForToday            = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
+		isAfterDelay           = state.DelayPassedSinceLastKYCStepAttempt(users.LivenessDetectionKYCStep, r.cfg.KYC.LivenessDelay)
+		isNetworkDelayAdjusted = state.DelayPassedSinceLastKYCStepAttempt(users.LivenessDetectionKYCStep, r.cfg.MiningSessionDuration.Max)
+		isReservedForToday     = r.cfg.KYC.LivenessDelay > r.cfg.MiningSessionDuration.Max && int64((time.Now().Sub(*r.livenessLoadDistributionStartDate.Time)%r.cfg.KYC.LivenessDelay)/r.cfg.MiningSessionDuration.Max) == state.ID%int64(r.cfg.KYC.LivenessDelay/r.cfg.MiningSessionDuration.Max) //nolint:lll // .
 	)
 	if isNetworkDelayAdjusted && (isAfterDelay || isReservedForToday) && r.isKYCEnabled(ctx, state.LatestDevice, users.LivenessDetectionKYCStep) {
 		return terror.New(ErrKYCRequired, map[string]any{
@@ -180,12 +179,10 @@ func (r *repository) verifyLivenessKYC(ctx context.Context, state *getCurrentMin
 }
 
 func (r *repository) isQuizRequired(state *getCurrentMiningSession) bool {
-	requireQuiz := len(*state.KYCStepsLastUpdatedAt) == int(users.QuizKYCStep)-1 ||
-		time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.QuizKYCStep-1].Time) >= r.cfg.KYC.QuizDelay
+	requireQuiz := (state.KYCStepAttempted(users.QuizKYCStep-1) && state.KYCStepNotAttempted(users.QuizKYCStep)) || state.DelayPassedSinceLastKYCStepAttempt(users.QuizKYCStep, r.cfg.KYC.QuizDelay) //nolint:lll // .
 	if r.cfg.KYC.RequireQuizOnlyOnSpecificDayOfWeek != nil {
 		offset := stdlibtime.Duration(state.UTCOffset) * stdlibtime.Minute
-		requireQuiz = (len(*state.KYCStepsLastUpdatedAt) == int(users.QuizKYCStep)-1 ||
-			time.Now().Sub(*(*state.KYCStepsLastUpdatedAt)[users.QuizKYCStep-1].Time) >= 2*r.cfg.MiningSessionDuration.Max) &&
+		requireQuiz = ((state.KYCStepAttempted(users.QuizKYCStep-1) && state.KYCStepNotAttempted(users.QuizKYCStep)) || state.DelayPassedSinceLastKYCStepAttempt(users.QuizKYCStep, 2*r.cfg.MiningSessionDuration.Max)) && //nolint:lll // .
 			int(time.Now().In(stdlibtime.FixedZone(offset.String(), int(offset.Seconds()))).Weekday()) == *r.cfg.KYC.RequireQuizOnlyOnSpecificDayOfWeek
 	}
 
@@ -366,6 +363,18 @@ func (r *repository) isKYCStepForced(state users.KYCStep, userID string) bool {
 	}
 
 	return false
+}
+
+func (kyc *KYCState) KYCStepNotAttempted(kycStep users.KYCStep) bool {
+	return !kyc.KYCStepAttempted(kycStep)
+}
+
+func (kyc *KYCState) KYCStepAttempted(kycStep users.KYCStep) bool {
+	return kyc.KYCStepsLastUpdatedAt != nil && len(*kyc.KYCStepsLastUpdatedAt) >= int(kycStep) && !(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].IsNil()
+}
+
+func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, duration stdlibtime.Duration) bool {
+	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
 }
 
 /*
