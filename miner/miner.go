@@ -511,12 +511,16 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if t0Ref != nil {
 					if IDT0Changed {
 						if !usr.BalanceLastUpdatedAt.IsNil() {
+							log.Info(fmt.Sprintf("idT0 changed for:%v from:%v to:%v, t1 referrals for:%v were incremented by 1", usr.ID, usr.IDT0, updatedUser.IDT0, t0Ref.ID))
+
 							t1ReferralsToIncrementActiveValue[t0Ref.ID]++
 							if t0Ref.IDT0 != 0 {
 								t2ReferralsToIncrementActiveValue[t0Ref.IDT0]++
 							}
 						}
 						if usr.ActiveT1Referrals > 0 && t0Ref.ID != 0 {
+							log.Info(fmt.Sprintf("idT0 changed for:%v from:%v to:%v, t2 referrals for:%v were incremented by: %v", usr.ID, usr.IDT0, updatedUser.IDT0, t0Ref.ID, usr.ActiveT1Referrals))
+
 							t2ReferralsToIncrementActiveValue[t0Ref.ID] += usr.ActiveT1Referrals
 						}
 					}
@@ -706,7 +710,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				continue
 			}
 		}
-		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(updatedUsers)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
+		if len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(updatedUsers)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(backupUsersUpdated)+len(userGlobalRanks) > 0 {
 			go m.telemetry.collectElapsed(7, *before.Time)
 		}
 
