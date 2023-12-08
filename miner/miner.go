@@ -515,6 +515,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 							t1ReferralsToIncrementActiveValue[t0Ref.ID]++
 							if t0Ref.IDT0 != 0 {
+								log.Info(fmt.Sprintf("idT0 changed for:%v from:%v to:%v, t2 referrals for:%v were incremented by 1", usr.ID, usr.IDT0, updatedUser.IDT0, t0Ref.IDT0))
+
 								t2ReferralsToIncrementActiveValue[t0Ref.IDT0]++
 							}
 						}
@@ -544,6 +546,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					referralsUpdated = append(referralsUpdated, updUsr)
 					if t0Ref != nil && t0Ref.ID != 0 && usr.ActiveT1Referrals > 0 {
 						t2ReferralsToIncrementActiveValue[t0Ref.ID] += usr.ActiveT1Referrals
+
+						log.Info(fmt.Sprintf("t2 referals for:%v were incremented by:%v", usr.ID, usr.ActiveT1Referrals))
 					}
 				}
 			}

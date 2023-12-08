@@ -16,6 +16,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/terror"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -148,6 +149,8 @@ func (r *repository) updateTMinus1(ctx context.Context, id, idT0, idTMinus1 int6
 		idTMinus1 = t0Data[0].IDT0
 		if idTMinus1 > 0 {
 			idTMinus1 *= -1
+
+			log.Info(fmt.Sprintf("idTMinus1 for:%v was changed to negative value:%v", id, idTMinus1))
 		}
 	}
 
@@ -325,9 +328,15 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 	if referees[0].IDT0 == 0 || referees[0].IDTMinus1 == 0 {
 		if referees[0].IDT0 >= 1 {
 			err = s.db.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDT0), "active_t1_referrals", 1).Err()
+			if err == nil {
+				log.Info(fmt.Sprintf("t1 active referrals were incremented by 1 for:%v", referees[0].IDT0))
+			}
 		}
 		if referees[0].IDTMinus1 >= 1 {
 			err = s.db.HIncrBy(ctx, model.SerializedUsersKey(referees[0].IDTMinus1), "active_t2_referrals", 1).Err()
+			if err == nil {
+				log.Info(fmt.Sprintf("t2 active referrals were incremented by 1 for:%v", referees[0].IDTMinus1))
+			}
 		}
 	} else {
 		responses, txErr := s.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
@@ -342,6 +351,9 @@ func (s *miningSessionsTableSource) incrementActiveReferralCountForT0AndTMinus1(
 				errs = append(errs, errors.Wrapf(response.Err(), "failed to `%v`", response.FullName()))
 			}
 			txErr = multierror.Append(nil, errs...).ErrorOrNil()
+			if txErr == nil {
+				log.Info(fmt.Sprintf("t1 referrals were incremented by 1 for:%v, t2 referrals were incremented by 1 for:%v", referees[0].IDT0, referees[0].IDTMinus1))
+			}
 		}
 		err = txErr
 	}
