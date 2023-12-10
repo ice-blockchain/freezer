@@ -28,6 +28,7 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloDayOffLastAwardedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
+		model.ReferralsCountChangeGuardUpdatedAtField
 		model.DeserializedUsersKey
 	}
 	KYCState struct {
@@ -50,6 +51,7 @@ type (
 		model.IDTMinus1Field
 		model.PreStakingAllocationField
 		model.PreStakingBonusField
+		model.ReferralsCountChangeGuardUpdatedAtField
 	}
 )
 
@@ -74,6 +76,12 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		!old[0].MiningSessionSoloLastStartedAt.IsNil() &&
 		old[0].MiningSessionSoloEndedAt.After(*now.Time) &&
 		(now.Sub(*old[0].MiningSessionSoloLastStartedAt.Time)/r.cfg.MiningSessionDuration.Min)%2 == 0 {
+		return ErrDuplicate
+	}
+	if !old[0].MiningSessionSoloEndedAt.IsNil() &&
+		!old[0].ReferralsCountChangeGuardUpdatedAt.IsNil() &&
+		now.After(*old[0].MiningSessionSoloEndedAt.Time) &&
+		old[0].MiningSessionSoloStartedAt.Equal(*old[0].ReferralsCountChangeGuardUpdatedAt.Time) {
 		return ErrDuplicate
 	}
 	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress) //nolint:lll // .
@@ -196,6 +204,7 @@ func (r *repository) newStartOrExtendMiningSession(old *StartOrExtendMiningSessi
 	resp.MiningSessionSoloEndedAt = time.New(now.Add(r.cfg.MiningSessionDuration.Max))
 	resp.MiningSessionSoloPreviouslyEndedAt = old.MiningSessionSoloEndedAt
 	resp.MiningSessionSoloDayOffLastAwardedAt = new(time.Time)
+	resp.ReferralsCountChangeGuardUpdatedAt = now
 
 	if old.MiningSessionSoloEndedAt.IsNil() || old.MiningSessionSoloStartedAt.IsNil() || old.MiningSessionSoloEndedAt.Before(*now.Time) {
 		return resp, r.cfg.MiningSessionDuration.Max

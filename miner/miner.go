@@ -175,6 +175,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		errs                                                                 = make([]error, 0, 3*batchSize)
 		updatedUsers                                                         = make([]*UpdatedUser, 0, batchSize)
 		extraBonusOnlyUpdatedUsers                                           = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
+		referralsCountGuardOnlyUpdatedUsers                                  = make([]*referralCountGuardUpdatedUser, 0, batchSize)
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
@@ -224,6 +225,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
 		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
+		referralsCountGuardOnlyUpdatedUsers = referralsCountGuardOnlyUpdatedUsers[:0]
 		referralsUpdated = referralsUpdated[:0]
 		histories = histories[:0]
 		userGlobalRanks = userGlobalRanks[:0]
@@ -502,6 +504,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if true || balanceBackupMode || !backupExists {
 					if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 						referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
+						referralsCountGuardOnlyUpdatedUsers = append(referralsCountGuardOnlyUpdatedUsers, &referralCountGuardUpdatedUser{
+							DeserializedUsersKey:                    usr.DeserializedUsersKey,
+							ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: time.Now()},
+						})
 					}
 				}
 
@@ -628,7 +634,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 
 		var pipeliner redis.Pipeliner
-		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks)+len(backupUsersUpdated) > 0 {
+		if len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks)+len(backupUsersUpdated) > 0 {
 			pipeliner = m.db.TxPipeline()
 		} else {
 			pipeliner = m.db.Pipeline()
@@ -653,6 +659,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			for id, value := range t2ReferralsThatStoppedMining {
 				if err := pipeliner.HIncrBy(reqCtx, model.SerializedUsersKey(id), "active_t2_referrals", -int64(value)).Err(); err != nil {
+					return err
+				}
+			}
+			for _, value := range referralsCountGuardOnlyUpdatedUsers {
+				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err
 				}
 			}
