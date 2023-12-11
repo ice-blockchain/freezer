@@ -52,9 +52,10 @@ func TestRepositoryNewStartOrExtendMiningSession_CloseToMin(t *testing.T) { //no
 	assert.Len(t, actual, 27)
 	ix := 0
 	assert.EqualValues(t, &StartOrExtendMiningSession{
-		MiningSessionSoloLastStartedAtField: model.MiningSessionSoloLastStartedAtField{MiningSessionSoloLastStartedAt: startDates[ix]},
-		MiningSessionSoloStartedAtField:     model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[0]},
-		MiningSessionSoloEndedAtField:       model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
+		MiningSessionSoloLastStartedAtField:     model.MiningSessionSoloLastStartedAtField{MiningSessionSoloLastStartedAt: startDates[ix]},
+		MiningSessionSoloStartedAtField:         model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[0]},
+		MiningSessionSoloEndedAtField:           model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
+		ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: startDates[0]},
 	}, actual[ix])
 	assert.EqualValues(t, repo.cfg.MiningSessionDuration.Max, extensions[ix])
 	ix++
@@ -254,6 +255,7 @@ func TestRepositoryNewStartOrExtendMiningSession_CloseToMin(t *testing.T) { //no
 		MiningSessionSoloStartedAtField:         model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[ix]},
 		MiningSessionSoloEndedAtField:           model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
 		MiningSessionSoloPreviouslyEndedAtField: model.MiningSessionSoloPreviouslyEndedAtField{MiningSessionSoloPreviouslyEndedAt: time.New(startDates[ix-1].Add(repo.cfg.MiningSessionDuration.Max))},
+		ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: startDates[ix]},
 	}, actual[ix])
 	assert.EqualValues(t, repo.cfg.MiningSessionDuration.Max, extensions[ix])
 }
@@ -297,9 +299,10 @@ func TestRepositoryNewStartOrExtendMiningSession_CloseToMax(t *testing.T) { //no
 	assert.Len(t, actual, 27)
 	ix := 0
 	assert.EqualValues(t, &StartOrExtendMiningSession{
-		MiningSessionSoloLastStartedAtField: model.MiningSessionSoloLastStartedAtField{MiningSessionSoloLastStartedAt: startDates[ix]},
-		MiningSessionSoloStartedAtField:     model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[0]},
-		MiningSessionSoloEndedAtField:       model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
+		MiningSessionSoloLastStartedAtField:     model.MiningSessionSoloLastStartedAtField{MiningSessionSoloLastStartedAt: startDates[ix]},
+		MiningSessionSoloStartedAtField:         model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[0]},
+		MiningSessionSoloEndedAtField:           model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
+		ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: startDates[0]},
 	}, actual[ix])
 	assert.EqualValues(t, repo.cfg.MiningSessionDuration.Max, extensions[ix])
 	ix++
@@ -504,6 +507,7 @@ func TestRepositoryNewStartOrExtendMiningSession_CloseToMax(t *testing.T) { //no
 		MiningSessionSoloStartedAtField:         model.MiningSessionSoloStartedAtField{MiningSessionSoloStartedAt: startDates[ix]},
 		MiningSessionSoloEndedAtField:           model.MiningSessionSoloEndedAtField{MiningSessionSoloEndedAt: time.New(startDates[ix].Add(repo.cfg.MiningSessionDuration.Max))},
 		MiningSessionSoloPreviouslyEndedAtField: model.MiningSessionSoloPreviouslyEndedAtField{MiningSessionSoloPreviouslyEndedAt: time.New(startDates[ix-1].Add(repo.cfg.MiningSessionDuration.Max).Add(repo.cfg.MiningSessionDuration.Max))},
+		ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: startDates[ix]},
 	}, actual[ix])
 	assert.EqualValues(t, repo.cfg.MiningSessionDuration.Max, extensions[ix])
 }
