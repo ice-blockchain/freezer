@@ -14,7 +14,6 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
-	"github.com/pkg/errors"
 )
 
 type (
