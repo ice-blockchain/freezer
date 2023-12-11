@@ -204,7 +204,9 @@ func (r *repository) newStartOrExtendMiningSession(old *StartOrExtendMiningSessi
 	resp.MiningSessionSoloEndedAt = time.New(now.Add(r.cfg.MiningSessionDuration.Max))
 	resp.MiningSessionSoloPreviouslyEndedAt = old.MiningSessionSoloEndedAt
 	resp.MiningSessionSoloDayOffLastAwardedAt = new(time.Time)
-	resp.ReferralsCountChangeGuardUpdatedAt = now
+	if old.MiningSessionSoloEndedAt.IsNil() || old.MiningSessionSoloEndedAt.Before(*now.Time) {
+		resp.ReferralsCountChangeGuardUpdatedAt = now
+	}
 
 	if old.MiningSessionSoloEndedAt.IsNil() || old.MiningSessionSoloStartedAt.IsNil() || old.MiningSessionSoloEndedAt.Before(*now.Time) {
 		return resp, r.cfg.MiningSessionDuration.Max
