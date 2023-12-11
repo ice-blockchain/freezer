@@ -105,6 +105,9 @@ type (
 	BalancesBackupUsedAtField struct {
 		BalancesBackupUsedAt *time.Time `redis:"balance_backup_used_at,omitempty"`
 	}
+	ReferralsCountChangeGuardUpdatedAtField struct {
+		ReferralsCountChangeGuardUpdatedAt *time.Time `redis:"referrals_count_change_guard_updated_at,omitempty"`
+	}
 	UserIDField struct {
 		UserID string `redis:"user_id,omitempty"`
 	}
