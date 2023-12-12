@@ -358,7 +358,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		if !balanceBackupMode {
-			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), 2*requestDeadline)
 			recalculationHistory, err = m.gatherHistoryAndReferralsInformation(reqCtx, userResults)
 			if err != nil {
 				log.Error(errors.New("tiers diff balances error"), workerNumber, err)

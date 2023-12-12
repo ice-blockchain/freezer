@@ -348,9 +348,10 @@ func (m *miner) gatherHistoryAndReferralsInformation(ctx context.Context, users 
 	}
 	offset := int64(0)
 	for {
+		start := stdlibtime.Now()
 		historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, userResults, maxLimit, offset)
 		if err != nil {
-			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", userResults)
+			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v, elapsed:%v", userResults, stdlibtime.Since(start))
 		}
 		if len(historyInformation) == 0 {
 			break
