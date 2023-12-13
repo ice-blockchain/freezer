@@ -23,8 +23,6 @@ type (
 		model.ExtraBonusLastClaimAvailableAtField
 		model.DeserializedUsersKey
 		model.ExtraBonusDaysClaimNotAvailableResettableField
-		model.PreStakingBonusField
-		model.PreStakingAllocationField
 		ExtraBonusIndex uint16 `redis:"-"`
 	}
 	ExtraBonusAvailable struct {

@@ -105,16 +105,12 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
-		model.PreStakingBonusField
-		model.PreStakingAllocationField
 	}
 
 	referralUpdated struct {
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field
-		model.PreStakingBonusField
-		model.PreStakingAllocationField
 	}
 
 	backupUserUpdated struct {
@@ -142,6 +138,12 @@ type (
 		model.ResurrectSoloUsedAtField
 		model.UserIDField
 		model.IDT0Field
+		model.DeserializedUsersKey
+	}
+
+	prestakingResettableUpdatedUser struct {
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
 		model.DeserializedUsersKey
 	}
 
