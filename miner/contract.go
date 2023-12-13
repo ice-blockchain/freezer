@@ -42,7 +42,7 @@ const (
 	applicationYamlKey       = "miner"
 	parentApplicationYamlKey = "tokenomics"
 	requestDeadline          = 30 * stdlibtime.Second
-	balanceBugFixEnabled     = false
+	balanceBugFixEnabled     = true
 )
 
 // .
@@ -122,8 +122,6 @@ type (
 		model.SlashingRateT2Field
 		model.FirstRecalculatedBalanceT1Field
 		model.FirstRecalculatedBalanceT2Field
-		model.FirstRecalculatedSlashingRateT1Field
-		model.FirstRecalculatedSlashingRateT2Field
 		model.DeserializedBackupUsersKey
 		model.ActiveT1ReferralsField
 		model.ActiveT2ReferralsField
@@ -138,6 +136,13 @@ type (
 		model.ResurrectSoloUsedAtField
 		model.UserIDField
 		model.IDT0Field
+		model.DeserializedUsersKey
+	}
+
+	recalculateReferral struct {
+		model.BalanceForT0Field
+		model.BalanceForTMinus1Field
+		model.UserIDField
 		model.DeserializedUsersKey
 	}
 

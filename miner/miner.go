@@ -181,12 +181,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
+		balanceRecalculationDryRunItems                                      = make([]*balanceRecalculationDryRun, 0, batchSize)
 		backupedUsers                                                        = make(map[int64]*backupUserUpdated, batchSize)
 		backupUsersUpdated                                                   = make([]*backupUserUpdated, 0, batchSize)
 		recalculatedTiersBalancesUsers                                       = make(map[int64]*user, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
-		recalculationHistory                                                 *historyData
+		recalculationInfo                                                    *recalculationData
 		allAdoptions                                                         []*tokenomics.Adoption[float64]
 	)
 	resetVars := func(success bool) {
@@ -231,6 +232,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
 		referralsCountGuardOnlyUpdatedUsers = referralsCountGuardOnlyUpdatedUsers[:0]
 		referralsUpdated = referralsUpdated[:0]
+		balanceRecalculationDryRunItems = balanceRecalculationDryRunItems[:0]
 		histories = histories[:0]
 		userGlobalRanks = userGlobalRanks[:0]
 		referralsThatStoppedMining = referralsThatStoppedMining[:0]
@@ -369,7 +371,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if balanceBugFixEnabled {
 			if !balanceBackupMode {
 				reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-				recalculationHistory, err = m.gatherHistoryAndReferralsInformation(reqCtx, userResults)
+				recalculationInfo, err = m.gatherReferralsInformation(reqCtx, userResults)
 				if err != nil {
 					log.Error(errors.New("tiers diff balances error"), workerNumber, err)
 				}
@@ -414,44 +416,62 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						}
 					}
 				} else {
-					if recalculatedUsr := m.recalculateUser(usr, allAdoptions, recalculationHistory); recalculatedUsr != nil {
-						diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
-						diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
-
-						oldBalanceT1 := usr.BalanceT1
-						oldBalanceT2 := usr.BalanceT2
-
-						if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
-							diffT1ActiveValue = -usr.ActiveT1Referrals
-						}
-						if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
-							diffT2ActiveValue = -usr.ActiveT2Referrals
-						}
-
-						oldSlashingT1Rate := usr.SlashingRateT1
-						oldSlashingT2Rate := usr.SlashingRateT2
-
-						if false {
-							t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
-							t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
-
-							usr.BalanceT1 = recalculatedUsr.BalanceT1
-							usr.BalanceT2 = recalculatedUsr.BalanceT2
-
-							usr.SlashingRateT1 = recalculatedUsr.SlashingRateT1
-							usr.SlashingRateT2 = recalculatedUsr.SlashingRateT2
-						}
-						if !backupExists {
-							metrics.AffectedUsers += 1
-							if recalculatedUsr.BalanceT1-oldBalanceT1 >= 0 {
-								metrics.T1BalancePositive += recalculatedUsr.BalanceT1 - oldBalanceT1
-							} else {
-								metrics.T1BalanceNegative += recalculatedUsr.BalanceT1 - oldBalanceT1
+					if !backupExists && recalculationInfo != nil {
+						if _, ok := recalculationInfo.NeedToBeRecalculatedUsers[usr.UserID]; ok {
+							balanceT1, balanceT2 := 0.0, 0.0
+							if recalculationInfo.T1Referrals != nil {
+								if referralsT1, ok := recalculationInfo.T1Referrals[usr.UserID]; ok {
+									for _, ref := range referralsT1 {
+										if _, ok := recalculationInfo.Referrals[ref]; ok {
+											balanceT1 += recalculationInfo.Referrals[ref].BalanceForT0
+										}
+									}
+								}
 							}
-							if recalculatedUsr.BalanceT2-oldBalanceT2 >= 0 {
-								metrics.T2BalancePositive += recalculatedUsr.BalanceT2 - oldBalanceT2
+							if recalculationInfo.T2Referrals != nil {
+								if referralsT2, ok := recalculationInfo.T2Referrals[usr.UserID]; ok {
+									for _, ref := range referralsT2 {
+										if _, ok := recalculationInfo.Referrals[ref]; ok {
+											balanceT2 += recalculationInfo.Referrals[ref].BalanceForTMinus1
+										}
+									}
+								}
+							}
+
+							diffT1ActiveValue := recalculationInfo.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
+							diffT2ActiveValue := recalculationInfo.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
+
+							oldBalanceT1 := usr.BalanceT1
+							oldBalanceT2 := usr.BalanceT2
+
+							if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
+								diffT1ActiveValue = -usr.ActiveT1Referrals
+							}
+							if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
+								diffT2ActiveValue = -usr.ActiveT2Referrals
+							}
+							if false {
+								t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+								t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
+
+								usr.BalanceT1 = balanceT1
+								usr.BalanceT2 = balanceT2
+							}
+
+							metrics.AffectedUsers += 1
+
+							t1BalanceDiff := balanceT1 - oldBalanceT1
+							t2BalanceDiff := balanceT2 - oldBalanceT2
+
+							if t1BalanceDiff >= 0 {
+								metrics.T1BalancePositive += t1BalanceDiff
 							} else {
-								metrics.T2BalanceNegative += recalculatedUsr.BalanceT2 - oldBalanceT2
+								metrics.T1BalanceNegative += t1BalanceDiff
+							}
+							if t2BalanceDiff >= 0 {
+								metrics.T2BalancePositive += t2BalanceDiff
+							} else {
+								metrics.T2BalanceNegative += t2BalanceDiff
 							}
 							if diffT1ActiveValue < 0 {
 								metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
@@ -463,20 +483,49 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 							} else {
 								metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
 							}
+							if !backupExists {
+								metrics.AffectedUsers += 1
+								if t1BalanceDiff >= 0 {
+									metrics.T1BalancePositive += t1BalanceDiff
+								} else {
+									metrics.T1BalanceNegative += t1BalanceDiff
+								}
+								if t2BalanceDiff >= 0 {
+									metrics.T2BalancePositive += t2BalanceDiff
+								} else {
+									metrics.T2BalanceNegative += t2BalanceDiff
+								}
+								if diffT1ActiveValue < 0 {
+									metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
+								} else {
+									metrics.T1ActiveCountsPositive += int64(diffT1ActiveValue)
+								}
+								if diffT2ActiveValue < 0 {
+									metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
+								} else {
+									metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
+								}
+							}
+
+							balanceRecalculationDryRunItems = append(balanceRecalculationDryRunItems, &balanceRecalculationDryRun{
+								T1BalanceDiff:      t1BalanceDiff,
+								T2BalanceDiff:      t2BalanceDiff,
+								T1ActiveCountsDiff: diffT1ActiveValue,
+								T2ActiveCountsDiff: diffT2ActiveValue,
+								UserID:             usr.UserID,
+							})
 
 							backupUsersUpdated = append(backupUsersUpdated, &backupUserUpdated{
 								DeserializedBackupUsersKey:              model.DeserializedBackupUsersKey{ID: usr.ID},
 								UserIDField:                             usr.UserIDField,
 								BalanceT1Field:                          model.BalanceT1Field{BalanceT1: oldBalanceT1},
 								BalanceT2Field:                          model.BalanceT2Field{BalanceT2: oldBalanceT2},
-								SlashingRateT1Field:                     model.SlashingRateT1Field{SlashingRateT1: oldSlashingT1Rate},
-								SlashingRateT2Field:                     model.SlashingRateT2Field{SlashingRateT2: oldSlashingT2Rate},
+								SlashingRateT1Field:                     model.SlashingRateT1Field{SlashingRateT1: usr.SlashingRateT1},
+								SlashingRateT2Field:                     model.SlashingRateT2Field{SlashingRateT2: usr.SlashingRateT2},
 								ActiveT1ReferralsField:                  model.ActiveT1ReferralsField{ActiveT1Referrals: usr.ActiveT1Referrals},
 								ActiveT2ReferralsField:                  model.ActiveT2ReferralsField{ActiveT2Referrals: usr.ActiveT2Referrals},
-								FirstRecalculatedBalanceT1Field:         model.FirstRecalculatedBalanceT1Field{FirstRecalculatedBalanceT1: recalculatedUsr.BalanceT1},
-								FirstRecalculatedBalanceT2Field:         model.FirstRecalculatedBalanceT2Field{FirstRecalculatedBalanceT2: recalculatedUsr.BalanceT2},
-								FirstRecalculatedSlashingRateT1Field:    model.FirstRecalculatedSlashingRateT1Field{FirstRecalculatedSlashingRateT1: recalculatedUsr.SlashingRateT1},
-								FirstRecalculatedSlashingRateT2Field:    model.FirstRecalculatedSlashingRateT2Field{FirstRecalculatedSlashingRateT2: recalculatedUsr.SlashingRateT2},
+								FirstRecalculatedBalanceT1Field:         model.FirstRecalculatedBalanceT1Field{FirstRecalculatedBalanceT1: balanceT1},
+								FirstRecalculatedBalanceT2Field:         model.FirstRecalculatedBalanceT2Field{FirstRecalculatedBalanceT2: balanceT2},
 								FirstRecalculatedActiveT1ReferralsField: model.FirstRecalculatedActiveT1ReferralsField{FirstRecalculatedActiveT1Referrals: usr.ActiveT1Referrals + diffT1ActiveValue},
 								FirstRecalculatedActiveT2ReferralsField: model.FirstRecalculatedActiveT2ReferralsField{FirstRecalculatedActiveT2Referrals: usr.ActiveT2Referrals + diffT2ActiveValue},
 							})
@@ -732,6 +781,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				continue
 			}
 		}
+		if err := m.insertBalanceRecalculationDryRunBatch(ctx, balanceRecalculationDryRunItems); err != nil {
+			log.Error(err, fmt.Sprintf("can't insert balance recalcualtion dry run information for users:%#v, workerNumber:%v", userResults, workerNumber))
+		}
+
 		if len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(updatedUsers)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
 			go m.telemetry.collectElapsed(7, *before.Time)
 		}
