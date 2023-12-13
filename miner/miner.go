@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -218,9 +217,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				shouldSynchronizeBalanceFunc = m.telemetry.shouldSynchronizeBalanceFunc(uint64(workerNumber), totalBatches, iteration)
 			}
 			batchNumber = 0
-			if err := preStakingResetFinishedForWorker(ctx, m.db, workerNumber, time.Now()); err != nil {
-				log.Error(err, "can't finish prestaking reset, worker:", workerNumber)
-			}
 		} else if success {
 			go m.telemetry.collectElapsed(1, *now.Time)
 		}
@@ -505,21 +501,16 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if isAdvancedTeamDisabled(usr.LatestDevice) {
 				usr.ActiveT2Referrals = 0
 			}
-			prestakingReset := false
-			if usr.PreStakingAllocation != 0 && usr.PreStakingBonus != 0 {
-				usr.PreStakingAllocation = 0
-				usr.PreStakingBonus = 0
-				prestakingReset = true
-			}
+			usr.PreStakingAllocation = 0
+			usr.PreStakingBonus = 0
 			updatedUser, shouldGenerateHistory, IDT0Changed := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if updatedUser != nil {
-				if prestakingReset {
-					updatedUser.UpdatedUser.PreStakingAllocation = 0
-					updatedUser.UpdatedUser.PreStakingBonus = 0
-				}
+				updatedUser.UpdatedUser.PreStakingAllocation = 0
+				updatedUser.UpdatedUser.PreStakingBonus = 0
+
 				var extraBonusIndex uint16
 				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, int16(updatedUser.UTCOffset), &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
 					eba := &extrabonusnotifier.ExtraBonusAvailable{UserID: updatedUser.UserID, ExtraBonusIndex: extraBonusIndex}
@@ -560,6 +551,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
 				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
+					PreStakingAllocationField:                      model.PreStakingAllocationField{PreStakingAllocation: 0},
+					PreStakingBonusField:                           model.PreStakingBonusField{PreStakingBonus: 0},
 					ExtraBonusLastClaimAvailableAtField:            usr.ExtraBonusLastClaimAvailableAtField,
 					DeserializedUsersKey:                           usr.DeserializedUsersKey,
 					ExtraBonusDaysClaimNotAvailableResettableField: model.ExtraBonusDaysClaimNotAvailableResettableField{ExtraBonusDaysClaimNotAvailable: usr.ExtraBonusDaysClaimNotAvailable},
@@ -570,6 +563,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					extraBonusOnlyUpdatedUsers = append(extraBonusOnlyUpdatedUsers, &extraBonusOnlyUpdatedUsr)
 				}
 				if updUsr := updateT0AndTMinus1ReferralsForUserHasNeverMined(usr); updUsr != nil {
+					updUsr.PreStakingAllocation = 0
+					updUsr.PreStakingBonus = 0
 					referralsUpdated = append(referralsUpdated, updUsr)
 					if t0Ref != nil && t0Ref.ID != 0 && usr.ActiveT1Referrals > 0 {
 						t2ReferralsToIncrementActiveValue[t0Ref.ID] += usr.ActiveT1Referrals
@@ -826,10 +821,4 @@ func isAdvancedTeamEnabled(device string) bool {
 
 func isAdvancedTeamDisabled(device string) bool {
 	return !isAdvancedTeamEnabled(device)
-}
-
-func preStakingResetFinishedForWorker(ctx context.Context, db storage.DB, w int64, now *time.Time) (err error) {
-	_, err = db.HSetNX(ctx, "prestaking_reset_end_date", strconv.FormatInt(w, 10), now).Result()
-
-	return errors.Wrapf(err, "failed to set finished for prestaking-reset, worker: %v", w)
 }

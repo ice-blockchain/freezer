@@ -113,6 +113,8 @@ type (
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
 	}
 
 	backupUserUpdated struct {
