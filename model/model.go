@@ -205,10 +205,10 @@ type (
 		SlashingRateForTMinus1 float64 `redis:"slashing_rate_for_tminus1"`
 	}
 	PreStakingBonusField struct {
-		PreStakingBonus float64 `redis:"pre_staking_bonus,omitempty"`
+		PreStakingBonus float64 `redis:"pre_staking_bonus"`
 	}
 	PreStakingAllocationField struct {
-		PreStakingAllocation float64 `redis:"pre_staking_allocation,omitempty"`
+		PreStakingAllocation float64 `redis:"pre_staking_allocation"`
 	}
 	ExtraBonusField struct {
 		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
