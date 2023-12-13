@@ -141,6 +141,12 @@ type (
 		model.DeserializedUsersKey
 	}
 
+	prestakingResettableUpdatedUser struct {
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
+		model.DeserializedUsersKey
+	}
+
 	referralCountGuardUpdatedUser struct {
 		model.ReferralsCountChangeGuardUpdatedAtField
 		model.DeserializedUsersKey
