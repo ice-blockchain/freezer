@@ -25,28 +25,6 @@ type (
 		Insert(ctx context.Context, columns *Columns, input InsertMetadata, usrs []*model.User) error
 		SelectBalanceHistory(ctx context.Context, id int64, createdAts []stdlibtime.Time) ([]*BalanceHistory, error)
 		SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error)
-		GetAdjustUserInformation(ctx context.Context, userIDs []string, limit, offset int64) ([]*AdjustUserInfo, error)
-	}
-	AdjustUserInfo struct {
-		MiningSessionSoloStartedAt         *time.Time
-		MiningSessionSoloEndedAt           *time.Time
-		MiningSessionSoloLastStartedAt     *time.Time
-		MiningSessionSoloPreviouslyEndedAt *time.Time
-		CreatedAt                          *time.Time
-		ResurrectSoloUsedAt                *time.Time
-		UserID                             string
-		ID                                 int64
-		SlashingRateSolo                   float64
-		SlashingRateT1                     float64
-		SlashingRateT2                     float64
-		BalanceSolo                        float64
-		BalanceT0                          float64
-		BalanceT1Pending                   float64
-		BalanceT1PendingApplied            float64
-		BalanceT2Pending                   float64
-		BalanceT2PendingApplied            float64
-		PrestakingAllocation               uint16
-		PrestakingBonus                    uint16
 	}
 	BalanceHistory struct {
 		CreatedAt                               *time.Time

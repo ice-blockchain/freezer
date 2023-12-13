@@ -18,3 +18,13 @@ CREATE TABLE IF NOT EXISTS balance_recalculation_metrics (
                         worker                      BIGINT NOT NULL PRIMARY KEY
                     ) WITH (fillfactor = 70);
 --************************************************************************************************************************************
+-- balance_recalculation_dry_run
+DROP TABLE IF EXISTS balance_recalculation_dry_run;
+CREATE TABLE IF NOT EXISTS balance_recalculation_dry_run (
+                        diff_t1_balance             DOUBLE PRECISION NOT NULL,
+                        diff_t2_balance             DOUBLE PRECISION NOT NULL,
+                        diff_t1_active_counts       DOUBLE PRECISION NOT NULL,
+                        diff_t2_active_counts       DOUBLE PRECISION NOT NULL,
+                        user_id                     text PRIMARY KEY
+                    ) WITH (fillfactor = 70);
+--************************************************************************************************************************************
