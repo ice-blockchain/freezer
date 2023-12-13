@@ -33,7 +33,7 @@ type (
 		ID        string
 	}
 
-	historyData struct {
+	recalculationData struct {
 		Referrals                      map[string]*recalculateReferral
 		NeedToBeRecalculatedUsers      map[string]struct{}
 		T1Referrals, T2Referrals       map[string][]string
@@ -110,6 +110,7 @@ func (m *miner) collectTiers(ctx context.Context, needToBeRecalculatedUsers map[
 	}
 	t1ActiveCounts, t2ActiveCounts = make(map[string]int32, len(needToBeRecalculatedUsers)), make(map[string]int32, len(needToBeRecalculatedUsers))
 	t1Referrals, t2Referrals = make(map[string][]string), make(map[string][]string)
+	referralsUserKeysMap := make(map[string]struct{})
 	for {
 		sql := `SELECT * FROM(
 					SELECT
@@ -157,13 +158,13 @@ func (m *miner) collectTiers(ctx context.Context, needToBeRecalculatedUsers map[
 			if row.ReferredBy != "bogus" && row.ReferredBy != "icenetwork" && row.ID != "bogus" && row.ID != "icenetwork" {
 				if row.ReferralType == "T1" {
 					t1Referrals[row.ReferredBy] = append(t1Referrals[row.ReferredBy], row.ID)
-					referralsUserKeys = append(referralsUserKeys, model.SerializedUsersKey(row.ID))
+					referralsUserKeysMap[model.SerializedUsersKey(row.ID)] = struct{}{}
 					if row.Active != nil && *row.Active {
 						t1ActiveCounts[row.ReferredBy]++
 					}
 				} else if row.ReferralType == "T2" {
 					t2Referrals[row.ReferredBy] = append(t2Referrals[row.ReferredBy], row.ID)
-					referralsUserKeys = append(referralsUserKeys, model.SerializedUsersKey(row.ID))
+					referralsUserKeysMap[model.SerializedUsersKey(row.ID)] = struct{}{}
 					if row.Active != nil && *row.Active {
 						t2ActiveCounts[row.ReferredBy]++
 					}
@@ -173,11 +174,14 @@ func (m *miner) collectTiers(ctx context.Context, needToBeRecalculatedUsers map[
 			}
 		}
 	}
+	for key, _ := range referralsUserKeysMap {
+		referralsUserKeys = append(referralsUserKeys, key)
+	}
 
 	return referralsUserKeys, t1Referrals, t2Referrals, t1ActiveCounts, t2ActiveCounts, nil
 }
 
-func getInternalIDs(ctx context.Context, db storage.DB, keys ...string) ([]string, error) {
+func getInternalIDsBatch(ctx context.Context, db storage.DB, keys ...string) ([]string, error) {
 	if cmdResults, err := db.Pipelined(ctx, func(pipeliner redis.Pipeliner) error {
 		if err := pipeliner.MGet(ctx, keys...).Err(); err != nil {
 			return err
@@ -202,7 +206,64 @@ func getInternalIDs(ctx context.Context, db storage.DB, keys ...string) ([]strin
 	}
 }
 
-func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (history *historyData, err error) {
+func getInternalIDs(ctx context.Context, db storage.DB, keys ...string) (result []string, err error) {
+	var batchKeys []string
+	for _, key := range keys {
+		batchKeys = append(batchKeys, key)
+		if len(batchKeys) >= int(cfg.BatchSize) {
+			res, err := getInternalIDsBatch(ctx, db, batchKeys...)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, res...)
+			batchKeys = batchKeys[:0]
+		}
+	}
+	if len(batchKeys) > 0 {
+		res, err := getInternalIDsBatch(ctx, db, batchKeys...)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, res...)
+	}
+
+	return result, nil
+}
+
+func getReferralsBatch(ctx context.Context, db storage.DB, keys ...string) ([]*recalculateReferral, error) {
+	referrals := make([]*recalculateReferral, 0)
+	if err := storage.Bind[recalculateReferral](ctx, db, keys, &referrals); err != nil {
+		return nil, errors.Wrapf(err, "failed to get referrals for:%v", keys)
+	}
+
+	return referrals, nil
+}
+
+func getReferrals(ctx context.Context, db storage.DB, keys ...string) (result []*recalculateReferral, err error) {
+	var batchKeys []string
+	for _, key := range keys {
+		batchKeys = append(batchKeys, key)
+		if len(batchKeys) >= int(cfg.BatchSize) {
+			referrals, err := getReferralsBatch(ctx, db, batchKeys...)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, referrals...)
+			batchKeys = batchKeys[:0]
+		}
+	}
+	if len(batchKeys) > 0 {
+		referrals, err := getReferralsBatch(ctx, db, batchKeys...)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, referrals...)
+	}
+
+	return result, nil
+}
+
+func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (history *recalculationData, err error) {
 	if len(users) == 0 {
 		return nil, nil
 	}
@@ -236,8 +297,8 @@ func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't get internal ids for:%#v", referralsUserKeys)
 	}
-	referrals := make([]*recalculateReferral, 0)
-	if err := storage.Bind[recalculateReferral](ctx, m.db, internalIDKeys, &referrals); err != nil {
+	referrals, err := getReferrals(ctx, m.db, internalIDKeys...)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get referrals for:%v", users)
 	}
 	referralsCollection := make(map[string]*recalculateReferral, len(referrals))
@@ -245,7 +306,7 @@ func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (
 		referralsCollection[ref.UserID] = ref
 	}
 
-	return &historyData{
+	return &recalculationData{
 		Referrals:                 referralsCollection,
 		NeedToBeRecalculatedUsers: needToBeRecalculatedUsers,
 		T1Referrals:               t1Referrals,

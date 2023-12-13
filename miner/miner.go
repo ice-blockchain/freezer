@@ -187,7 +187,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		recalculatedTiersBalancesUsers                                       = make(map[int64]*user, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
-		recalculationHistory                                                 *historyData
+		recalculationInfo                                                    *recalculationData
 		allAdoptions                                                         []*tokenomics.Adoption[float64]
 	)
 	resetVars := func(success bool) {
@@ -371,7 +371,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if balanceBugFixEnabled {
 			if !balanceBackupMode {
 				reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-				recalculationHistory, err = m.gatherReferralsInformation(reqCtx, userResults)
+				recalculationInfo, err = m.gatherReferralsInformation(reqCtx, userResults)
 				if err != nil {
 					log.Error(errors.New("tiers diff balances error"), workerNumber, err)
 				}
@@ -416,30 +416,30 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						}
 					}
 				} else {
-					if !backupExists && recalculationHistory != nil {
-						if _, ok := recalculationHistory.NeedToBeRecalculatedUsers[usr.UserID]; ok {
+					if !backupExists && recalculationInfo != nil {
+						if _, ok := recalculationInfo.NeedToBeRecalculatedUsers[usr.UserID]; ok {
 							balanceT1, balanceT2 := 0.0, 0.0
-							if recalculationHistory.T1Referrals != nil {
-								if referralsT1, ok := recalculationHistory.T1Referrals[usr.UserID]; ok {
+							if recalculationInfo.T1Referrals != nil {
+								if referralsT1, ok := recalculationInfo.T1Referrals[usr.UserID]; ok {
 									for _, ref := range referralsT1 {
-										if _, ok := recalculationHistory.Referrals[ref]; ok {
-											balanceT1 += recalculationHistory.Referrals[ref].BalanceForT0
+										if _, ok := recalculationInfo.Referrals[ref]; ok {
+											balanceT1 += recalculationInfo.Referrals[ref].BalanceForT0
 										}
 									}
 								}
 							}
-							if recalculationHistory.T2Referrals != nil {
-								if referralsT2, ok := recalculationHistory.T2Referrals[usr.UserID]; ok {
+							if recalculationInfo.T2Referrals != nil {
+								if referralsT2, ok := recalculationInfo.T2Referrals[usr.UserID]; ok {
 									for _, ref := range referralsT2 {
-										if _, ok := recalculationHistory.Referrals[ref]; ok {
-											balanceT2 += recalculationHistory.Referrals[ref].BalanceForTMinus1
+										if _, ok := recalculationInfo.Referrals[ref]; ok {
+											balanceT2 += recalculationInfo.Referrals[ref].BalanceForTMinus1
 										}
 									}
 								}
 							}
 
-							diffT1ActiveValue := recalculationHistory.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
-							diffT2ActiveValue := recalculationHistory.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
+							diffT1ActiveValue := recalculationInfo.T1ActiveCounts[usr.UserID] - usr.ActiveT1Referrals
+							diffT2ActiveValue := recalculationInfo.T2ActiveCounts[usr.UserID] - usr.ActiveT2Referrals
 
 							oldBalanceT1 := usr.BalanceT1
 							oldBalanceT2 := usr.BalanceT2
