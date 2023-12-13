@@ -49,7 +49,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi.cancel = cancel
 	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, mi.db)
 	mi.extraBonusIndicesDistribution = extrabonusnotifier.MustGetExtraBonusIndicesDistribution(ctx, mi.db)
-	if false {
+	if balanceBugFixEnabled {
 		mi.recalculationBalanceStartDate = mustGetRecalculationBalancesStartDate(ctx, mi.db)
 	}
 
@@ -198,7 +198,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				panic("unexpected batch number: " + fmt.Sprint(batchNumber))
 			}
 			totalBatches = uint64(batchNumber - 1)
-			if false {
+			if balanceBugFixEnabled {
 				metricsExists, err := m.getBalanceRecalculationMetrics(ctx, workerNumber)
 				if err != nil {
 					log.Error(err, "can't get balance recalculation metrics for worker:", workerNumber)
@@ -284,7 +284,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
 		}
-		if false {
+		if balanceBugFixEnabled {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
 				userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey((workers*ix)+workerNumber))
 			}
@@ -306,7 +306,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
-		if false {
+		if balanceBugFixEnabled {
 			for _, usr := range backupUserResults {
 				backupedUsers[usr.ID] = usr
 			}
@@ -366,7 +366,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				t0Referrals[ref.ID] = ref
 			}
 		}
-		if false {
+		if balanceBugFixEnabled {
 			if !balanceBackupMode {
 				reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 				recalculationHistory, err = m.gatherHistoryAndReferralsInformation(reqCtx, userResults)
@@ -388,7 +388,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				continue
 			}
 			backupedUsr, backupExists := backupedUsers[usr.ID]
-			if false {
+			if balanceBugFixEnabled {
 				if balanceBackupMode {
 					if backupExists {
 						diffT1ActiveValue := backupedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
@@ -695,7 +695,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					return err
 				}
 			}
-			if false {
+			if balanceBugFixEnabled {
 				for _, value := range backupUsersUpdated {
 					if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 						return err
