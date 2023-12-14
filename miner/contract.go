@@ -74,6 +74,7 @@ type (
 		model.PreStakingAllocationField
 		model.ExtraBonusField
 		model.UTCOffsetField
+		model.ReferralsCountChangeGuardUpdatedAtField
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.

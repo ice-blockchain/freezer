@@ -563,16 +563,14 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
 					updatedUser.ExtraBonusLastClaimAvailableAt = nil
 				}
+				if userStoppedMining := didUserStoppedMining(now, usr); userStoppedMining != nil {
+					referralsCountGuardOnlyUpdatedUsers = append(referralsCountGuardOnlyUpdatedUsers, userStoppedMining)
+				}
 				if true || balanceBackupMode || !backupExists {
 					if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 						referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
-						referralsCountGuardOnlyUpdatedUsers = append(referralsCountGuardOnlyUpdatedUsers, &referralCountGuardUpdatedUser{
-							DeserializedUsersKey:                    usr.DeserializedUsersKey,
-							ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: time.Now()},
-						})
 					}
 				}
-
 				if dayOffStarted := didANewDayOffJustStart(now, usr); dayOffStarted != nil {
 					msgs = append(msgs, dayOffStartedMessage(reqCtx, dayOffStarted))
 				}
@@ -865,4 +863,19 @@ func isAdvancedTeamEnabled(device string) bool {
 
 func isAdvancedTeamDisabled(device string) bool {
 	return !isAdvancedTeamEnabled(device)
+}
+
+func didUserStoppedMining(now *time.Time, before *user) *referralCountGuardUpdatedUser {
+	if !before.ReferralsCountChangeGuardUpdatedAt.IsNil() &&
+		!before.MiningSessionSoloStartedAt.IsNil() &&
+		!before.MiningSessionSoloEndedAt.IsNil() &&
+		before.ReferralsCountChangeGuardUpdatedAt.Equal(*before.MiningSessionSoloStartedAt.Time) &&
+		before.MiningSessionSoloEndedAt.Before(*now.Time) {
+		return &referralCountGuardUpdatedUser{
+			DeserializedUsersKey:                    before.DeserializedUsersKey,
+			ReferralsCountChangeGuardUpdatedAtField: model.ReferralsCountChangeGuardUpdatedAtField{ReferralsCountChangeGuardUpdatedAt: time.Now()},
+		}
+	}
+
+	return nil
 }

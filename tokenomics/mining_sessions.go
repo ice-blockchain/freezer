@@ -78,13 +78,11 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		(now.Sub(*old[0].MiningSessionSoloLastStartedAt.Time)/r.cfg.MiningSessionDuration.Min)%2 == 0 {
 		return ErrDuplicate
 	}
-	if false {
-		if !old[0].MiningSessionSoloEndedAt.IsNil() &&
-			!old[0].ReferralsCountChangeGuardUpdatedAt.IsNil() &&
-			now.After(*old[0].MiningSessionSoloEndedAt.Time) &&
-			old[0].MiningSessionSoloStartedAt.Equal(*old[0].ReferralsCountChangeGuardUpdatedAt.Time) {
-			return ErrDuplicate
-		}
+	if !old[0].MiningSessionSoloEndedAt.IsNil() &&
+		!old[0].ReferralsCountChangeGuardUpdatedAt.IsNil() &&
+		now.After(*old[0].MiningSessionSoloEndedAt.Time) &&
+		old[0].MiningSessionSoloStartedAt.Equal(*old[0].ReferralsCountChangeGuardUpdatedAt.Time) {
+		return ErrDuplicate
 	}
 	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress) //nolint:lll // .
 	if err != nil {
