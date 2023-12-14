@@ -52,7 +52,6 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	if balanceBugFixEnabled {
 		mi.recalculationBalanceStartDate = mustGetRecalculationBalancesStartDate(ctx, mi.db)
 	}
-	removeBackupKeys(ctx, mi.db)
 
 	for workerNumber := int64(0); workerNumber < cfg.Workers; workerNumber++ {
 		go func(wn int64) {
@@ -62,17 +61,6 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	}
 
 	return mi
-}
-
-func removeBackupKeys(ctx context.Context, db storage.DB) {
-	var userBackupKeys []string
-	for ix := int64(1); ix < 10_000_000; ix++ {
-		userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey(ix))
-	}
-	_, err := db.Del(ctx, userBackupKeys...).Result()
-	if err != nil {
-		log.Panic(errors.Wrap(err, fmt.Sprintf("can't remove backup keys:%#v", userBackupKeys)))
-	}
 }
 
 func (m *miner) Close() error {
@@ -283,6 +271,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(userKeys) == 0 {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
 				userKeys = append(userKeys, model.SerializedUsersKey((workers*ix)+workerNumber))
+				userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey((workers*ix)+workerNumber))
 			}
 		}
 		before := time.Now()
@@ -294,14 +283,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
+		_, err := m.db.Del(reqCtx, userBackupKeys...).Result()
+		if err != nil {
+			log.Error(errors.Wrap(err, fmt.Sprintf("can't remove backup keys:%#v", userBackupKeys)))
+		}
 		reqCancel()
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
 		}
 		if balanceBugFixEnabled {
-			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
-				userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey((workers*ix)+workerNumber))
-			}
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			if err := storage.Bind[backupUserUpdated](reqCtx, m.db, userBackupKeys, &backupUserResults); err != nil {
 				log.Error(errors.Wrapf(err, "[miner] failed to get backuped users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
