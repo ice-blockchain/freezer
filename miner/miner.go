@@ -283,10 +283,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
-		_, err := m.db.Del(reqCtx, userBackupKeys...).Result()
-		if err != nil {
-			log.Error(errors.Wrap(err, fmt.Sprintf("can't remove backup keys:%#v", userBackupKeys)))
-		}
 		reqCancel()
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
@@ -394,7 +390,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			backupedUsr, backupExists := backupedUsers[usr.ID]
 			if balanceBugFixEnabled {
 				if balanceBackupMode {
-					if backupExists {
+					if backupExists && backupedUsr.BalancesBackupUsedAt.IsNil() {
 						diffT1ActiveValue := backupedUsr.ActiveT1Referrals - usr.ActiveT1Referrals
 						diffT2ActiveValue := backupedUsr.ActiveT2Referrals - usr.ActiveT2Referrals
 						if diffT1ActiveValue < 0 && diffT1ActiveValue*-1 > usr.ActiveT1Referrals {
@@ -403,19 +399,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
 							diffT2ActiveValue = -usr.ActiveT2Referrals
 						}
-						if false {
-							t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
-							t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-							usr.BalanceT1 = backupedUsr.BalanceT1
-							usr.BalanceT2 = backupedUsr.BalanceT2
+						t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+						t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-							usr.SlashingRateT1 = backupedUsr.SlashingRateT1
-							usr.SlashingRateT2 = backupedUsr.SlashingRateT2
+						usr.BalanceT1 = backupedUsr.BalanceT1
+						usr.BalanceT2 = backupedUsr.BalanceT2
+						usr.SlashingRateT1 = backupedUsr.SlashingRateT1
+						usr.SlashingRateT2 = backupedUsr.SlashingRateT2
+						usr.ActiveT1Referrals = backupedUsr.ActiveT1Referrals
+						usr.ActiveT2Referrals = backupedUsr.ActiveT2Referrals
 
-							backupedUsr.BalancesBackupUsedAt = time.Now()
-							backupUsersUpdated = append(backupUsersUpdated, backupedUsr)
-						}
+						backupedUsr.BalancesBackupUsedAt = time.Now()
+						backupUsersUpdated = append(backupUsersUpdated, backupedUsr)
 					}
 				} else {
 					if !backupExists && recalculationInfo != nil {
@@ -452,18 +448,21 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 							if diffT2ActiveValue < 0 && diffT2ActiveValue*-1 > usr.ActiveT2Referrals {
 								diffT2ActiveValue = -usr.ActiveT2Referrals
 							}
-							if false {
-								t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
-								t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-								usr.BalanceT1 = balanceT1
-								usr.BalanceT2 = balanceT2
-							}
+							t1ReferralsToIncrementActiveValue[usr.ID] += diffT1ActiveValue
+							t2ReferralsToIncrementActiveValue[usr.ID] += diffT2ActiveValue
 
-							metrics.AffectedUsers += 1
+							usr.BalanceT1 = balanceT1
+							usr.BalanceT2 = balanceT2
+							usr.SlashingRateT1 = 0
+							usr.SlashingRateT2 = 0
+							usr.ActiveT1Referrals = recalculationInfo.T1ActiveCounts[usr.UserID]
+							usr.ActiveT2Referrals = recalculationInfo.T2ActiveCounts[usr.UserID]
 
 							t1BalanceDiff := balanceT1 - oldBalanceT1
 							t2BalanceDiff := balanceT2 - oldBalanceT2
+
+							metrics.AffectedUsers += 1
 
 							if t1BalanceDiff >= 0 {
 								metrics.T1BalancePositive += t1BalanceDiff
@@ -484,29 +483,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 								metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
 							} else {
 								metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
-							}
-							if !backupExists {
-								metrics.AffectedUsers += 1
-								if t1BalanceDiff >= 0 {
-									metrics.T1BalancePositive += t1BalanceDiff
-								} else {
-									metrics.T1BalanceNegative += t1BalanceDiff
-								}
-								if t2BalanceDiff >= 0 {
-									metrics.T2BalancePositive += t2BalanceDiff
-								} else {
-									metrics.T2BalanceNegative += t2BalanceDiff
-								}
-								if diffT1ActiveValue < 0 {
-									metrics.T1ActiveCountsNegative += int64(diffT1ActiveValue)
-								} else {
-									metrics.T1ActiveCountsPositive += int64(diffT1ActiveValue)
-								}
-								if diffT2ActiveValue < 0 {
-									metrics.T2ActiveCountsNegative += int64(diffT2ActiveValue)
-								} else {
-									metrics.T2ActiveCountsPositive += int64(diffT2ActiveValue)
-								}
 							}
 
 							balanceRecalculationDryRunItems = append(balanceRecalculationDryRunItems, &balanceRecalculationDryRun{
@@ -565,10 +541,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					updatedUser.ExtraBonusDaysClaimNotAvailable = 0
 					updatedUser.ExtraBonusLastClaimAvailableAt = nil
 				}
-				if userStoppedMining := didUserStoppedMining(now, usr); userStoppedMining != nil {
-					referralsCountGuardOnlyUpdatedUsers = append(referralsCountGuardOnlyUpdatedUsers, userStoppedMining)
-				}
-				if true || balanceBackupMode || !backupExists {
+				if !balanceBugFixEnabled || balanceBackupMode {
+					if userStoppedMining := didUserStoppedMining(now, usr); userStoppedMining != nil {
+						referralsCountGuardOnlyUpdatedUsers = append(referralsCountGuardOnlyUpdatedUsers, userStoppedMining)
+					}
 					if userStoppedMining := didReferralJustStopMining(now, usr, t0Ref, tMinus1Ref); userStoppedMining != nil {
 						referralsThatStoppedMining = append(referralsThatStoppedMining, userStoppedMining)
 					}
