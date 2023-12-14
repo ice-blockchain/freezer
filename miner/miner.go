@@ -271,6 +271,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(userKeys) == 0 {
 			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
 				userKeys = append(userKeys, model.SerializedUsersKey((workers*ix)+workerNumber))
+				userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey((workers*ix)+workerNumber))
 			}
 		}
 		before := time.Now()
@@ -282,14 +283,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 			continue
 		}
+		_, err := m.db.Del(reqCtx, userBackupKeys...).Result()
+		if err != nil {
+			log.Error(errors.Wrap(err, fmt.Sprintf("can't remove backup keys:%#v", userBackupKeys)))
+		}
 		reqCancel()
 		if len(userKeys) > 0 {
 			go m.telemetry.collectElapsed(2, *before.Time)
 		}
 		if balanceBugFixEnabled {
-			for ix := batchNumber * batchSize; ix < (batchNumber+1)*batchSize; ix++ {
-				userBackupKeys = append(userBackupKeys, model.SerializedBackupUsersKey((workers*ix)+workerNumber))
-			}
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			if err := storage.Bind[backupUserUpdated](reqCtx, m.db, userBackupKeys, &backupUserResults); err != nil {
 				log.Error(errors.Wrapf(err, "[miner] failed to get backuped users for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
