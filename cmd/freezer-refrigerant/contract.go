@@ -63,6 +63,8 @@ const (
 	miningDisabledErrorCode                                  = "MINING_DISABLED"
 	noExtraBonusAvailableErrorCode                           = "NO_EXTRA_BONUS_AVAILABLE"
 	extraBonusAlreadyClaimedErrorCode                        = "EXTRA_BONUS_ALREADY_CLAIMED"
+
+	defaultDistributionLimit = 5000
 )
 
 type (

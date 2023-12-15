@@ -40,7 +40,9 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	if req.AuthenticatedUser.Role != adminRole {
 		return nil, server.Forbidden(errors.Errorf("insufficient role: %v, admin role required", req.AuthenticatedUser.Role))
 	}
-
+	if req.Data.Limit == 0 {
+		req.Data.Limit = defaultDistributionLimit
+	}
 	cursor, distributions, err := s.coinDistributionRepository.GetCoinDistributionsForReview(ctx, req.Data.Cursor, req.Data.Limit)
 	if err != nil {
 		return nil, server.Unexpected(err)
