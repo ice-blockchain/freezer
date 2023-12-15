@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/cmd/freezer-refrigerant/api"
+	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/log"
@@ -36,10 +37,12 @@ func main() {
 
 func (s *service) RegisterRoutes(router *server.Router) {
 	s.setupTokenomicsRoutes(router)
+	s.setupCoinDistributionRoutesRoutes(router)
 }
 
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {
 	s.tokenomicsProcessor = tokenomics.StartProcessor(ctx, cancel)
+	s.coinDistributionRepository = coindistribution.NewRepository(ctx, cancel)
 }
 
 func (s *service) Close(ctx context.Context) error {

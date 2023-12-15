@@ -39,6 +39,12 @@ func MustStartCoinDistribution(ctx context.Context, cancel context.CancelFunc) C
 	return cd
 }
 
+func NewRepository(ctx context.Context, cancel context.CancelFunc) Repository {
+	repo := &repository{db: storage.MustConnect(context.Background(), ddl, applicationYamlKey)}
+
+	return repo
+}
+
 func (cd *coinDistributer) Close() error {
 	cd.cancel()
 	cd.wg.Wait()
