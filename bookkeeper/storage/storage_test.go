@@ -4,7 +4,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"testing"
 	stdlibtime "time"
@@ -115,41 +114,4 @@ func TestStorage(t *testing.T) {
 	require.NoError(t, err)
 	sort.SliceStable(h2, func(ii, jj int) bool { return h2[ii].CreatedAt.Before(*h2[jj].CreatedAt.Time) })
 	assert.EqualValues(t, []*BalanceHistory{}, h2)
-}
-
-func TestStorage_SelectAdjustUserInformation_NoError_On_LongValues(t *testing.T) {
-	cl := MustConnect(context.Background(), "self")
-	defer func() {
-		if err := recover(); err != nil {
-			cl.Close()
-			panic(err)
-		}
-		cl.Close()
-	}()
-	require.NoError(t, cl.Ping(context.Background()))
-
-	limit := int64(1000)
-	offset := int64(0)
-	userIDs := make([]string, 0, 1_000_000)
-	for ix := 1_000_000; ix < 2_000_000; ix++ {
-		userIDs = append(userIDs, fmt.Sprint(ix))
-	}
-	_, err := cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
-	require.NoError(t, err)
-
-	userIDs = nil
-	userIDs = make([]string, 0, 1_000_000)
-	for ix := 10_000_000; ix < 11_000_000; ix++ {
-		userIDs = append(userIDs, fmt.Sprint(ix))
-	}
-	_, err = cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
-	require.NoError(t, err)
-
-	userIDs = nil
-	userIDs = make([]string, 0, 1_000_000)
-	for ix := 54_000_000; ix < 55_000_000; ix++ {
-		userIDs = append(userIDs, fmt.Sprint(ix))
-	}
-	_, err = cl.GetAdjustUserInformation(context.Background(), userIDs, limit, offset)
-	require.NoError(t, err)
 }

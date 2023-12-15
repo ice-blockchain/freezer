@@ -102,9 +102,6 @@ type (
 	ExtraBonusLastClaimAvailableAtField struct {
 		ExtraBonusLastClaimAvailableAt *time.Time `redis:"extra_bonus_last_claim_available_at,omitempty"`
 	}
-	BalancesBackupUsedAtField struct {
-		BalancesBackupUsedAt *time.Time `redis:"balance_backup_used_at,omitempty"`
-	}
 	ReferralsCountChangeGuardUpdatedAtField struct {
 		ReferralsCountChangeGuardUpdatedAt *time.Time `redis:"referrals_count_change_guard_updated_at,omitempty"`
 	}
@@ -168,12 +165,6 @@ type (
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
 	}
-	FirstRecalculatedBalanceT1Field struct {
-		FirstRecalculatedBalanceT1 float64 `redis:"first_recalculated_balance_t1"`
-	}
-	FirstRecalculatedBalanceT2Field struct {
-		FirstRecalculatedBalanceT2 float64 `redis:"first_recalculated_balance_t2"`
-	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
 	}
@@ -191,12 +182,6 @@ type (
 	}
 	SlashingRateT2Field struct {
 		SlashingRateT2 float64 `redis:"slashing_rate_t2"`
-	}
-	FirstRecalculatedSlashingRateT1Field struct {
-		FirstRecalculatedSlashingRateT1 float64 `redis:"first_recalculated_slashing_rate_t1"`
-	}
-	FirstRecalculatedSlashingRateT2Field struct {
-		FirstRecalculatedSlashingRateT2 float64 `redis:"first_recalculated_slashing_rate_t2"`
 	}
 	SlashingRateForT0Field struct {
 		SlashingRateForT0 float64 `redis:"slashing_rate_for_t0"`
@@ -234,12 +219,6 @@ type (
 	ActiveT2ReferralsField struct {
 		ActiveT2Referrals int32 `redis:"active_t2_referrals,omitempty"`
 	}
-	FirstRecalculatedActiveT1ReferralsField struct {
-		FirstRecalculatedActiveT1Referrals int32 `redis:"first_recalculated_active_t1_referrals,omitempty"`
-	}
-	FirstRecalculatedActiveT2ReferralsField struct {
-		FirstRecalculatedActiveT2Referrals int32 `redis:"first_recalculated_active_t2_referrals,omitempty"`
-	}
 	NewsSeenField struct {
 		NewsSeen uint16 `redis:"news_seen"`
 	}
@@ -266,9 +245,6 @@ type (
 	}
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
-	}
-	DeserializedBackupUsersKey struct {
-		ID int64 `redis:"-"`
 	}
 )
 
@@ -308,45 +284,6 @@ func SerializedUsersKey(val any) string {
 		return "users:" + strconv.FormatInt(typedVal, 10)
 	default:
 		panic(fmt.Sprintf("%#v cannot be used as users key", val))
-	}
-}
-
-func (k *DeserializedBackupUsersKey) Key() string {
-	if k == nil || k.ID == 0 {
-		return ""
-	}
-
-	return SerializedBackupUsersKey(k.ID)
-}
-
-func (k *DeserializedBackupUsersKey) SetKey(val string) {
-	if val == "" || val == "backup:" {
-		return
-	}
-	if val[0] == 'b' {
-		val = val[7:]
-	}
-	var err error
-	k.ID, err = strconv.ParseInt(val, 10, 64)
-	log.Panic(err)
-}
-
-func SerializedBackupUsersKey(val any) string {
-	switch typedVal := val.(type) {
-	case string:
-		if typedVal == "" {
-			return ""
-		}
-
-		return "backup:" + typedVal
-	case int64:
-		if typedVal == 0 {
-			return ""
-		}
-
-		return "backup:" + strconv.FormatInt(typedVal, 10)
-	default:
-		panic(fmt.Sprintf("%#v cannot be used as backup key", val))
 	}
 }
 
