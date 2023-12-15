@@ -246,9 +246,6 @@ type (
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
-	DeserializedBackupUsersKey struct {
-		ID int64 `redis:"-"`
-	}
 )
 
 func (k *DeserializedUsersKey) Key() string {
