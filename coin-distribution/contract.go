@@ -18,11 +18,13 @@ import (
 type (
 	Client interface {
 		io.Closer
-		CheckHealth(context.Context) error
+		CheckHealth(ctx context.Context) error
 	}
 
 	Repository interface {
+		io.Closer
 		GetCoinDistributionsForReview(ctx context.Context, cursor, limit uint64) (updatedCursor uint64, distributions []*CoinDistibutionForReview, err error)
+		CheckHealth(ctx context.Context) error
 	}
 
 	CoinDistibutionForReview struct {
@@ -30,7 +32,7 @@ type (
 		Iceflakes          string     `json:"iceflakes" swaggertype:"string" example:"100000000000000"`
 		Username           string     `json:"username" swaggertype:"string" example:"myusername"`
 		ReferredByUsername string     `json:"referredByUsername" swaggertype:"string" example:"myrefusername"`
-		UserID             string     `json:"userID" swaggertype:"string" example:"12746386-03de-44d7-91c7-856fa66b6ed6"`
+		UserID             string     `json:"userId" swaggertype:"string" example:"12746386-03de-44d7-91c7-856fa66b6ed6"`
 		EthAddress         string     `json:"ethAddress" swaggertype:"string" example:"0x43...."`
 	}
 )

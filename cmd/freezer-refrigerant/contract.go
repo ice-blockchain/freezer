@@ -38,8 +38,8 @@ type (
 	}
 
 	GetCoinDistributionForReviewParams struct {
-		Cursor uint64 `json:"cursor" example:"5065"`
-		Limit  uint64 `json:"limit" example:"5000"`
+		Cursor uint64 `form:"cursor" example:"5065"`
+		Limit  uint64 `form:"limit" example:"5000"`
 	}
 )
 

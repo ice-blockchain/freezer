@@ -123,3 +123,10 @@ func (cd *coinDistributer) Disable(rooCtx context.Context) error {
 
 	return nil
 }
+
+func (r *repository) CheckHealth(ctx context.Context) error {
+	return errors.Wrap(r.db.Ping(ctx), "[health-check] failed to ping DB for coindistribution.repository")
+}
+func (r *repository) Close() error {
+	return errors.Wrap(r.db.Close(), "failed to close db")
+}

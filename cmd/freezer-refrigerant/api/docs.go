@@ -48,13 +48,18 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "description": "Request params",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.GetCoinDistributionForReviewParams"
-                        }
+                        "type": "integer",
+                        "default": 0,
+                        "description": "current cursor to fetch data from",
+                        "name": "cursor",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "count of records in response, 5000 by default",
+                        "name": "limit",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -397,7 +402,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "2022-01-03T16:20:52.156534Z"
                 },
-                "userID": {
+                "userId": {
                     "type": "string",
                     "example": "12746386-03de-44d7-91c7-856fa66b6ed6"
                 },
@@ -418,19 +423,6 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/coindistribution.CoinDistibutionForReview"
                     }
-                }
-            }
-        },
-        "main.GetCoinDistributionForReviewParams": {
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "type": "integer",
-                    "example": 5065
-                },
-                "limit": {
-                    "type": "integer",
-                    "example": 5000
                 }
             }
         },

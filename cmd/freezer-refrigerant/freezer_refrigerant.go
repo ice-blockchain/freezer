@@ -6,6 +6,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/cmd/freezer-refrigerant/api"
@@ -50,13 +51,20 @@ func (s *service) Close(ctx context.Context) error {
 		return errors.Wrap(ctx.Err(), "could not close processor because context ended")
 	}
 
-	return errors.Wrap(s.tokenomicsProcessor.Close(), "could not close service")
+	return multierror.Append(
+		errors.Wrapf(s.tokenomicsProcessor.Close(), "could not close processor"),
+		errors.Wrapf(s.coinDistributionRepository.Close(), "could not close coindistribution repository"),
+	).ErrorOrNil() //nolint:wrapcheck // .
 }
 
 func (s *service) CheckHealth(ctx context.Context) error {
 	log.Debug("checking health...", "package", "tokenomics")
 
-	return errors.Wrap(s.tokenomicsProcessor.CheckHealth(ctx), "failed to check processor's health")
+	return multierror.Append(
+		errors.Wrap(s.tokenomicsProcessor.CheckHealth(ctx), "failed to check processor's health"),
+		errors.Wrap(s.coinDistributionRepository.CheckHealth(ctx), "failed to check coindistribution repository health"),
+	).ErrorOrNil() //nolint:wrapcheck // .
+
 }
 
 func contextWithHashCode[REQ, RESP any](ctx context.Context, req *server.Request[REQ, RESP]) context.Context {

@@ -23,9 +23,10 @@ func (s *service) setupCoinDistributionRoutesRoutes(router *server.Router) {
 //	@Tags			CoinDistribution
 //	@Accept			json
 //	@Produce		json
-//	@Param			Authorization	header		string								true	"Insert your access token"	default(Bearer <Add access token here>)
-//	@Param			x_client_type	query		string								false	"the type of the client calling this API. I.E. `web`"
-//	@Param			request			body		GetCoinDistributionForReviewParams	true	"Request params"
+//	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
+//	@Param			x_client_type	query		string	false	"the type of the client calling this API. I.E. `web`"
+//	@Param			cursor			query		uint64	true	"current cursor to fetch data from"	default(0)
+//	@Param			limit			query		uint64	false	"count of records in response, 5000 by default"
 //	@Success		200				{object}	CoinDistributionsForReview
 //	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
 //	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
@@ -45,7 +46,7 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	}
 	cursor, distributions, err := s.coinDistributionRepository.GetCoinDistributionsForReview(ctx, req.Data.Cursor, req.Data.Limit)
 	if err != nil {
-		return nil, server.Unexpected(err)
+		return nil, server.Unexpected(errors.Wrapf(err, "failed to fetch %v records from review coin distribution starting with %v", req.Data.Limit, req.Data.Cursor))
 	}
 
 	return server.OK(&CoinDistributionsForReview{

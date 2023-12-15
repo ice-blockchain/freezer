@@ -16,7 +16,7 @@ definitions:
       time:
         example: "2022-01-03T16:20:52.156534Z"
         type: string
-      userID:
+      userId:
         example: 12746386-03de-44d7-91c7-856fa66b6ed6
         type: string
       username:
@@ -31,15 +31,6 @@ definitions:
         items:
           $ref: '#/definitions/coindistribution.CoinDistibutionForReview'
         type: array
-    type: object
-  main.GetCoinDistributionForReviewParams:
-    properties:
-      cursor:
-        example: 5065
-        type: integer
-      limit:
-        example: 5000
-        type: integer
     type: object
   main.StartNewMiningSessionRequestBody:
     properties:
@@ -232,12 +223,16 @@ paths:
         in: query
         name: x_client_type
         type: string
-      - description: Request params
-        in: body
-        name: request
+      - default: 0
+        description: current cursor to fetch data from
+        in: query
+        name: cursor
         required: true
-        schema:
-          $ref: '#/definitions/main.GetCoinDistributionForReviewParams'
+        type: integer
+      - description: count of records in response, 5000 by default
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
