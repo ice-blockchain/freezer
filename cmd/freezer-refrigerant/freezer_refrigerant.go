@@ -38,7 +38,7 @@ func main() {
 
 func (s *service) RegisterRoutes(router *server.Router) {
 	s.setupTokenomicsRoutes(router)
-	s.setupCoinDistributionRoutesRoutes(router)
+	s.setupCoinDistributionRoutes(router)
 }
 
 func (s *service) Init(ctx context.Context, cancel context.CancelFunc) {

@@ -39,8 +39,8 @@ func MustStartCoinDistribution(ctx context.Context, cancel context.CancelFunc) C
 	return cd
 }
 
-func NewRepository(ctx context.Context, cancel context.CancelFunc) Repository {
-	repo := &repository{db: storage.MustConnect(context.Background(), ddl, applicationYamlKey)}
+func NewRepository(ctx context.Context, _ context.CancelFunc) Repository {
+	repo := &repository{db: storage.MustConnect(ctx, ddl, applicationYamlKey)}
 
 	return repo
 }

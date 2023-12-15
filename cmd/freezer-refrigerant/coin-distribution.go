@@ -10,7 +10,7 @@ import (
 	"github.com/ice-blockchain/wintr/server"
 )
 
-func (s *service) setupCoinDistributionRoutesRoutes(router *server.Router) {
+func (s *service) setupCoinDistributionRoutes(router *server.Router) {
 	router.
 		Group("/v1w").
 		POST("/getCoinDistributionsForReview", server.RootHandler(s.GetCoinDistributionsForReview))
@@ -25,7 +25,7 @@ func (s *service) setupCoinDistributionRoutesRoutes(router *server.Router) {
 //	@Produce		json
 //	@Param			Authorization	header		string	true	"Insert your access token"	default(Bearer <Add access token here>)
 //	@Param			x_client_type	query		string	false	"the type of the client calling this API. I.E. `web`"
-//	@Param			cursor			query		uint64	true	"current cursor to fetch data from"	default(0)
+//	@Param			cursor			query		uint64	true	"current cursor to fetch data from" default(0)
 //	@Param			limit			query		uint64	false	"count of records in response, 5000 by default"
 //	@Success		200				{object}	CoinDistributionsForReview
 //	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
