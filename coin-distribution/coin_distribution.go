@@ -39,6 +39,12 @@ func MustStartCoinDistribution(ctx context.Context, cancel context.CancelFunc) C
 	return cd
 }
 
+func NewRepository(ctx context.Context, _ context.CancelFunc) Repository {
+	repo := &repository{db: storage.MustConnect(ctx, ddl, applicationYamlKey)}
+
+	return repo
+}
+
 func (cd *coinDistributer) Close() error {
 	cd.cancel()
 	cd.wg.Wait()
@@ -116,4 +122,11 @@ func (cd *coinDistributer) Disable(rooCtx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *repository) CheckHealth(ctx context.Context) error {
+	return errors.Wrap(r.db.Ping(ctx), "[health-check] failed to ping DB for coindistribution.repository")
+}
+func (r *repository) Close() error {
+	return errors.Wrap(r.db.Close(), "failed to close db")
 }

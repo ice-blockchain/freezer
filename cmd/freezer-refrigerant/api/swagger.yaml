@@ -2,6 +2,36 @@
 
 basePath: /v1w
 definitions:
+  coindistribution.CoinDistibutionForReview:
+    properties:
+      ethAddress:
+        example: 0x43....
+        type: string
+      iceflakes:
+        example: "100000000000000"
+        type: string
+      referredByUsername:
+        example: myrefusername
+        type: string
+      time:
+        example: "2022-01-03T16:20:52.156534Z"
+        type: string
+      userId:
+        example: 12746386-03de-44d7-91c7-856fa66b6ed6
+        type: string
+      username:
+        example: myusername
+        type: string
+    type: object
+  main.CoinDistributionsForReview:
+    properties:
+      cursor:
+        type: integer
+      distributions:
+        items:
+          $ref: '#/definitions/coindistribution.CoinDistibutionForReview'
+        type: array
+    type: object
   main.StartNewMiningSessionRequestBody:
     properties:
       resurrect:
@@ -177,6 +207,61 @@ info:
   title: Tokenomics API
   version: latest
 paths:
+  /getCoinDistributionsForReview:
+    post:
+      consumes:
+      - application/json
+      description: Fetches data of pending coin distributions for review.
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: the type of the client calling this API. I.E. `web`
+        in: query
+        name: x_client_type
+        type: string
+      - default: 0
+        description: current cursor to fetch data from
+        in: query
+        name: cursor
+        required: true
+        type: integer
+      - description: count of records in response, 5000 by default
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.CoinDistributionsForReview'
+        "401":
+          description: if not authorized
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "403":
+          description: if not allowed
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "422":
+          description: if syntax fails
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "504":
+          description: if request times out
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      tags:
+      - CoinDistribution
   /tokenomics/{userId}/extra-bonus-claims:
     post:
       consumes:

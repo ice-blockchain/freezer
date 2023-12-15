@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
                     user_id                   text      NOT NULL PRIMARY KEY,
                     eth_address               text      NOT NULL);
 
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_internal_id_ix ON coin_distributions_pending_review (internal_id);
+
 CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     reviewed_at               timestamp NOT NULL,
                     created_at                timestamp NOT NULL,

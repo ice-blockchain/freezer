@@ -4,6 +4,7 @@ package main
 
 import (
 	"github.com/ice-blockchain/eskimo/users"
+	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/tokenomics"
 )
 
@@ -30,6 +31,16 @@ type (
 		Years      uint8  `json:"years" required:"true" maximum:"5" example:"1"`
 		Allocation uint8  `json:"allocation" required:"true" maximum:"100" example:"100"`
 	}
+
+	CoinDistributionsForReview struct {
+		Distributions []*coindistribution.CoinDistibutionForReview `json:"distributions"`
+		Cursor        uint64                                       `json:"cursor" example: 5065`
+	}
+
+	GetCoinDistributionForReviewParams struct {
+		Cursor uint64 `form:"cursor" example:"5065"`
+		Limit  uint64 `form:"limit" example:"5000"`
+	}
 )
 
 // Private API.
@@ -37,6 +48,8 @@ type (
 const (
 	applicationYamlKey = "cmd/freezer-refrigerant"
 	swaggerRoot        = "/tokenomics/w"
+
+	adminRole = "admin"
 )
 
 // Values for server.ErrorResponse#Code.
@@ -50,12 +63,15 @@ const (
 	miningDisabledErrorCode                                  = "MINING_DISABLED"
 	noExtraBonusAvailableErrorCode                           = "NO_EXTRA_BONUS_AVAILABLE"
 	extraBonusAlreadyClaimedErrorCode                        = "EXTRA_BONUS_ALREADY_CLAIMED"
+
+	defaultDistributionLimit = 5000
 )
 
 type (
 	// | service implements server.State and is responsible for managing the state and lifecycle of the package.
 	service struct {
-		tokenomicsProcessor tokenomics.Processor
+		tokenomicsProcessor        tokenomics.Processor
+		coinDistributionRepository coindistribution.Repository
 	}
 	config struct {
 		Host    string `yaml:"host"`
