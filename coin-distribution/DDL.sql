@@ -47,6 +47,16 @@ CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
                     PRIMARY KEY(day, user_id));
 
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_internal_id_ix ON coin_distributions_pending_review (internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_created_at_ix ON coin_distributions_pending_review (created_at);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_ice_ix ON coin_distributions_pending_review (ice);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_username_ix ON coin_distributions_pending_review (username);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_referred_by_username_ix ON coin_distributions_pending_review (referred_by_username);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup1_ix ON coin_distributions_pending_review (ice,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup2_ix ON coin_distributions_pending_review (created_at,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup3_ix ON coin_distributions_pending_review (username,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup4_ix ON coin_distributions_pending_review (ice,username,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup5_ix ON coin_distributions_pending_review (referred_by_username,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup6_ix ON coin_distributions_pending_review (ice,referred_by_username,internal_id);
 
 CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     reviewed_at               timestamp NOT NULL,

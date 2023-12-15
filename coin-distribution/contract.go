@@ -23,8 +23,18 @@ type (
 
 	Repository interface {
 		io.Closer
-		GetCoinDistributionsForReview(ctx context.Context, cursor, limit uint64) (updatedCursor uint64, distributions []*PendingReview, err error)
+		GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (updatedCursor uint64, distributions []*PendingReview, err error)
 		CheckHealth(ctx context.Context) error
+	}
+	GetCoinDistributionsForReviewArg struct {
+		CreatedAtOrderBy          string `form:"createdAtOrderBy" example:"asc"`
+		IceOrderBy                string `form:"iceOrderBy" example:"asc"`
+		UsernameOrderBy           string `form:"usernameOrderBy" example:"asc"`
+		ReferredByUsernameOrderBy string `form:"referredByUsernameOrderBy" example:"asc"`
+		UsernameKeyword           string `form:"usernameKeyword" example:"jdoe"`
+		ReferredByUsernameKeyword string `form:"referredByUsernameKeyword" example:"jdoe"`
+		Cursor                    uint64 `form:"cursor" example:"5065"`
+		Limit                     uint64 `form:"limit" example:"5000"`
 	}
 
 	PendingReview struct {

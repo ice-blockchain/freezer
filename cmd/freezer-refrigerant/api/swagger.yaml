@@ -237,6 +237,42 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: if u want to order by createdAt
+        enum:
+        - asc
+        - desc
+        in: query
+        name: createdAtOrderBy
+        type: string
+      - description: if u want to order by ice amount
+        enum:
+        - asc
+        - desc
+        in: query
+        name: iceOrderBy
+        type: string
+      - description: if u want to order by username lexicographically
+        enum:
+        - asc
+        - desc
+        in: query
+        name: usernameOrderBy
+        type: string
+      - description: if u want to order by referredByUsername lexicographically
+        enum:
+        - asc
+        - desc
+        in: query
+        name: referredByUsernameOrderBy
+        type: string
+      - description: if u want to find usernames starting with keyword
+        in: query
+        name: usernameKeyword
+        type: string
+      - description: if u want to find referredByUsernames starting with keyword
+        in: query
+        name: referredByUsernameKeyword
+        type: string
       produces:
       - application/json
       responses:

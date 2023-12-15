@@ -60,6 +60,58 @@ const docTemplate = `{
                         "description": "count of records in response, 5000 by default",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "if u want to order by createdAt",
+                        "name": "createdAtOrderBy",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "if u want to order by ice amount",
+                        "name": "iceOrderBy",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "if u want to order by username lexicographically",
+                        "name": "usernameOrderBy",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "if u want to order by referredByUsername lexicographically",
+                        "name": "referredByUsernameOrderBy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "if u want to find usernames starting with keyword",
+                        "name": "usernameKeyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "if u want to find referredByUsernames starting with keyword",
+                        "name": "referredByUsernameKeyword",
+                        "in": "query"
                     }
                 ],
                 "responses": {
