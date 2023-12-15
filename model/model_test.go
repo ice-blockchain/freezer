@@ -117,20 +117,21 @@ func TestEskimoToFreezerKYCStateDeserialization(t *testing.T) {
 		KYCStepPassed:         &stepB,
 		KYCStepBlocked:        &stepA,
 	}
+	usr.Country = "XX"
+	usr.MiningBlockchainAccountAddress = "YY"
 	serializedUser, err := json.Marshal(usr)
 	require.NoError(t, err)
 
-	type (
-		KYCState struct {
-			KYCStepsCreatedAtField
-			KYCStepsLastUpdatedAtField
-			KYCStepPassedField
-			KYCStepBlockedField
-		}
-	)
-	var deserializedUser KYCState
+	var deserializedUser struct {
+		CountryField
+		MiningBlockchainAccountAddressField
+		KYCState
+		DeserializedUsersKey
+	}
 	err = json.Unmarshal(serializedUser, &deserializedUser)
 	require.NoError(t, err)
+	assert.EqualValues(t, "XX", deserializedUser.Country)
+	assert.EqualValues(t, "YY", deserializedUser.MiningBlockchainAccountAddress)
 	assert.EqualValues(t, stepA, deserializedUser.KYCStepBlocked)
 	assert.EqualValues(t, stepB, deserializedUser.KYCStepPassed)
 	assert.EqualValues(t, 1, len(*usr.KYCStepsCreatedAt))

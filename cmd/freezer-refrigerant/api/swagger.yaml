@@ -2,11 +2,14 @@
 
 basePath: /v1w
 definitions:
-  coindistribution.CoinDistibutionForReview:
+  coindistribution.PendingReview:
     properties:
       ethAddress:
         example: 0x43....
         type: string
+      ice:
+        example: 1000
+        type: number
       iceflakes:
         example: "100000000000000"
         type: string
@@ -26,10 +29,11 @@ definitions:
   main.CoinDistributionsForReview:
     properties:
       cursor:
+        example: 5065
         type: integer
       distributions:
         items:
-          $ref: '#/definitions/coindistribution.CoinDistibutionForReview'
+          $ref: '#/definitions/coindistribution.PendingReview'
         type: array
     type: object
   main.StartNewMiningSessionRequestBody:

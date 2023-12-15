@@ -176,7 +176,12 @@ wintr/connectors/storage/v2: &db
 miner:
   bookkeeper/storage: *bookkeeperStorage
   development: true
-  workers: 1
+  workers: 2
+  batchSize: 100
+  wintr/connectors/storage/v2: *db
+coin-distribution:
+  development: true
+  workers: 2
   batchSize: 100
   wintr/connectors/storage/v2: *db
 extra-bonus-notifier:

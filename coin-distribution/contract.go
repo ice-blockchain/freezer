@@ -23,17 +23,19 @@ type (
 
 	Repository interface {
 		io.Closer
-		GetCoinDistributionsForReview(ctx context.Context, cursor, limit uint64) (updatedCursor uint64, distributions []*CoinDistibutionForReview, err error)
+		GetCoinDistributionsForReview(ctx context.Context, cursor, limit uint64) (updatedCursor uint64, distributions []*PendingReview, err error)
 		CheckHealth(ctx context.Context) error
 	}
 
-	CoinDistibutionForReview struct {
+	PendingReview struct {
 		CreatedAt          *time.Time `json:"time" swaggertype:"string" example:"2022-01-03T16:20:52.156534Z"`
 		Iceflakes          string     `json:"iceflakes" swaggertype:"string" example:"100000000000000"`
 		Username           string     `json:"username" swaggertype:"string" example:"myusername"`
 		ReferredByUsername string     `json:"referredByUsername" swaggertype:"string" example:"myrefusername"`
 		UserID             string     `json:"userId" swaggertype:"string" example:"12746386-03de-44d7-91c7-856fa66b6ed6"`
 		EthAddress         string     `json:"ethAddress" swaggertype:"string" example:"0x43...."`
+		Ice                float64    `json:"ice" db:"-" example:"1000"`
+		IceInternal        int64      `json:"-" db:"ice" swaggerignore:"true"`
 	}
 )
 
@@ -69,7 +71,8 @@ type (
 		Development bool  `yaml:"development"`
 	}
 	coinDistribution struct {
-		*CoinDistibutionForReview
+		*PendingReview
+		Day        stdlibtime.Time
 		InternalID uint64
 	}
 )

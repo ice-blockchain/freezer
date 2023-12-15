@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/ice-blockchain/eskimo/users"
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/terror"
@@ -93,7 +94,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
 		}
 	}
-	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, &state.KYCState, skipKYCSteps); err != nil {
+	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, state, skipKYCSteps); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
 	if state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
@@ -365,24 +366,12 @@ func (r *repository) isKYCStepForced(state users.KYCStep, userID string) bool {
 	return false
 }
 
-func (kyc *KYCState) KYCStepNotAttempted(kycStep users.KYCStep) bool {
-	return !kyc.KYCStepAttempted(kycStep)
-}
-
-func (kyc *KYCState) KYCStepAttempted(kycStep users.KYCStep) bool {
-	return kyc.KYCStepsLastUpdatedAt != nil && len(*kyc.KYCStepsLastUpdatedAt) >= int(kycStep) && !(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].IsNil()
-}
-
-func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, duration stdlibtime.Duration) bool {
-	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
-}
-
 /*
 Because existing users have empty KYCState in dragonfly cuz usersTableSource might not have updated it yet.
 And because we might need to reset any kyc steps for the user prior to starting to mine.
 So we need to call Eskimo for that, to be sure we have the valid kyc state for the user before starting to mine.
 */
-func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *KYCState, skipKYCSteps []users.KYCStep) error {
+func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, userID string, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep) error {
 	request := req.
 		SetContext(ctx).
 		SetRetryCount(25).
@@ -420,7 +409,20 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 	} else if data, err2 := resp.ToBytes(); err2 != nil {
 		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v, skipKYCSteps:%#v", userID, skipKYCSteps)
 	} else {
-		return errors.Wrapf(json.Unmarshal(data, state), "failed to unmarshal into %#v, data: %v, skipKYCSteps:%#v", state, string(data), skipKYCSteps)
+		var usr struct {
+			model.CountryField
+			model.MiningBlockchainAccountAddressField
+			model.KYCState
+			model.DeserializedUsersKey
+		}
+		if err3 := json.Unmarshal(data, &usr); err3 != nil {
+			return errors.Wrapf(err3, "failed to unmarshal into %#v, data: `%v`, skipKYCSteps:%#v", &usr, string(data), skipKYCSteps)
+		} else {
+			usr.DeserializedUsersKey = state.DeserializedUsersKey
+			state.KYCState = usr.KYCState
+
+			return errors.Wrapf(storage.Set(ctx, r.db, &usr), "failed to db set partial state:%#v, userID:%v, skipKYCSteps:%#v", &usr, userID, skipKYCSteps) //nolint:lll // .
+		}
 	}
 }
 

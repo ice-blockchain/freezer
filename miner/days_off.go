@@ -9,6 +9,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/freezer/model"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
@@ -36,7 +37,7 @@ func didANewDayOffJustStart(now *time.Time, usr *user) *DayOffStarted {
 		UserID:                      usr.UserID,
 		ID:                          fmt.Sprintf("%v~%v", usr.UserID, startedAt.UnixNano()/miningSessionDuration.Nanoseconds()),
 		RemainingFreeMiningSessions: uint64(usr.MiningSessionSoloEndedAt.Sub(*now.Time) / miningSessionDuration),
-		MiningStreak:                uint64(now.Sub(*usr.MiningSessionSoloStartedAt.Time) / miningSessionDuration),
+		MiningStreak:                model.CalculateMiningStreak(now, usr.MiningSessionSoloStartedAt, usr.MiningSessionSoloEndedAt, miningSessionDuration),
 	}
 }
 

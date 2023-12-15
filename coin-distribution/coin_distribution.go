@@ -100,7 +100,7 @@ func (cd *coinDistributer) isEnabled(rooCtx context.Context) bool {
 	defer cancel()
 	val, err := storage.Get[struct {
 		Enabled bool
-	}](ctx, cd.db, `SELECT value::bool as enabled FROM pending_coin_distribution_configurations WHERE key = 'enabled'`)
+	}](ctx, cd.db, `SELECT value::bool as enabled FROM global WHERE key = 'coin_distributer_enabled'`)
 	if err != nil {
 		log.Error(errors.Wrap(err, "failed to check if coinDistributer is enabled"))
 
@@ -113,7 +113,7 @@ func (cd *coinDistributer) isEnabled(rooCtx context.Context) bool {
 func (cd *coinDistributer) Disable(rooCtx context.Context) error {
 	ctx, cancel := context.WithTimeout(rooCtx, requestDeadline)
 	defer cancel()
-	rows, err := storage.Exec(ctx, cd.db, `UPDATE pending_coin_distribution_configurations SET value = 'false' WHERE key = 'enabled'`)
+	rows, err := storage.Exec(ctx, cd.db, `UPDATE global SET value = 'false' WHERE key = 'coin_distributer_enabled'`)
 	if err != nil {
 		return errors.Wrap(err, "failed to disable coinDistributer")
 	}

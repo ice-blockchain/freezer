@@ -264,30 +264,30 @@ type (
 			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
 			Enabled            bool     `json:"enabled"`
 		} `json:"face-auth"`
-		WebFaceAuth struct {
-			Enabled bool `json:"enabled"`
-		} `json:"web-face-auth"`
 		Social1KYC struct {
 			DisabledVersions   []string `json:"disabledVersions"`
 			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
 			Enabled            bool     `json:"enabled"`
 		} `json:"social1-kyc"`
-		WebSocial1KYC struct {
-			Enabled bool `json:"enabled"`
-		} `json:"web-social1-kyc"`
 		QuizKYC struct {
 			DisabledVersions   []string `json:"disabledVersions"`
 			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
 			Enabled            bool     `json:"enabled"`
 		} `json:"quiz-kyc"`
-		WebQuizKYC struct {
-			Enabled bool `json:"enabled"`
-		} `json:"web-quiz-kyc"`
 		Social2KYC struct {
 			DisabledVersions   []string `json:"disabledVersions"`
 			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
 			Enabled            bool     `json:"enabled"`
 		} `json:"social2-kyc"`
+		WebFaceAuth struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-face-auth"`
+		WebSocial1KYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-social1-kyc"`
+		WebQuizKYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-quiz-kyc"`
 		WebSocial2KYC struct {
 			Enabled bool `json:"enabled"`
 		} `json:"web-social2-kyc"`

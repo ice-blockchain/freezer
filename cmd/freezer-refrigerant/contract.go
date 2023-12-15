@@ -33,8 +33,8 @@ type (
 	}
 
 	CoinDistributionsForReview struct {
-		Distributions []*coindistribution.CoinDistibutionForReview `json:"distributions"`
-		Cursor        uint64                                       `json:"cursor" example: 5065`
+		Distributions []*coindistribution.PendingReview `json:"distributions"`
+		Cursor        uint64                            `json:"cursor" example:"5065"`
 	}
 
 	GetCoinDistributionForReviewParams struct {

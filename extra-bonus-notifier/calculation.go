@@ -3,6 +3,7 @@
 package extrabonusnotifier
 
 import (
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/time"
 )
 
@@ -15,7 +16,7 @@ func CalculateExtraBonus(
 		newsSeenBonusValues            = cfg.ExtraBonuses.NewsSeenValues
 		miningStreakValues             = cfg.ExtraBonuses.MiningStreakValues
 		bonusPercentageRemaining       = float64(100 * (1 + extraBonusDaysClaimNotAvailable))
-		miningStreak                   = calculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt)
+		miningStreak                   = model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, cfg.MiningSessionDuration)
 		flatBonusValue                 = cfg.ExtraBonuses.FlatValues[extraBonusIndex]
 		firstDelayedClaimPenaltyWindow = int64(float64(cfg.ExtraBonuses.DelayedClaimPenaltyWindow.Nanoseconds()) * networkDelayDelta)
 	)
@@ -33,12 +34,4 @@ func CalculateExtraBonus(
 	}
 
 	return (float64(flatBonusValue+miningStreakValues[miningStreak]+newsSeenBonusValues[newsSeen]) * bonusPercentageRemaining) / 100
-}
-
-func calculateMiningStreak(now, start, end *time.Time) uint64 {
-	if start.IsNil() || end.IsNil() || now.After(*end.Time) || now.Before(*start.Time) {
-		return 0
-	}
-
-	return uint64(now.Sub(*start.Time) / cfg.MiningSessionDuration)
 }

@@ -383,12 +383,16 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "coindistribution.CoinDistibutionForReview": {
+        "coindistribution.PendingReview": {
             "type": "object",
             "properties": {
                 "ethAddress": {
                     "type": "string",
                     "example": "0x43...."
+                },
+                "ice": {
+                    "type": "number",
+                    "example": 1000
                 },
                 "iceflakes": {
                     "type": "string",
@@ -416,12 +420,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 5065
                 },
                 "distributions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/coindistribution.CoinDistibutionForReview"
+                        "$ref": "#/definitions/coindistribution.PendingReview"
                     }
                 }
             }

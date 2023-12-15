@@ -31,15 +31,10 @@ type (
 		model.ReferralsCountChangeGuardUpdatedAtField
 		model.DeserializedUsersKey
 	}
-	KYCState struct {
-		model.KYCStepsCreatedAtField
-		model.KYCStepsLastUpdatedAtField
-		model.KYCStepPassedField
-		model.KYCStepBlockedField
-	}
 	getCurrentMiningSession struct {
-		KYCState
+		model.ReferralsCountChangeGuardUpdatedAtField
 		StartOrExtendMiningSession
+		model.KYCState
 		model.LatestDeviceField
 		model.UserIDField
 		model.SlashingRateSoloField
@@ -51,7 +46,6 @@ type (
 		model.IDTMinus1Field
 		model.PreStakingAllocationField
 		model.PreStakingBonusField
-		model.ReferralsCountChangeGuardUpdatedAtField
 	}
 )
 

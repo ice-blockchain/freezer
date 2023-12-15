@@ -165,10 +165,11 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	}
 	type (
 		user struct {
-			KYCState
+			model.KYCState
 			model.UserIDField
 			model.ProfilePictureNameField
 			model.UsernameField
+			model.CountryField
 			model.MiningBlockchainAccountAddressField
 			model.BlockchainAccountAddressField
 			model.BalanceForTMinus1Field
@@ -190,6 +191,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	newPartialState.ID = internalID
 	newPartialState.ProfilePictureName = s.pictureClient.StripDownloadURL(usr.ProfilePictureURL)
 	newPartialState.Username = usr.Username
+	newPartialState.Country = usr.Country
 	newPartialState.MiningBlockchainAccountAddress = usr.MiningBlockchainAccountAddress
 	newPartialState.BlockchainAccountAddress = usr.BlockchainAccountAddress
 	if usr.KYCStepPassed != nil {
@@ -209,6 +211,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	newPartialState.HideRanking = s.hideRanking(usr)
 	if newPartialState.ProfilePictureName != dbUser[0].ProfilePictureName ||
 		newPartialState.Username != dbUser[0].Username ||
+		!strings.EqualFold(newPartialState.Country, dbUser[0].Country) ||
 		newPartialState.MiningBlockchainAccountAddress != dbUser[0].MiningBlockchainAccountAddress ||
 		newPartialState.BlockchainAccountAddress != dbUser[0].BlockchainAccountAddress ||
 		newPartialState.HideRanking != dbUser[0].HideRanking ||

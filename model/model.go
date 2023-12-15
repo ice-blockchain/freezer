@@ -29,6 +29,9 @@ type (
 		ResurrectTMinus1UsedAtField
 		MiningSessionSoloDayOffLastAwardedAtField
 		ExtraBonusLastClaimAvailableAtField
+		SoloLastEthereumCoinDistributionProcessedAtField
+		ForT0LastEthereumCoinDistributionProcessedAtField
+		ForTMinus1LastEthereumCoinDistributionProcessedAtField
 		ProfilePictureNameField
 		UsernameField
 		MiningBlockchainAccountAddressField
@@ -51,6 +54,12 @@ type (
 		BalanceT2Field
 		BalanceForT0Field
 		BalanceForTMinus1Field
+		BalanceSoloEthereumField
+		BalanceT0EthereumField
+		BalanceT1EthereumField
+		BalanceT2EthereumField
+		BalanceForT0EthereumField
+		BalanceForTMinus1EthereumField
 		SlashingRateSoloField
 		SlashingRateT0Field
 		SlashingRateT1Field
@@ -68,6 +77,21 @@ type (
 		NewsSeenField
 		ExtraBonusDaysClaimNotAvailableField
 		HideRankingField
+	}
+	KYCState struct {
+		KYCStepsCreatedAtField
+		KYCStepsLastUpdatedAtField
+		KYCStepPassedField
+		KYCStepBlockedField
+	}
+	SoloLastEthereumCoinDistributionProcessedAtField struct {
+		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
+	}
+	ForT0LastEthereumCoinDistributionProcessedAtField struct {
+		ForT0LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_ethereum_coin_distribution_processed_at,omitempty"`
+	}
+	ForTMinus1LastEthereumCoinDistributionProcessedAtField struct {
+		ForTMinus1LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
@@ -115,13 +139,16 @@ type (
 		Username string `redis:"username,omitempty"`
 	}
 	MiningBlockchainAccountAddressField struct {
-		MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address,omitempty"`
+		MiningBlockchainAccountAddress string `redis:"mining_blockchain_account_address" json:"miningBlockchainAccountAddress"`
 	}
 	BlockchainAccountAddressField struct {
-		BlockchainAccountAddress string `redis:"blockchain_account_address,omitempty"`
+		BlockchainAccountAddress string `redis:"blockchain_account_address"`
 	}
 	LatestDeviceField struct {
 		LatestDevice string `redis:"latest_device,omitempty"`
+	}
+	CountryField struct {
+		Country string `redis:"country" json:"country"`
 	}
 	BalanceTotalStandardField struct {
 		BalanceTotalStandard float64 `redis:"balance_total_standard"`
@@ -156,20 +183,44 @@ type (
 	BalanceSoloField struct {
 		BalanceSolo float64 `redis:"balance_solo"`
 	}
+	BalanceSoloEthereumField struct {
+		BalanceSoloEthereum float64 `redis:"balance_solo_ethereum"`
+	}
 	BalanceT0Field struct {
 		BalanceT0 float64 `redis:"balance_t0"`
+	}
+	BalanceT0EthereumField struct {
+		BalanceT0Ethereum float64 `redis:"balance_t0_ethereum"`
 	}
 	BalanceT1Field struct {
 		BalanceT1 float64 `redis:"balance_t1"`
 	}
+	BalanceT1EthereumField struct {
+		BalanceT1Ethereum float64 `redis:"balance_t1_ethereum"`
+	}
+	BalanceT1EthereumPendingField struct {
+		BalanceT1EthereumPending float64 `redis:"balance_t1_ethereum_pending"`
+	}
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
+	}
+	BalanceT2EthereumField struct {
+		BalanceT2Ethereum float64 `redis:"balance_t2_ethereum"`
+	}
+	BalanceT2EthereumPendingField struct {
+		BalanceT2EthereumPending float64 `redis:"balance_t2_ethereum_pending"`
 	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
 	}
+	BalanceForT0EthereumField struct {
+		BalanceForT0Ethereum float64 `redis:"balance_for_t0_ethereum"`
+	}
 	BalanceForTMinus1Field struct {
 		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
+	}
+	BalanceForTMinus1EthereumField struct {
+		BalanceForTMinus1Ethereum float64 `redis:"balance_for_tminus1_ethereum"`
 	}
 	SlashingRateSoloField struct {
 		SlashingRateSolo float64 `redis:"slashing_rate_solo"`
@@ -199,7 +250,7 @@ type (
 		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
 	}
 	DeserializedUsersKey struct {
-		ID int64 `redis:"-"`
+		ID int64 `redis:"-" json:"-"`
 	}
 	IDT0Field struct {
 		IDT0 int64 `redis:"id_t0,omitempty"`
@@ -285,6 +336,32 @@ func SerializedUsersKey(val any) string {
 	default:
 		panic(fmt.Sprintf("%#v cannot be used as users key", val))
 	}
+}
+
+func CalculateMiningStreak(now, start, end *time.Time, miningSessionDuration stdlibtime.Duration) uint64 {
+	if start.IsNil() || end.IsNil() || now.After(*end.Time) || now.Before(*start.Time) {
+		return 0
+	}
+
+	return uint64(now.Sub(*start.Time) / miningSessionDuration)
+}
+
+func (kyc *KYCState) KYCStepPassedCorrectly(kycStep users.KYCStep) bool {
+	return (kyc.KYCStepBlocked == users.NoneKYCStep || kyc.KYCStepBlocked > kycStep) &&
+		kycStep == kyc.KYCStepPassed &&
+		kyc.KYCStepAttempted(kycStep)
+}
+
+func (kyc *KYCState) KYCStepNotAttempted(kycStep users.KYCStep) bool {
+	return !kyc.KYCStepAttempted(kycStep)
+}
+
+func (kyc *KYCState) KYCStepAttempted(kycStep users.KYCStep) bool {
+	return kyc.KYCStepsLastUpdatedAt != nil && len(*kyc.KYCStepsLastUpdatedAt) >= int(kycStep) && !(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].IsNil()
+}
+
+func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, duration stdlibtime.Duration) bool {
+	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
 }
 
 type (
