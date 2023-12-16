@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
        resurrect_tminus1_used_at DateTime64(9,'UTC')  DEFAULT 0,
        mining_session_solo_day_off_last_awarded_at DateTime64(9,'UTC')  DEFAULT 0,
        extra_bonus_last_claim_available_at DateTime64(9,'UTC')  DEFAULT 0,
+       solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+       for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+       for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
        created_at DateTime('UTC')  DEFAULT 0,
        balance_total_standard Float64  DEFAULT 0,
        balance_total_pre_staking Float64  DEFAULT 0,
@@ -31,6 +34,12 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
        balance_t2 Float64  DEFAULT 0,
        balance_for_t0 Float64  DEFAULT 0,
        balance_for_tminus1 Float64  DEFAULT 0,
+       balance_solo_ethereum Float64  DEFAULT 0,
+       balance_t0_ethereum Float64  DEFAULT 0,
+       balance_t1_ethereum Float64  DEFAULT 0,
+       balance_t2_ethereum Float64  DEFAULT 0,
+       balance_for_t0_ethereum Float64  DEFAULT 0,
+       balance_for_tminus1_ethereum Float64  DEFAULT 0,
        slashing_rate_solo Float64  DEFAULT 0,
        slashing_rate_t0 Float64  DEFAULT 0,
        slashing_rate_t1 Float64  DEFAULT 0,
@@ -48,7 +57,12 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
        news_seen UInt16  DEFAULT 0,
        extra_bonus_days_claim_not_available UInt16  DEFAULT 0,
        utc_offset Int16  DEFAULT 0,
+       kyc_step_passed UInt8  DEFAULT 0,
+       kyc_step_blocked UInt8  DEFAULT 0,
        hide_ranking Bool  DEFAULT FALSE,
+       kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
+       kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
+       country String  DEFAULT '',
        profile_picture_name String  DEFAULT '',
        username String  DEFAULT '',
        mining_blockchain_account_address String  DEFAULT '',
@@ -57,6 +71,40 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
 ) ENGINE=ReplicatedMergeTree('/clickhouse/tables/{cluster}/{shard_light}/freezer_user_history', '{replica_light}')
   PARTITION BY toDate(created_at)
   PRIMARY KEY (id, created_at);
+ 
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER extra_bonus_last_claim_available_at;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER solo_last_ethereum_coin_distribution_processed_at;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER for_t0_last_ethereum_coin_distribution_processed_at;
+
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum Float64 DEFAULT 0 AFTER balance_for_tminus1;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum Float64 DEFAULT 0 AFTER balance_solo_ethereum;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum Float64 DEFAULT 0 AFTER balance_t0_ethereum;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum Float64 DEFAULT 0 AFTER balance_t1_ethereum;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum Float64 DEFAULT 0 AFTER balance_t2_ethereum;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
+
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_blocked UInt8 DEFAULT 0 AFTER kyc_step_passed;
+
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER hide_ranking;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER kyc_steps_created_at;
+
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS country String  DEFAULT '' AFTER kyc_steps_last_updated_at;
+  
 CREATE TABLE IF NOT EXISTS dark.freezer_user_history
 (
       mining_session_solo_last_started_at DateTime64(9,'UTC')  DEFAULT 0,
@@ -69,6 +117,9 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
       resurrect_tminus1_used_at DateTime64(9,'UTC')  DEFAULT 0,
       mining_session_solo_day_off_last_awarded_at DateTime64(9,'UTC')  DEFAULT 0,
       extra_bonus_last_claim_available_at DateTime64(9,'UTC')  DEFAULT 0,
+      solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+      for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+      for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
       created_at DateTime('UTC')  DEFAULT 0,
       balance_total_standard Float64  DEFAULT 0,
       balance_total_pre_staking Float64  DEFAULT 0,
@@ -86,6 +137,12 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
       balance_t2 Float64  DEFAULT 0,
       balance_for_t0 Float64  DEFAULT 0,
       balance_for_tminus1 Float64  DEFAULT 0,
+      balance_solo_ethereum Float64  DEFAULT 0,
+      balance_t0_ethereum Float64  DEFAULT 0,
+      balance_t1_ethereum Float64  DEFAULT 0,
+      balance_t2_ethereum Float64  DEFAULT 0,
+      balance_for_t0_ethereum Float64  DEFAULT 0,
+      balance_for_tminus1_ethereum Float64  DEFAULT 0,
       slashing_rate_solo Float64  DEFAULT 0,
       slashing_rate_t0 Float64  DEFAULT 0,
       slashing_rate_t1 Float64  DEFAULT 0,
@@ -103,7 +160,12 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
       news_seen UInt16  DEFAULT 0,
       extra_bonus_days_claim_not_available UInt16  DEFAULT 0,
       utc_offset Int16  DEFAULT 0,
+      kyc_step_passed UInt8  DEFAULT 0,
+      kyc_step_blocked UInt8  DEFAULT 0,
       hide_ranking Bool  DEFAULT FALSE,
+      kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
+      kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
+      country String  DEFAULT '',
       profile_picture_name String  DEFAULT '',
       username String  DEFAULT '',
       mining_blockchain_account_address String  DEFAULT '',
@@ -112,6 +174,40 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
 ) ENGINE=ReplicatedMergeTree('/clickhouse/tables/{cluster}/{shard_dark}/freezer_user_history', '{replica_dark}')
   PARTITION BY toDate(created_at)
   PRIMARY KEY (id, created_at);
+  
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER extra_bonus_last_claim_available_at;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER solo_last_ethereum_coin_distribution_processed_at;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER for_t0_last_ethereum_coin_distribution_processed_at;
+
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum Float64 DEFAULT 0 AFTER balance_for_tminus1;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum Float64 DEFAULT 0 AFTER balance_solo_ethereum;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum Float64 DEFAULT 0 AFTER balance_t0_ethereum;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum Float64 DEFAULT 0 AFTER balance_t1_ethereum;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum Float64 DEFAULT 0 AFTER balance_t2_ethereum;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
+
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_blocked UInt8 DEFAULT 0 AFTER kyc_step_passed;
+
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER hide_ranking;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER kyc_steps_created_at;
+
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS country String  DEFAULT '' AFTER kyc_steps_last_updated_at;
+  
 CREATE TABLE IF NOT EXISTS freezer_user_history
 (
      mining_session_solo_last_started_at DateTime64(9,'UTC')  DEFAULT 0,
@@ -124,6 +220,9 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      resurrect_tminus1_used_at DateTime64(9,'UTC')  DEFAULT 0,
      mining_session_solo_day_off_last_awarded_at DateTime64(9,'UTC')  DEFAULT 0,
      extra_bonus_last_claim_available_at DateTime64(9,'UTC')  DEFAULT 0,
+     solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+     for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
+     for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC')  DEFAULT 0,
      created_at DateTime('UTC')  DEFAULT 0,
      balance_total_standard Float64  DEFAULT 0,
      balance_total_pre_staking Float64  DEFAULT 0,
@@ -141,6 +240,12 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      balance_t2 Float64  DEFAULT 0,
      balance_for_t0 Float64  DEFAULT 0,
      balance_for_tminus1 Float64  DEFAULT 0,
+     balance_solo_ethereum Float64  DEFAULT 0,
+     balance_t0_ethereum Float64  DEFAULT 0,
+     balance_t1_ethereum Float64  DEFAULT 0,
+     balance_t2_ethereum Float64  DEFAULT 0,
+     balance_for_t0_ethereum Float64  DEFAULT 0,
+     balance_for_tminus1_ethereum Float64  DEFAULT 0,
      slashing_rate_solo Float64  DEFAULT 0,
      slashing_rate_t0 Float64  DEFAULT 0,
      slashing_rate_t1 Float64  DEFAULT 0,
@@ -158,10 +263,48 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      news_seen UInt16  DEFAULT 0,
      extra_bonus_days_claim_not_available UInt16  DEFAULT 0,
      utc_offset Int16  DEFAULT 0,
+     kyc_step_passed UInt8  DEFAULT 0,
+     kyc_step_blocked UInt8  DEFAULT 0,
      hide_ranking Bool  DEFAULT FALSE,
+     kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
+     kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
+     country String  DEFAULT '',
      profile_picture_name String  DEFAULT '',
      username String  DEFAULT '',
      mining_blockchain_account_address String  DEFAULT '',
      blockchain_account_address String  DEFAULT '',
      user_id String  DEFAULT ''
 ) ENGINE = Distributed('{cluster}', '', 'freezer_user_history', toUInt64(toDate(created_at)));
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS solo_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER extra_bonus_last_claim_available_at;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_t0_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER solo_last_ethereum_coin_distribution_processed_at;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS for_tminus1_last_ethereum_coin_distribution_processed_at DateTime64(9,'UTC') DEFAULT 0 AFTER for_t0_last_ethereum_coin_distribution_processed_at;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum Float64 DEFAULT 0 AFTER balance_for_tminus1;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum Float64 DEFAULT 0 AFTER balance_solo_ethereum;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum Float64 DEFAULT 0 AFTER balance_t0_ethereum;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum Float64 DEFAULT 0 AFTER balance_t1_ethereum;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum Float64 DEFAULT 0 AFTER balance_t2_ethereum;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_step_blocked UInt8 DEFAULT 0 AFTER kyc_step_passed;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER hide_ranking;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [] AFTER kyc_steps_created_at;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS country String  DEFAULT '' AFTER kyc_steps_last_updated_at;

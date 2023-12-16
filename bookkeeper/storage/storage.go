@@ -171,7 +171,23 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		} else {
 			columns.extraBonusLastClaimAvailableAt.Append(*usr.ExtraBonusLastClaimAvailableAt.Time)
 		}
+		if usr.SoloLastEthereumCoinDistributionProcessedAt.IsNil() {
+			columns.soloLastEthereumCoinDistributionProcessedAt.Append(stdlibtime.Time{})
+		} else {
+			columns.soloLastEthereumCoinDistributionProcessedAt.Append(*usr.SoloLastEthereumCoinDistributionProcessedAt.Time)
+		}
+		if usr.ForT0LastEthereumCoinDistributionProcessedAt.IsNil() {
+			columns.forT0LastEthereumCoinDistributionProcessedAt.Append(stdlibtime.Time{})
+		} else {
+			columns.forT0LastEthereumCoinDistributionProcessedAt.Append(*usr.ForT0LastEthereumCoinDistributionProcessedAt.Time)
+		}
+		if usr.ForTMinus1LastEthereumCoinDistributionProcessedAt.IsNil() {
+			columns.forTMinus1LastEthereumCoinDistributionProcessedAt.Append(stdlibtime.Time{})
+		} else {
+			columns.forTMinus1LastEthereumCoinDistributionProcessedAt.Append(*usr.ForTMinus1LastEthereumCoinDistributionProcessedAt.Time)
+		}
 		columns.createdAt.Append(now.Truncate(truncateDuration))
+		columns.country.Append(usr.Country)
 		columns.profilePictureName.Append(usr.ProfilePictureName)
 		columns.username.Append(usr.Username)
 		columns.miningBlockchainAccountAddress.Append(usr.MiningBlockchainAccountAddress)
@@ -196,6 +212,12 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		columns.balanceT2.Append(usr.BalanceT2)
 		columns.balanceForT0.Append(usr.BalanceForT0)
 		columns.balanceForTminus1.Append(usr.BalanceForTMinus1)
+		columns.balanceSoloEthereum.Append(usr.BalanceSoloEthereum)
+		columns.balanceT0Ethereum.Append(usr.BalanceT0Ethereum)
+		columns.balanceT1Ethereum.Append(usr.BalanceT1Ethereum)
+		columns.balanceT2Ethereum.Append(usr.BalanceT2Ethereum)
+		columns.balanceForT0Ethereum.Append(usr.BalanceForT0Ethereum)
+		columns.balanceForTMinus1Ethereum.Append(usr.BalanceForTMinus1Ethereum)
 		columns.slashingRateSolo.Append(usr.SlashingRateSolo)
 		columns.slashingRateT0.Append(usr.SlashingRateT0)
 		columns.slashingRateT1.Append(usr.SlashingRateT1)
@@ -210,7 +232,31 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		columns.newsSeen.Append(usr.NewsSeen)
 		columns.extraBonusDaysClaimNotAvailable.Append(usr.ExtraBonusDaysClaimNotAvailable)
 		columns.utcOffset.Append(int16(usr.UTCOffset))
+		columns.kycStepPassed.Append(uint8(usr.KYCStepPassed))
+		columns.kycStepBlocked.Append(uint8(usr.KYCStepBlocked))
 		columns.hideRanking.Append(usr.HideRanking)
+		kycStepsCreatedAt := make([]stdlibtime.Time, 0, 6)
+		if usr.KYCStepsCreatedAt != nil {
+			for _, date := range *usr.KYCStepsCreatedAt {
+				if date.IsNil() {
+					kycStepsCreatedAt = append(kycStepsCreatedAt, stdlibtime.Time{})
+				} else {
+					kycStepsCreatedAt = append(kycStepsCreatedAt, *date.Time)
+				}
+			}
+		}
+		columns.kycStepsCreatedAt.Append(kycStepsCreatedAt)
+		kycStepsLastUpdatedAt := make([]stdlibtime.Time, 0, 6)
+		if usr.KYCStepsLastUpdatedAt != nil {
+			for _, date := range *usr.KYCStepsLastUpdatedAt {
+				if date.IsNil() {
+					kycStepsLastUpdatedAt = append(kycStepsLastUpdatedAt, stdlibtime.Time{})
+				} else {
+					kycStepsLastUpdatedAt = append(kycStepsLastUpdatedAt, *date.Time)
+				}
+			}
+		}
+		columns.kycStepsLastUpdatedAt.Append(kycStepsLastUpdatedAt)
 	}
 
 	return db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
@@ -222,58 +268,72 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 
 func InsertDDL(rows int) (*Columns, proto.Input) {
 	var (
-		miningSessionSoloLastStartedAt       = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		miningSessionSoloStartedAt           = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		miningSessionSoloEndedAt             = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		miningSessionSoloPreviouslyEndedAt   = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		extraBonusStartedAt                  = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		resurrectSoloUsedAt                  = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		resurrectT0UsedAt                    = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		resurrectTminus1UsedAt               = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		miningSessionSoloDayOffLastAwardedAt = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		extraBonusLastClaimAvailableAt       = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
-		createdAt                            = &proto.ColDateTime{Data: make([]proto.DateTime, 0, rows), Location: stdlibtime.UTC}
-		profilePictureName                   = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
-		username                             = &proto.ColStr{Buf: make([]byte, 0, 40*rows), Pos: make([]proto.Position, 0, rows)}
-		miningBlockchainAccountAddress       = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
-		blockchainAccountAddress             = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
-		userID                               = &proto.ColStr{Buf: make([]byte, 0, 30*rows), Pos: make([]proto.Position, 0, rows)}
-		id                                   = make(proto.ColInt64, 0, rows)
-		idT0                                 = make(proto.ColInt64, 0, rows)
-		idTminus1                            = make(proto.ColInt64, 0, rows)
-		balanceTotalStandard                 = make(proto.ColFloat64, 0, rows)
-		balanceTotalPreStaking               = make(proto.ColFloat64, 0, rows)
-		balanceTotalMinted                   = make(proto.ColFloat64, 0, rows)
-		balanceTotalSlashed                  = make(proto.ColFloat64, 0, rows)
-		balanceSoloPending                   = make(proto.ColFloat64, 0, rows)
-		balanceT1Pending                     = make(proto.ColFloat64, 0, rows)
-		balanceT2Pending                     = make(proto.ColFloat64, 0, rows)
-		balanceSoloPendingApplied            = make(proto.ColFloat64, 0, rows)
-		balanceT1PendingApplied              = make(proto.ColFloat64, 0, rows)
-		balanceT2PendingApplied              = make(proto.ColFloat64, 0, rows)
-		balanceSolo                          = make(proto.ColFloat64, 0, rows)
-		balanceT0                            = make(proto.ColFloat64, 0, rows)
-		balanceT1                            = make(proto.ColFloat64, 0, rows)
-		balanceT2                            = make(proto.ColFloat64, 0, rows)
-		balanceForT0                         = make(proto.ColFloat64, 0, rows)
-		balanceForTminus1                    = make(proto.ColFloat64, 0, rows)
-		slashingRateSolo                     = make(proto.ColFloat64, 0, rows)
-		slashingRateT0                       = make(proto.ColFloat64, 0, rows)
-		slashingRateT1                       = make(proto.ColFloat64, 0, rows)
-		slashingRateT2                       = make(proto.ColFloat64, 0, rows)
-		slashingRateForT0                    = make(proto.ColFloat64, 0, rows)
-		slashingRateForTminus1               = make(proto.ColFloat64, 0, rows)
-		activeT1Referrals                    = make(proto.ColInt32, 0, rows)
-		activeT2Referrals                    = make(proto.ColInt32, 0, rows)
-		preStakingBonus                      = make(proto.ColUInt16, 0, rows)
-		preStakingAllocation                 = make(proto.ColUInt16, 0, rows)
-		extraBonus                           = make(proto.ColUInt16, 0, rows)
-		newsSeen                             = make(proto.ColUInt16, 0, rows)
-		extraBonusDaysClaimNotAvailable      = make(proto.ColUInt16, 0, rows)
-		utcOffset                            = make(proto.ColInt16, 0, rows)
-		hideRanking                          = make(proto.ColBool, 0, rows)
+		miningSessionSoloLastStartedAt                    = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		miningSessionSoloStartedAt                        = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		miningSessionSoloEndedAt                          = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		miningSessionSoloPreviouslyEndedAt                = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		extraBonusStartedAt                               = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		resurrectSoloUsedAt                               = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		resurrectT0UsedAt                                 = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		resurrectTminus1UsedAt                            = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		miningSessionSoloDayOffLastAwardedAt              = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		extraBonusLastClaimAvailableAt                    = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		soloLastEthereumCoinDistributionProcessedAt       = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		forT0LastEthereumCoinDistributionProcessedAt      = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		forTMinus1LastEthereumCoinDistributionProcessedAt = &proto.ColDateTime64{Data: make([]proto.DateTime64, 0, rows), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}
+		createdAt                                         = &proto.ColDateTime{Data: make([]proto.DateTime, 0, rows), Location: stdlibtime.UTC}
+		country                                           = &proto.ColStr{Buf: make([]byte, 0, 3*rows), Pos: make([]proto.Position, 0, rows)}
+		profilePictureName                                = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
+		username                                          = &proto.ColStr{Buf: make([]byte, 0, 40*rows), Pos: make([]proto.Position, 0, rows)}
+		miningBlockchainAccountAddress                    = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
+		blockchainAccountAddress                          = &proto.ColStr{Buf: make([]byte, 0, 50*rows), Pos: make([]proto.Position, 0, rows)}
+		userID                                            = &proto.ColStr{Buf: make([]byte, 0, 40*rows), Pos: make([]proto.Position, 0, rows)}
+		id                                                = make(proto.ColInt64, 0, rows)
+		idT0                                              = make(proto.ColInt64, 0, rows)
+		idTminus1                                         = make(proto.ColInt64, 0, rows)
+		balanceTotalStandard                              = make(proto.ColFloat64, 0, rows)
+		balanceTotalPreStaking                            = make(proto.ColFloat64, 0, rows)
+		balanceTotalMinted                                = make(proto.ColFloat64, 0, rows)
+		balanceTotalSlashed                               = make(proto.ColFloat64, 0, rows)
+		balanceSoloPending                                = make(proto.ColFloat64, 0, rows)
+		balanceT1Pending                                  = make(proto.ColFloat64, 0, rows)
+		balanceT2Pending                                  = make(proto.ColFloat64, 0, rows)
+		balanceSoloPendingApplied                         = make(proto.ColFloat64, 0, rows)
+		balanceT1PendingApplied                           = make(proto.ColFloat64, 0, rows)
+		balanceT2PendingApplied                           = make(proto.ColFloat64, 0, rows)
+		balanceSolo                                       = make(proto.ColFloat64, 0, rows)
+		balanceT0                                         = make(proto.ColFloat64, 0, rows)
+		balanceT1                                         = make(proto.ColFloat64, 0, rows)
+		balanceT2                                         = make(proto.ColFloat64, 0, rows)
+		balanceForT0                                      = make(proto.ColFloat64, 0, rows)
+		balanceForTminus1                                 = make(proto.ColFloat64, 0, rows)
+		balanceSoloEthereum                               = make(proto.ColFloat64, 0, rows)
+		balanceT0Ethereum                                 = make(proto.ColFloat64, 0, rows)
+		balanceT1Ethereum                                 = make(proto.ColFloat64, 0, rows)
+		balanceT2Ethereum                                 = make(proto.ColFloat64, 0, rows)
+		balanceForT0Ethereum                              = make(proto.ColFloat64, 0, rows)
+		balanceForTMinus1Ethereum                         = make(proto.ColFloat64, 0, rows)
+		slashingRateSolo                                  = make(proto.ColFloat64, 0, rows)
+		slashingRateT0                                    = make(proto.ColFloat64, 0, rows)
+		slashingRateT1                                    = make(proto.ColFloat64, 0, rows)
+		slashingRateT2                                    = make(proto.ColFloat64, 0, rows)
+		slashingRateForT0                                 = make(proto.ColFloat64, 0, rows)
+		slashingRateForTminus1                            = make(proto.ColFloat64, 0, rows)
+		activeT1Referrals                                 = make(proto.ColInt32, 0, rows)
+		activeT2Referrals                                 = make(proto.ColInt32, 0, rows)
+		preStakingBonus                                   = make(proto.ColUInt16, 0, rows)
+		preStakingAllocation                              = make(proto.ColUInt16, 0, rows)
+		extraBonus                                        = make(proto.ColUInt16, 0, rows)
+		newsSeen                                          = make(proto.ColUInt16, 0, rows)
+		extraBonusDaysClaimNotAvailable                   = make(proto.ColUInt16, 0, rows)
+		utcOffset                                         = make(proto.ColInt16, 0, rows)
+		kycStepPassed                                     = make(proto.ColUInt8, 0, rows)
+		kycStepBlocked                                    = make(proto.ColUInt8, 0, rows)
+		hideRanking                                       = make(proto.ColBool, 0, rows)
+		kycStepsCreatedAt                                 = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
+		kycStepsLastUpdatedAt                             = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
 	)
-	input := append(make(proto.Input, 0, 50),
+	input := append(make(proto.Input, 0, 64),
 		proto.InputColumn{Name: "mining_session_solo_last_started_at", Data: miningSessionSoloLastStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_started_at", Data: miningSessionSoloStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_ended_at", Data: miningSessionSoloEndedAt},
@@ -284,7 +344,11 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		proto.InputColumn{Name: "resurrect_tminus1_used_at", Data: resurrectTminus1UsedAt},
 		proto.InputColumn{Name: "mining_session_solo_day_off_last_awarded_at", Data: miningSessionSoloDayOffLastAwardedAt},
 		proto.InputColumn{Name: "extra_bonus_last_claim_available_at", Data: extraBonusLastClaimAvailableAt},
+		proto.InputColumn{Name: "solo_last_ethereum_coin_distribution_processed_at", Data: soloLastEthereumCoinDistributionProcessedAt},
+		proto.InputColumn{Name: "for_t0_last_ethereum_coin_distribution_processed_at", Data: forT0LastEthereumCoinDistributionProcessedAt},
+		proto.InputColumn{Name: "for_tminus1_last_ethereum_coin_distribution_processed_at", Data: forTMinus1LastEthereumCoinDistributionProcessedAt},
 		proto.InputColumn{Name: "created_at", Data: createdAt},
+		proto.InputColumn{Name: "country", Data: country},
 		proto.InputColumn{Name: "profile_picture_name", Data: profilePictureName},
 		proto.InputColumn{Name: "username", Data: username},
 		proto.InputColumn{Name: "mining_blockchain_account_address", Data: miningBlockchainAccountAddress},
@@ -306,6 +370,12 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		proto.InputColumn{Name: "balance_t2", Data: &balanceT2},
 		proto.InputColumn{Name: "balance_for_t0", Data: &balanceForT0},
 		proto.InputColumn{Name: "balance_for_tminus1", Data: &balanceForTminus1},
+		proto.InputColumn{Name: "balance_solo_ethereum", Data: &balanceSoloEthereum},
+		proto.InputColumn{Name: "balance_t0_ethereum", Data: &balanceT0Ethereum},
+		proto.InputColumn{Name: "balance_t1_ethereum", Data: &balanceT1Ethereum},
+		proto.InputColumn{Name: "balance_t2_ethereum", Data: &balanceT2Ethereum},
+		proto.InputColumn{Name: "balance_for_t0_ethereum", Data: &balanceForT0Ethereum},
+		proto.InputColumn{Name: "balance_for_tminus1_ethereum", Data: &balanceForTMinus1Ethereum},
 		proto.InputColumn{Name: "slashing_rate_solo", Data: &slashingRateSolo},
 		proto.InputColumn{Name: "slashing_rate_t0", Data: &slashingRateT0},
 		proto.InputColumn{Name: "slashing_rate_t1", Data: &slashingRateT1},
@@ -323,59 +393,77 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		proto.InputColumn{Name: "news_seen", Data: &newsSeen},
 		proto.InputColumn{Name: "extra_bonus_days_claim_not_available", Data: &extraBonusDaysClaimNotAvailable},
 		proto.InputColumn{Name: "utc_offset", Data: &utcOffset},
-		proto.InputColumn{Name: "hide_ranking", Data: &hideRanking})
+		proto.InputColumn{Name: "kyc_step_passed", Data: &kycStepPassed},
+		proto.InputColumn{Name: "kyc_step_blocked", Data: &kycStepBlocked},
+		proto.InputColumn{Name: "hide_ranking", Data: &hideRanking},
+		proto.InputColumn{Name: "kyc_steps_created_at", Data: kycStepsCreatedAt},
+		proto.InputColumn{Name: "kyc_steps_last_updated_at", Data: kycStepsLastUpdatedAt})
 
 	return &Columns{
-		miningSessionSoloLastStartedAt:       miningSessionSoloLastStartedAt,
-		miningSessionSoloStartedAt:           miningSessionSoloStartedAt,
-		miningSessionSoloEndedAt:             miningSessionSoloEndedAt,
-		miningSessionSoloPreviouslyEndedAt:   miningSessionSoloPreviouslyEndedAt,
-		extraBonusStartedAt:                  extraBonusStartedAt,
-		resurrectSoloUsedAt:                  resurrectSoloUsedAt,
-		resurrectT0UsedAt:                    resurrectT0UsedAt,
-		resurrectTminus1UsedAt:               resurrectTminus1UsedAt,
-		miningSessionSoloDayOffLastAwardedAt: miningSessionSoloDayOffLastAwardedAt,
-		extraBonusLastClaimAvailableAt:       extraBonusLastClaimAvailableAt,
-		createdAt:                            createdAt,
-		profilePictureName:                   profilePictureName,
-		username:                             username,
-		miningBlockchainAccountAddress:       miningBlockchainAccountAddress,
-		blockchainAccountAddress:             blockchainAccountAddress,
-		userID:                               userID,
-		id:                                   &id,
-		idT0:                                 &idT0,
-		idTminus1:                            &idTminus1,
-		balanceTotalStandard:                 &balanceTotalStandard,
-		balanceTotalPreStaking:               &balanceTotalPreStaking,
-		balanceTotalMinted:                   &balanceTotalMinted,
-		balanceTotalSlashed:                  &balanceTotalSlashed,
-		balanceSoloPending:                   &balanceSoloPending,
-		balanceT1Pending:                     &balanceT1Pending,
-		balanceT2Pending:                     &balanceT2Pending,
-		balanceSoloPendingApplied:            &balanceSoloPendingApplied,
-		balanceT1PendingApplied:              &balanceT1PendingApplied,
-		balanceT2PendingApplied:              &balanceT2PendingApplied,
-		balanceSolo:                          &balanceSolo,
-		balanceT0:                            &balanceT0,
-		balanceT1:                            &balanceT1,
-		balanceT2:                            &balanceT2,
-		balanceForT0:                         &balanceForT0,
-		balanceForTminus1:                    &balanceForTminus1,
-		slashingRateSolo:                     &slashingRateSolo,
-		slashingRateT0:                       &slashingRateT0,
-		slashingRateT1:                       &slashingRateT1,
-		slashingRateT2:                       &slashingRateT2,
-		slashingRateForT0:                    &slashingRateForT0,
-		slashingRateForTminus1:               &slashingRateForTminus1,
-		activeT1Referrals:                    &activeT1Referrals,
-		activeT2Referrals:                    &activeT2Referrals,
-		preStakingBonus:                      &preStakingBonus,
-		preStakingAllocation:                 &preStakingAllocation,
-		extraBonus:                           &extraBonus,
-		newsSeen:                             &newsSeen,
-		extraBonusDaysClaimNotAvailable:      &extraBonusDaysClaimNotAvailable,
-		utcOffset:                            &utcOffset,
-		hideRanking:                          &hideRanking,
+		miningSessionSoloLastStartedAt:                    miningSessionSoloLastStartedAt,
+		miningSessionSoloStartedAt:                        miningSessionSoloStartedAt,
+		miningSessionSoloEndedAt:                          miningSessionSoloEndedAt,
+		miningSessionSoloPreviouslyEndedAt:                miningSessionSoloPreviouslyEndedAt,
+		extraBonusStartedAt:                               extraBonusStartedAt,
+		resurrectSoloUsedAt:                               resurrectSoloUsedAt,
+		resurrectT0UsedAt:                                 resurrectT0UsedAt,
+		resurrectTminus1UsedAt:                            resurrectTminus1UsedAt,
+		miningSessionSoloDayOffLastAwardedAt:              miningSessionSoloDayOffLastAwardedAt,
+		extraBonusLastClaimAvailableAt:                    extraBonusLastClaimAvailableAt,
+		soloLastEthereumCoinDistributionProcessedAt:       soloLastEthereumCoinDistributionProcessedAt,
+		forT0LastEthereumCoinDistributionProcessedAt:      forT0LastEthereumCoinDistributionProcessedAt,
+		forTMinus1LastEthereumCoinDistributionProcessedAt: forTMinus1LastEthereumCoinDistributionProcessedAt,
+		createdAt:                       createdAt,
+		country:                         country,
+		profilePictureName:              profilePictureName,
+		username:                        username,
+		miningBlockchainAccountAddress:  miningBlockchainAccountAddress,
+		blockchainAccountAddress:        blockchainAccountAddress,
+		userID:                          userID,
+		id:                              &id,
+		idT0:                            &idT0,
+		idTminus1:                       &idTminus1,
+		balanceTotalStandard:            &balanceTotalStandard,
+		balanceTotalPreStaking:          &balanceTotalPreStaking,
+		balanceTotalMinted:              &balanceTotalMinted,
+		balanceTotalSlashed:             &balanceTotalSlashed,
+		balanceSoloPending:              &balanceSoloPending,
+		balanceT1Pending:                &balanceT1Pending,
+		balanceT2Pending:                &balanceT2Pending,
+		balanceSoloPendingApplied:       &balanceSoloPendingApplied,
+		balanceT1PendingApplied:         &balanceT1PendingApplied,
+		balanceT2PendingApplied:         &balanceT2PendingApplied,
+		balanceSolo:                     &balanceSolo,
+		balanceT0:                       &balanceT0,
+		balanceT1:                       &balanceT1,
+		balanceT2:                       &balanceT2,
+		balanceForT0:                    &balanceForT0,
+		balanceForTminus1:               &balanceForTminus1,
+		balanceSoloEthereum:             &balanceSoloEthereum,
+		balanceT0Ethereum:               &balanceT0Ethereum,
+		balanceT1Ethereum:               &balanceT1Ethereum,
+		balanceT2Ethereum:               &balanceT2Ethereum,
+		balanceForT0Ethereum:            &balanceForT0Ethereum,
+		balanceForTMinus1Ethereum:       &balanceForTMinus1Ethereum,
+		slashingRateSolo:                &slashingRateSolo,
+		slashingRateT0:                  &slashingRateT0,
+		slashingRateT1:                  &slashingRateT1,
+		slashingRateT2:                  &slashingRateT2,
+		slashingRateForT0:               &slashingRateForT0,
+		slashingRateForTminus1:          &slashingRateForTminus1,
+		activeT1Referrals:               &activeT1Referrals,
+		activeT2Referrals:               &activeT2Referrals,
+		preStakingBonus:                 &preStakingBonus,
+		preStakingAllocation:            &preStakingAllocation,
+		extraBonus:                      &extraBonus,
+		newsSeen:                        &newsSeen,
+		extraBonusDaysClaimNotAvailable: &extraBonusDaysClaimNotAvailable,
+		utcOffset:                       &utcOffset,
+		kycStepPassed:                   &kycStepPassed,
+		kycStepBlocked:                  &kycStepBlocked,
+		hideRanking:                     &hideRanking,
+		kycStepsCreatedAt:               kycStepsCreatedAt,
+		kycStepsLastUpdatedAt:           kycStepsLastUpdatedAt,
 	}, input
 }
 
@@ -457,7 +545,7 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		Body: fmt.Sprintf(`SELECT created_at,
 								  sum(balance_total_standard) AS balance_total_standard,
 								  sum(balance_total_pre_staking) AS balance_total_pre_staking, 
-								  toFloat64(0) AS balance_total_ethereum
+								  sum(balance_solo_ethereum)+sum(balance_t0_ethereum)+sum(balance_t1_ethereum)+sum(balance_t2_ethereum) AS balance_total_ethereum
 						   FROM %[1]v
 						   WHERE created_at IN ['%[2]v']
 						   GROUP BY created_at`, tableName, strings.Join(createdAtArray, "','")),

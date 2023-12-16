@@ -32,11 +32,13 @@ type (
 		SoloLastEthereumCoinDistributionProcessedAtField
 		ForT0LastEthereumCoinDistributionProcessedAtField
 		ForTMinus1LastEthereumCoinDistributionProcessedAtField
+		KYCState
 		ProfilePictureNameField
 		UsernameField
 		MiningBlockchainAccountAddressField
 		BlockchainAccountAddressField
 		UserIDField
+		CountryField
 		DeserializedUsersKey
 		BalanceTotalStandardField
 		BalanceTotalPreStakingField
