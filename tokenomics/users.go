@@ -164,7 +164,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 		return errors.Wrapf(err, "failed to getOrInitInternalID for user:%#v", usr)
 	}
 	type (
-		user struct {
+		LocalUser struct {
 			model.KYCState
 			model.UserIDField
 			model.ProfilePictureNameField
@@ -172,14 +172,17 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			model.CountryField
 			model.MiningBlockchainAccountAddressField
 			model.BlockchainAccountAddressField
-			model.BalanceForTMinus1Field
 			model.DeserializedUsersKey
-			model.IDT0Field
-			model.IDTMinus1Field
 			model.HideRankingField
 		}
+		readOnlyUser struct {
+			LocalUser
+			model.BalanceForTMinus1Field
+			model.IDT0Field
+			model.IDTMinus1Field
+		}
 	)
-	dbUser, err := storage.Get[user](ctx, s.db, model.SerializedUsersKey(internalID))
+	dbUser, err := storage.Get[readOnlyUser](ctx, s.db, model.SerializedUsersKey(internalID))
 	if err != nil || len(dbUser) == 0 {
 		if err == nil && len(dbUser) == 0 {
 			err = errors.Errorf("missing state for user:%#v", usr)
@@ -187,7 +190,7 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 
 		return errors.Wrapf(err, "failed to get current user for internalID:%v", internalID)
 	}
-	newPartialState := new(user)
+	newPartialState := new(LocalUser)
 	newPartialState.ID = internalID
 	newPartialState.ProfilePictureName = s.pictureClient.StripDownloadURL(usr.ProfilePictureURL)
 	newPartialState.Username = usr.Username
