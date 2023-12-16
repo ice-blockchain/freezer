@@ -44,7 +44,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 	total, err := storage.Get[struct {
 		Rows uint64
 		Ice  uint64
-	}](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...)...)
+	}](ctx, r.db, sql, whereArgs...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select coin_distributions_pending_review totals for %#v", arg)
 	}
