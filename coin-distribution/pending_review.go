@@ -86,24 +86,24 @@ func (a *GetCoinDistributionsForReviewArg) where() ([]string, []any) {
 	args := make([]any, 0, 2)
 
 	i := 3
-	if a.ReferredByUsernameKeyword != "" {
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "!", "!!")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "%", "!%")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "_", "!_")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "[", "![")
-		a.ReferredByUsernameKeyword = a.ReferredByUsernameKeyword + "%"
+	if referredByUsernameKeyword := a.ReferredByUsernameKeyword; referredByUsernameKeyword != "" {
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "!", "!!")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "%", "!%")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "_", "!_")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "[", "![")
+		referredByUsernameKeyword = referredByUsernameKeyword + "%"
 		conditions = append(conditions, fmt.Sprintf("referred_by_username LIKE $%v ESCAPE '!'", i))
-		args = append(args, strings.ToLower(a.ReferredByUsernameKeyword))
+		args = append(args, strings.ToLower(referredByUsernameKeyword))
 		i++
 	}
-	if a.UsernameKeyword != "" {
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "!", "!!")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "%", "!%")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "_", "!_")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "[", "![")
-		a.UsernameKeyword = a.UsernameKeyword + "%"
+	if usernameKeyword := a.UsernameKeyword; usernameKeyword != "" {
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "!", "!!")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "%", "!%")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "_", "!_")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "[", "![")
+		usernameKeyword = usernameKeyword + "%"
 		conditions = append(conditions, fmt.Sprintf("username LIKE $%v ESCAPE '!'", i))
-		args = append(args, strings.ToLower(a.UsernameKeyword))
+		args = append(args, strings.ToLower(usernameKeyword))
 	}
 
 	return conditions, args
@@ -114,24 +114,24 @@ func (a *GetCoinDistributionsForReviewArg) totalsWhere() ([]string, []any) {
 	args := make([]any, 0, 2)
 
 	i := 1
-	if a.ReferredByUsernameKeyword != "" {
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "!", "!!")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "%", "!%")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "_", "!_")
-		a.ReferredByUsernameKeyword = strings.ReplaceAll(a.ReferredByUsernameKeyword, "[", "![")
-		a.ReferredByUsernameKeyword = a.ReferredByUsernameKeyword + "%"
+	if referredByUsernameKeyword := a.ReferredByUsernameKeyword; referredByUsernameKeyword != "" {
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "!", "!!")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "%", "!%")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "_", "!_")
+		referredByUsernameKeyword = strings.ReplaceAll(referredByUsernameKeyword, "[", "![")
+		referredByUsernameKeyword = referredByUsernameKeyword + "%"
 		conditions = append(conditions, fmt.Sprintf("referred_by_username LIKE $%v ESCAPE '!'", i))
-		args = append(args, strings.ToLower(a.ReferredByUsernameKeyword))
+		args = append(args, strings.ToLower(referredByUsernameKeyword))
 		i++
 	}
-	if a.UsernameKeyword != "" {
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "!", "!!")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "%", "!%")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "_", "!_")
-		a.UsernameKeyword = strings.ReplaceAll(a.UsernameKeyword, "[", "![")
-		a.UsernameKeyword = a.UsernameKeyword + "%"
+	if usernameKeyword := a.UsernameKeyword; usernameKeyword != "" {
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "!", "!!")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "%", "!%")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "_", "!_")
+		usernameKeyword = strings.ReplaceAll(usernameKeyword, "[", "![")
+		usernameKeyword = usernameKeyword + "%"
 		conditions = append(conditions, fmt.Sprintf("username LIKE $%v ESCAPE '!'", i))
-		args = append(args, strings.ToLower(a.UsernameKeyword))
+		args = append(args, strings.ToLower(usernameKeyword))
 	}
 
 	return conditions, args
