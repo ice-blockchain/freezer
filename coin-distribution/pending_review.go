@@ -20,7 +20,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 						  AND %[1]v
 						ORDER BY %[2]v 
 						LIMIT $2`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
-	result, err := storage.Select[coinDistribution](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...))
+	result, err := storage.Select[coinDistribution](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...)...)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "failed to select coin_distributions_pending_review for %#v", arg)
 	}
