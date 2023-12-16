@@ -21,7 +21,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 						WHERE 1=1 
 						  AND %[1]v
 						ORDER BY %[2]v 
-						LIMIT $2 OFFSET %1`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
+						LIMIT $2 OFFSET $1`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
 	result, err := storage.Select[struct {
 		*PendingReview
 		Day        stdlibtime.Time
