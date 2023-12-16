@@ -6,35 +6,58 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	stdlibtime "time"
 
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
 
-func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (updCursor uint64, distributions []*PendingReview, err error) { //nolint:lll // .
+//nolint:funlen // .
+func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (*CoinDistributionsForReview, error) { //nolint:lll // .
 	conditions, whereArgs := arg.where()
 	sql := fmt.Sprintf(`SELECT * 
 						FROM coin_distributions_pending_review 
-						WHERE internal_id > $1 
+						WHERE 1=1 
 						  AND %[1]v
 						ORDER BY %[2]v 
-						LIMIT $2`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
-	result, err := storage.Select[coinDistribution](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...)...)
+						LIMIT $2 OFFSET %1`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
+	result, err := storage.Select[struct {
+		*PendingReview
+		Day        stdlibtime.Time
+		InternalID uint64
+	}](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...)...)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "failed to select coin_distributions_pending_review for %#v", arg)
+		return nil, errors.Wrapf(err, "failed to select coin_distributions_pending_review for %#v", arg)
 	}
-	updCursor = 0
-	if uint64(len(result)) == arg.Limit {
-		updCursor = result[len(result)-1].InternalID
-	}
-	distributions = make([]*PendingReview, len(result)) //nolint:makezero // .
+	distributions := make([]*PendingReview, len(result)) //nolint:makezero // .
 	for i, d := range result {
 		d.PendingReview.Ice = float64(d.PendingReview.IceInternal) / 100
 		distributions[i] = d.PendingReview
 	}
+	sql = fmt.Sprintf(`SELECT count(1) AS rows,
+							  sum(ice) AS ice 
+					   FROM coin_distributions_pending_review 
+					   WHERE $1=$1 AND $2=$2 
+						 AND %[1]v`, strings.Join(append(conditions, "1=1"), " AND "))
+	total, err := storage.Get[struct {
+		Rows uint64
+		Ice  uint64
+	}](ctx, r.db, sql, append([]any{arg.Cursor, arg.Limit}, whereArgs...)...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to select coin_distributions_pending_review totals for %#v", arg)
+	}
+	nextCursor := uint64(0)
+	if len(result) == int(arg.Limit) {
+		nextCursor = arg.Cursor + arg.Limit
+	}
 
-	return
+	return &CoinDistributionsForReview{
+		Distributions: distributions,
+		Cursor:        nextCursor,
+		TotalRows:     total.Rows,
+		TotalIce:      float64(total.Ice) / 100,
+	}, nil
 }
 
 func (a *GetCoinDistributionsForReviewArg) orderBy() []string {

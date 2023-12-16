@@ -31,11 +31,6 @@ type (
 		Years      uint8  `json:"years" required:"true" maximum:"5" example:"1"`
 		Allocation uint8  `json:"allocation" required:"true" maximum:"100" example:"100"`
 	}
-
-	CoinDistributionsForReview struct {
-		Distributions []*coindistribution.PendingReview `json:"distributions"`
-		Cursor        uint64                            `json:"cursor" example:"5065"`
-	}
 )
 
 // Private API.

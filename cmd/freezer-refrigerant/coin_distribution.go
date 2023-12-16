@@ -35,7 +35,7 @@ func (s *service) setupCoinDistributionRoutes(router *server.Router) {
 //	@Param			referredByUsernameOrderBy	query		string	false	"if u want to order by referredByUsername lexicographically"	Enums(asc,desc)
 //	@Param			usernameKeyword				query		string	false	"if u want to find usernames starting with keyword"
 //	@Param			referredByUsernameKeyword	query		string	false	"if u want to find referredByUsernames starting with keyword"
-//	@Success		200							{object}	CoinDistributionsForReview
+//	@Success		200							{object}	coindistribution.CoinDistributionsForReview
 //	@Failure		401							{object}	server.ErrorResponse	"if not authorized"
 //	@Failure		403							{object}	server.ErrorResponse	"if not allowed"
 //	@Failure		422							{object}	server.ErrorResponse	"if syntax fails"
@@ -44,8 +44,8 @@ func (s *service) setupCoinDistributionRoutes(router *server.Router) {
 //	@Router			/getCoinDistributionsForReview [POST].
 func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	ctx context.Context,
-	req *server.Request[coindistribution.GetCoinDistributionsForReviewArg, CoinDistributionsForReview],
-) (*server.Response[CoinDistributionsForReview], *server.Response[server.ErrorResponse]) {
+	req *server.Request[coindistribution.GetCoinDistributionsForReviewArg, coindistribution.CoinDistributionsForReview],
+) (*server.Response[coindistribution.CoinDistributionsForReview], *server.Response[server.ErrorResponse]) {
 	if req.AuthenticatedUser.Role != adminRole {
 		return nil, server.Forbidden(errors.Errorf("insufficient role: %v, admin role required", req.AuthenticatedUser.Role))
 	}
@@ -64,13 +64,10 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	if req.Data.ReferredByUsernameOrderBy != "" && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "desc") && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "asc") { //nolint:lll // .
 		return nil, server.UnprocessableEntity(errors.Errorf("`referredByUsernameOrderBy` has to be `asc` or `desc`"), "invalid params")
 	}
-	cursor, distributions, err := s.coinDistributionRepository.GetCoinDistributionsForReview(ctx, req.Data)
+	resp, err := s.coinDistributionRepository.GetCoinDistributionsForReview(ctx, req.Data)
 	if err != nil {
 		return nil, server.Unexpected(errors.Wrapf(err, "failed to GetCoinDistributionsForReview for %#v", req.Data))
 	}
 
-	return server.OK(&CoinDistributionsForReview{
-		Cursor:        cursor,
-		Distributions: distributions,
-	}), nil
+	return server.OK(resp), nil
 }

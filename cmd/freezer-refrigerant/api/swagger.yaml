@@ -2,6 +2,22 @@
 
 basePath: /v1w
 definitions:
+  coindistribution.CoinDistributionsForReview:
+    properties:
+      cursor:
+        example: 5065
+        type: integer
+      distributions:
+        items:
+          $ref: '#/definitions/coindistribution.PendingReview'
+        type: array
+      totalIce:
+        example: 5065.3
+        type: number
+      totalRows:
+        example: 5065
+        type: integer
+    type: object
   coindistribution.PendingReview:
     properties:
       ethAddress:
@@ -25,16 +41,6 @@ definitions:
       username:
         example: myusername
         type: string
-    type: object
-  main.CoinDistributionsForReview:
-    properties:
-      cursor:
-        example: 5065
-        type: integer
-      distributions:
-        items:
-          $ref: '#/definitions/coindistribution.PendingReview'
-        type: array
     type: object
   main.StartNewMiningSessionRequestBody:
     properties:
@@ -279,7 +285,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.CoinDistributionsForReview'
+            $ref: '#/definitions/coindistribution.CoinDistributionsForReview'
         "401":
           description: if not authorized
           schema:

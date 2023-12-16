@@ -118,7 +118,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/main.CoinDistributionsForReview"
+                            "$ref": "#/definitions/coindistribution.CoinDistributionsForReview"
                         }
                     },
                     "401": {
@@ -435,6 +435,29 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "coindistribution.CoinDistributionsForReview": {
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "integer",
+                    "example": 5065
+                },
+                "distributions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/coindistribution.PendingReview"
+                    }
+                },
+                "totalIce": {
+                    "type": "number",
+                    "example": 5065.3
+                },
+                "totalRows": {
+                    "type": "integer",
+                    "example": 5065
+                }
+            }
+        },
         "coindistribution.PendingReview": {
             "type": "object",
             "properties": {
@@ -465,21 +488,6 @@ const docTemplate = `{
                 "username": {
                     "type": "string",
                     "example": "myusername"
-                }
-            }
-        },
-        "main.CoinDistributionsForReview": {
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "type": "integer",
-                    "example": 5065
-                },
-                "distributions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/coindistribution.PendingReview"
-                    }
                 }
             }
         },

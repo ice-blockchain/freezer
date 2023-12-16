@@ -23,9 +23,17 @@ type (
 
 	Repository interface {
 		io.Closer
-		GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (updatedCursor uint64, distributions []*PendingReview, err error)
+		GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (*CoinDistributionsForReview, error)
 		CheckHealth(ctx context.Context) error
 	}
+
+	CoinDistributionsForReview struct {
+		Distributions []*PendingReview `json:"distributions"`
+		Cursor        uint64           `json:"cursor" example:"5065"`
+		TotalRows     uint64           `json:"totalRows" example:"5065"`
+		TotalIce      float64          `json:"totalIce" example:"5065.3"`
+	}
+
 	GetCoinDistributionsForReviewArg struct {
 		CreatedAtOrderBy          string `form:"createdAtOrderBy" example:"asc"`
 		IceOrderBy                string `form:"iceOrderBy" example:"asc"`
@@ -79,10 +87,5 @@ type (
 		Workers     int64 `yaml:"workers"`
 		BatchSize   int64 `yaml:"batchSize"`
 		Development bool  `yaml:"development"`
-	}
-	coinDistribution struct {
-		*PendingReview
-		Day        stdlibtime.Time
-		InternalID uint64
 	}
 )
