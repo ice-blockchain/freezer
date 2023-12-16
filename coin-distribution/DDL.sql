@@ -10,9 +10,11 @@ END $$;
 CREATE TABLE IF NOT EXISTS pending_coin_distributions  (
                     created_at                timestamp NOT NULL,
                     internal_id               bigint    NOT NULL,
+                    day                       date      NOT NULL,
                     iceflakes                 uint256,
-                    user_id                   text      NOT NULL PRIMARY KEY,
-                    eth_address               text      NOT NULL);
+                    user_id                   text      NOT NULL,
+                    eth_address               text      NOT NULL,
+                    PRIMARY KEY(day, user_id));
 
 CREATE INDEX IF NOT EXISTS pending_coin_distributions_worker_number_ix ON pending_coin_distributions ((internal_id % 10), created_at ASC);
 
@@ -27,12 +29,13 @@ CREATE TABLE IF NOT EXISTS coin_distributions_by_earner (
                     created_at                timestamp NOT NULL,
                     internal_id               bigint    NOT NULL,
                     balance                   bigint    NOT NULL,
+                    day                       date      NOT NULL,
                     username                  text      NOT NULL,
                     referred_by_username      text      NOT NULL,
                     user_id                   text      NOT NULL,
                     earner_user_id            text      NOT NULL,
                     eth_address               text      NOT NULL,
-                    PRIMARY KEY(user_id, earner_user_id));
+                    PRIMARY KEY(day, user_id, earner_user_id));
 
 CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
                     created_at                timestamp NOT NULL,

@@ -28,12 +28,13 @@ type (
 )
 
 func TriggerCoinDistribution(ctx context.Context, db storage.Execer, records []*TriggeringRecord) error {
-	const columns = 8
+	const columns = 9
 	values := make([]string, 0, len(records))
 	args := make([]any, 0, len(records)*columns)
 	for ix, record := range records {
 		values = append(values, generateValuesSQLParams(ix, columns))
 		args = append(args,
+			record.CreatedAt.Time,
 			record.CreatedAt.Time,
 			record.InternalID,
 			int64(record.Balance*100),
@@ -43,9 +44,9 @@ func TriggerCoinDistribution(ctx context.Context, db storage.Execer, records []*
 			record.EarnerUserID,
 			record.EthAddress)
 	}
-	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
+	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
 																 VALUES %v
-						ON CONFLICT (user_id, earner_user_id) DO UPDATE
+						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
 							SET balance = EXCLUDED.balance`, strings.Join(values, ",\n"))
 	_, err := storage.Exec(ctx, db, sql, args...)
 
