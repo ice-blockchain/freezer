@@ -52,16 +52,16 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	if req.Data.Limit == 0 {
 		req.Data.Limit = defaultDistributionLimit
 	}
-	if req.Data.CreatedAtOrderBy != "" && !strings.EqualFold(req.Data.CreatedAtOrderBy, "asc") && !strings.EqualFold(req.Data.CreatedAtOrderBy, "asc") {
+	if req.Data.CreatedAtOrderBy != "" && !strings.EqualFold(req.Data.CreatedAtOrderBy, "desc") && !strings.EqualFold(req.Data.CreatedAtOrderBy, "asc") {
 		return nil, server.UnprocessableEntity(errors.Errorf("`createdAtOrderBy` has to be `asc` or `desc`"), "invalid params")
 	}
-	if req.Data.IceOrderBy != "" && !strings.EqualFold(req.Data.IceOrderBy, "asc") && !strings.EqualFold(req.Data.IceOrderBy, "asc") {
+	if req.Data.IceOrderBy != "" && !strings.EqualFold(req.Data.IceOrderBy, "desc") && !strings.EqualFold(req.Data.IceOrderBy, "asc") {
 		return nil, server.UnprocessableEntity(errors.Errorf("`iceOrderBy` has to be `asc` or `desc`"), "invalid params")
 	}
-	if req.Data.UsernameOrderBy != "" && !strings.EqualFold(req.Data.UsernameOrderBy, "asc") && !strings.EqualFold(req.Data.UsernameOrderBy, "asc") {
+	if req.Data.UsernameOrderBy != "" && !strings.EqualFold(req.Data.UsernameOrderBy, "desc") && !strings.EqualFold(req.Data.UsernameOrderBy, "asc") {
 		return nil, server.UnprocessableEntity(errors.Errorf("`usernameOrderBy` has to be `asc` or `desc`"), "invalid params")
 	}
-	if req.Data.ReferredByUsernameOrderBy != "" && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "asc") && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "asc") { //nolint:lll // .
+	if req.Data.ReferredByUsernameOrderBy != "" && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "desc") && !strings.EqualFold(req.Data.ReferredByUsernameOrderBy, "asc") { //nolint:lll // .
 		return nil, server.UnprocessableEntity(errors.Errorf("`referredByUsernameOrderBy` has to be `asc` or `desc`"), "invalid params")
 	}
 	cursor, distributions, err := s.coinDistributionRepository.GetCoinDistributionsForReview(ctx, req.Data)
