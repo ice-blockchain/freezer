@@ -38,7 +38,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 	}
 	conditions, whereArgs = arg.totalsWhere()
 	sql = fmt.Sprintf(`SELECT count(1) AS rows,
-							  sum(ice) AS ice 
+							   coalesce(sum(ice),0) AS ice 
 					   FROM coin_distributions_pending_review 
 					   WHERE 1=1
 						 AND %[1]v`, strings.Join(append(conditions, "1=1"), " AND "))

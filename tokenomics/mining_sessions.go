@@ -32,7 +32,6 @@ type (
 		model.DeserializedUsersKey
 	}
 	getCurrentMiningSession struct {
-		model.ReferralsCountChangeGuardUpdatedAtField
 		StartOrExtendMiningSession
 		model.KYCState
 		model.LatestDeviceField
