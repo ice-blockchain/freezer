@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/log"
 )
 
 //nolint:funlen // .
@@ -134,4 +135,10 @@ func (a *GetCoinDistributionsForReviewArg) totalsWhere() ([]string, []any) {
 	}
 
 	return conditions, args
+}
+
+func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID string, decision string) error {
+	log.Info(fmt.Sprintf("ReviewCoinDistributions(userID:`%v`, decision:`%v`)", reviewerUserID, decision))
+
+	return ctx.Err()
 }

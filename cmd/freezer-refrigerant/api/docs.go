@@ -154,6 +154,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/reviewDistributions": {
+            "post": {
+                "description": "Reviews Coin Distributions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "CoinDistribution"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003cAdd access token here\u003e",
+                        "description": "Insert your access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the type of the client calling this API. I.E. ` + "`" + `web` + "`" + `",
+                        "name": "x_client_type",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "approve",
+                            "deny"
+                        ],
+                        "type": "string",
+                        "description": "the decision for the current coin distributions",
+                        "name": "decision",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "if not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "if not allowed",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "if syntax fails",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "if request times out",
+                        "schema": {
+                            "$ref": "#/definitions/server.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/tokenomics/{userId}/extra-bonus-claims": {
             "post": {
                 "description": "Claims an extra bonus for the user.",

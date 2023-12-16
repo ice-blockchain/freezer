@@ -25,6 +25,7 @@ type (
 		io.Closer
 		GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (*CoinDistributionsForReview, error)
 		CheckHealth(ctx context.Context) error
+		ReviewCoinDistributions(ctx context.Context, reviewerUserID string, decision string) error
 	}
 
 	CoinDistributionsForReview struct {

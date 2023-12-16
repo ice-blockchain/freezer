@@ -15,7 +15,8 @@ import (
 func (s *service) setupCoinDistributionRoutes(router *server.Router) {
 	router.
 		Group("/v1w").
-		POST("/getCoinDistributionsForReview", server.RootHandler(s.GetCoinDistributionsForReview))
+		POST("/getCoinDistributionsForReview", server.RootHandler(s.GetCoinDistributionsForReview)).
+		POST("/reviewDistributions", server.RootHandler(s.ReviewCoinDistributions))
 }
 
 // GetCoinDistributionsForReview godoc
@@ -70,4 +71,40 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 	}
 
 	return server.OK(resp), nil
+}
+
+// ReviewCoinDistributions godoc
+//
+//	@Schemes
+//	@Description	Reviews Coin Distributions.
+//	@Tags			CoinDistribution
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header	string	true	"Insert your access token"	default(Bearer <Add access token here>)
+//	@Param			x_client_type	query	string	false	"the type of the client calling this API. I.E. `web`"
+//	@Param			decision		query	string	true	"the decision for the current coin distributions"	Enums(approve,deny)
+//	@Success		200				"OK"
+//	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
+//	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
+//	@Failure		422				{object}	server.ErrorResponse	"if syntax fails"
+//	@Failure		500				{object}	server.ErrorResponse
+//	@Failure		504				{object}	server.ErrorResponse	"if request times out"
+//	@Router			/reviewDistributions [POST].
+func (s *service) ReviewCoinDistributions( //nolint:gocritic // .
+	ctx context.Context,
+	req *server.Request[struct {
+		Decision string `form:"decision" required:"true" swaggerignore:"true" enums:"approve,deny"`
+	}, any],
+) (*server.Response[any], *server.Response[server.ErrorResponse]) {
+	if req.AuthenticatedUser.Role != adminRole {
+		return nil, server.Forbidden(errors.Errorf("insufficient role: %v, admin role required", req.AuthenticatedUser.Role))
+	}
+	if !strings.EqualFold(req.Data.Decision, "approve") && !strings.EqualFold(req.Data.Decision, "deny") {
+		return nil, server.UnprocessableEntity(errors.Errorf("`decision` has to be `approve` or `deny`"), "invalid params")
+	}
+	if err := s.coinDistributionRepository.ReviewCoinDistributions(ctx, req.AuthenticatedUser.UserID, req.Data.Decision); err != nil {
+		return nil, server.Unexpected(errors.Wrapf(err, "failed to ReviewCoinDistributions for adminUserID:%v,decision:%v", req.AuthenticatedUser.UserID, req.Data.Decision)) //nolint:lll // .
+	}
+
+	return server.OK[any](), nil
 }
