@@ -25,6 +25,17 @@ type (
 		Insert(ctx context.Context, columns *Columns, input InsertMetadata, usrs []*model.User) error
 		SelectBalanceHistory(ctx context.Context, id int64, createdAts []stdlibtime.Time) ([]*BalanceHistory, error)
 		SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error)
+		GetAdjustUserInformation(ctx context.Context, userIDs []string, startFrom string, limit, offset int64) ([]*AdjustUserInfo, error)
+		GetBaseBalanceForTMinus1(ctx context.Context, userIDs []string, limit, offset int64) (map[int64]float64, error)
+	}
+	AdjustUserInfo struct {
+		MiningSessionSoloStartedAt         *time.Time
+		MiningSessionSoloEndedAt           *time.Time
+		MiningSessionSoloLastStartedAt     *time.Time
+		MiningSessionSoloPreviouslyEndedAt *time.Time
+		ResurrectSoloUsedAt                *time.Time
+		CreatedAt                          *time.Time
+		ID                                 int64
 	}
 	BalanceHistory struct {
 		CreatedAt                               *time.Time
@@ -107,6 +118,8 @@ type (
 
 const (
 	tableName = "freezer_user_history"
+
+	validBalanceForTMinus1DateTime = "2023-11-20T14:00:00"
 )
 
 // .
