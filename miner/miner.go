@@ -42,7 +42,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		dwhClient: dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:        new(sync.WaitGroup),
 		telemetry: new(telemetry).mustInit(cfg),
-		dbPG:      storagePG.MustConnect(ctx, eskimoDDL, applicationYamlKey),
+		dbPG:      storagePG.MustConnect(context.Background(), eskimoDDL, applicationYamlKey),
 	}
 	go mi.startDisableAdvancedTeamCfgSyncer(ctx)
 	mi.wg.Add(int(cfg.Workers))
@@ -150,6 +150,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		userGlobalRanks                                                                          = make([]redis.Z, 0, batchSize)
 		balanceTMinus1RecalculationDryRunItems                                                   = make([]*balanceTMinus1RecalculationDryRun, 0, batchSize)
 		balanceT2RecalculationDryRunItems                                                        = make([]*balanceT2RecalculationDryRun, 0, batchSize)
+		balances                                                                                 = make(map[int64]float64, 0)
 		historyColumns, historyInsertMetadata                                                    = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                                             = func(batchNumberArg uint64) bool { return false }
 		allAdoptions                                                                             []*tokenomics.Adoption[float64]
@@ -210,6 +211,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		for k := range history {
 			delete(history, k)
 		}
+		for k := range balances {
+			delete(balances, k)
+		}
 		for k := range referralsCollection {
 			delete(referralsCollection, k)
 		}
@@ -256,11 +260,14 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		/******************************************************************************************************************************************************
 			2. Fetching T0 & T-1 referrals of the fetched users.
 		******************************************************************************************************************************************************/
-		balances, err := m.dwhClient.GetBaseBalanceForTMinus1(ctx, userHistoryKeys, int64(len(userKeys)), 0)
-		if err != nil {
-			log.Error(err)
+
+		if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
+			var err error
+			balances, err = m.dwhClient.GetBaseBalanceForTMinus1(ctx, userHistoryKeys, int64(len(userKeys)), 0)
+			if err != nil {
+				log.Error(errors.Wrapf(err, "[miner] failed to fetch base balances for tminus1 batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			}
 		}
-		log.Debug("BALANCES:", balances)
 
 		for _, usr := range userResults {
 			if usr.UserID == "" {
@@ -294,6 +301,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
+			var err error
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			history, err = m.gatherHistory(reqCtx, userResults, referralIDTMinus1KeysOnly)
 			if err != nil {
@@ -306,6 +314,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			reqCancel()
 		}
 		if (balanceT2BugfixEnabled || balanceT2BugfixDryRunEnabled) && !balanceForTMinusBugfixEnabled {
+			var err error
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			referralsCollection, t2Referrals, err = m.gatherReferralsInformation(reqCtx, userResults)
 			if err != nil {
