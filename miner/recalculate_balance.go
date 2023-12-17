@@ -276,17 +276,6 @@ func calculateTimeBounds(refTimeRange, usrRange *dwh.AdjustUserInfo) (*time.Time
 	return startedAt, endedAt
 }
 
-func initializeEmptyUser(updatedUser, usr *user) *user {
-	var newUser user
-	newUser.ID = usr.ID
-	newUser.UserID = usr.UserID
-	newUser.IDT0 = usr.IDT0
-	newUser.IDTMinus1 = usr.IDTMinus1
-	newUser.BalanceLastUpdatedAt = nil
-
-	return &newUser
-}
-
 func gatherHistory(ctx context.Context, dwhClient dwh.Client, users []*user, referralIDTMinus1Keys []string) (history map[int64][]*dwh.AdjustUserInfo, err error) {
 	if len(users) == 0 {
 		return nil, nil
@@ -341,15 +330,12 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 	if _, ok = history[idTMinus1]; ok {
 		var isResurrected bool
 
-		clonedUser1 := *usr
-		updatedUser := &clonedUser1
+		updatedUser := new(user)
 		updatedUser.BalanceForTMinus1 = baseBalanceTMinus1
+
 		for _, tminus1Range := range history[idTMinus1] {
 			if !tminus1Range.MiningSessionSoloEndedAt.IsNil() {
 				lastMiningSessionSoloEndedAt = tminus1Range.MiningSessionSoloEndedAt
-			}
-			if updatedUser == nil {
-				updatedUser = initializeEmptyUser(updatedUser, usr)
 			}
 			if tminus1Range.MiningSessionSoloStartedAt.Before(startTime) {
 				tminus1Range.MiningSessionSoloStartedAt = time.New(startTime)
@@ -358,7 +344,7 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 			/******************************************************************************************************************************************************
 				1. Resurrection check.
 			******************************************************************************************************************************************************/
-			if !tminus1Range.ResurrectSoloUsedAt.IsNil() && !tminus1Range.ResurrectSoloUsedAt.IsZero() && !isResurrected {
+			if !tminus1Range.ResurrectSoloUsedAt.IsNil() && !tminus1Range.ResurrectSoloUsedAt.IsZero() && tminus1Range.ResurrectSoloUsedAt.After(startTime) && !isResurrected {
 				var resurrectDelta float64
 				if timeSpent := tminus1Range.MiningSessionSoloStartedAt.Sub(*tminus1Range.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
 					resurrectDelta = timeSpent.Minutes()
@@ -464,9 +450,6 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 					updatedUser.BalanceForTMinus1 -= updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
 				}
 			}
-		}
-		if updatedUser == nil {
-			updatedUser = initializeEmptyUser(updatedUser, usr)
 		}
 
 		return updatedUser
