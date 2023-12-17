@@ -303,7 +303,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
 			var err error
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-			history, err = gatherHistory(reqCtx, m.dwhClient, userResults, referralIDTMinus1KeysOnly)
+			history, err = gatherHistory(reqCtx, dwhClient, userResults, referralIDTMinus1KeysOnly)
 			if err != nil {
 				log.Error(err, fmt.Sprintf("can't gather history for: %#v", userResults))
 			}
@@ -316,7 +316,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if (balanceT2BugfixEnabled || balanceT2BugfixDryRunEnabled) && !balanceForTMinusBugfixEnabled {
 			var err error
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-			referralsCollection, t2Referrals, err = gatherReferralsInformation(reqCtx, m.dbPG, m.db, userResults)
+			referralsCollection, t2Referrals, err = m.gatherReferralsInformation(reqCtx, userResults)
 			if err != nil {
 				log.Error(errors.New("gather referrals info error"), workerNumber, err)
 			}
@@ -377,7 +377,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
 				if recalculatedVal, ok := recalculatedUsers[usr.ID]; !ok || (recalculatedVal != nil && recalculatedVal.RecalculatedBalanceForTMinus1At.IsNil()) {
-					if recalculatedUsr := recalculateBalanceTMinus1(usr, allAdoptions, history, balances); recalculatedUsr != nil {
+					if recalculatedUsr := m.recalculateBalanceTMinus1(usr, allAdoptions, history, balances); recalculatedUsr != nil {
 						tMinus1ID := ""
 						if tMinus1Ref != nil {
 							tMinus1ID = tMinus1Ref.UserID
@@ -658,12 +658,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			go m.telemetry.collectElapsed(7, *before.Time)
 		}
 		if balanceForTMinusBugfixEnabled {
-			if err := insertBalanceTMinus1RecalculationDryRunBatch(ctx, m.dbPG, balanceTMinus1RecalculationDryRunItems); err != nil {
+			if err := m.insertBalanceTMinus1RecalculationDryRunBatch(ctx, balanceTMinus1RecalculationDryRunItems); err != nil {
 				log.Error(err, fmt.Sprintf("can't insert balance tminus1 recalculation dry run information for users:%#v, workerNumber:%v", userResults, workerNumber))
 			}
 		}
 		if balanceT2BugfixDryRunEnabled {
-			if err := insertBalanceT2RecalculationDryRunBatch(ctx, m.dbPG, balanceT2RecalculationDryRunItems); err != nil {
+			if err := m.insertBalanceT2RecalculationDryRunBatch(ctx, balanceT2RecalculationDryRunItems); err != nil {
 				log.Error(err, fmt.Sprintf("can't insert balance t2 recalculation dry run information for users:%#v, workerNumber:%v", userResults, workerNumber))
 			}
 		}
