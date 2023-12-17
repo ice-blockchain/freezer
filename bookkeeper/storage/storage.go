@@ -14,6 +14,7 @@ import (
 	"github.com/ClickHouse/ch-go/chpool"
 	"github.com/ClickHouse/ch-go/proto"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/ice-blockchain/freezer/model"
@@ -524,6 +525,101 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 		}
 	}
 	res = dedupedRes
+
+	return res, nil
+}
+
+func (db *db) GetAdjustUserInformation(ctx context.Context, userIDArray []string, startFrom string, limit, offset int64) ([]*AdjustUserInfo, error) {
+	var (
+		id                                 = make(proto.ColInt64, 0)
+		miningSessionSoloStartedAt         = proto.ColDateTime64{Data: make([]proto.DateTime64, 0), Location: stdlibtime.UTC}
+		miningSessionSoloEndedAt           = proto.ColDateTime64{Data: make([]proto.DateTime64, 0), Location: stdlibtime.UTC}
+		miningSessionSoloPreviouslyEndedAt = proto.ColDateTime64{Data: make([]proto.DateTime64, 0), Location: stdlibtime.UTC}
+		resurrectSoloUsedAt                = proto.ColDateTime64{Data: make([]proto.DateTime64, 0), Location: stdlibtime.UTC}
+		createdAt                          = proto.ColDateTime{Data: make([]proto.DateTime, 0), Location: stdlibtime.UTC}
+		res                                = make([]*AdjustUserInfo, 0, len(userIDArray))
+	)
+	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
+		Body: fmt.Sprintf(`SELECT
+								id,
+								mining_session_solo_started_at,
+								max(mining_session_solo_ended_at) AS mining_session_solo_ended_at,
+								mining_session_solo_previously_ended_at,
+								resurrect_solo_used_at,
+								max(created_at) as created_at_time
+							FROM %[1]v
+								WHERE id IN [%[2]v] AND created_at > toDateTime('%[3]v', 'UTC')
+							GROUP BY mining_session_solo_started_at, id, mining_session_solo_previously_ended_at, resurrect_solo_used_at
+							ORDER BY id ASC, created_at_time ASC
+							LIMIT %[4]v, %[5]v
+						`, tableName, strings.Join(userIDArray, ","), startFrom, offset, limit),
+		Result: append(make(proto.Results, 0, 6),
+			proto.ResultColumn{Name: "id", Data: &id},
+			proto.ResultColumn{Name: "mining_session_solo_started_at", Data: &miningSessionSoloStartedAt},
+			proto.ResultColumn{Name: "mining_session_solo_ended_at", Data: &miningSessionSoloEndedAt},
+			proto.ResultColumn{Name: "mining_session_solo_previously_ended_at", Data: &miningSessionSoloPreviouslyEndedAt},
+			proto.ResultColumn{Name: "resurrect_solo_used_at", Data: &resurrectSoloUsedAt},
+			proto.ResultColumn{Name: "created_at_time", Data: &createdAt},
+		),
+		OnResult: func(_ context.Context, block proto.Block) error {
+			for ix := 0; ix < block.Rows; ix++ {
+				res = append(res, &AdjustUserInfo{
+					ID:                                 (&id).Row(ix),
+					MiningSessionSoloStartedAt:         time.New((&miningSessionSoloStartedAt).Row(ix)),
+					MiningSessionSoloEndedAt:           time.New((&miningSessionSoloEndedAt).Row(ix)),
+					MiningSessionSoloPreviouslyEndedAt: time.New((&miningSessionSoloPreviouslyEndedAt).Row(ix)),
+					CreatedAt:                          time.New((&createdAt).Row(ix)),
+					ResurrectSoloUsedAt:                time.New((&resurrectSoloUsedAt).Row(ix)),
+				})
+			}
+			(&id).Reset()
+			(&miningSessionSoloStartedAt).Reset()
+			(&miningSessionSoloEndedAt).Reset()
+			(&miningSessionSoloPreviouslyEndedAt).Reset()
+			(&resurrectSoloUsedAt).Reset()
+			(&createdAt).Reset()
+
+			return nil
+		},
+		Secret:      "",
+		InitialUser: "",
+	}); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (db *db) GetBaseBalanceForTMinus1(ctx context.Context, userIDs []string, limit, offset int64) (map[int64]float64, error) {
+	var (
+		id                = make(proto.ColInt64, 0, len(userIDs))
+		balanceForTMinus1 = make(proto.ColFloat64, 0, len(userIDs))
+		res               = make(map[int64]float64)
+	)
+	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
+		Body: fmt.Sprintf(`SELECT  id, balance_for_tminus1
+								FROM %[1]v
+								WHERE id IN [%[2]v] AND created_at = toDateTime('%[3]v', 'UTC')
+								LIMIT %[4]v, %[5]v
+							`, tableName, strings.Join(userIDs, ","), validBalanceForTMinus1DateTime, offset, limit),
+		Result: append(make(proto.Results, 0, 2),
+			proto.ResultColumn{Name: "id", Data: &id},
+			proto.ResultColumn{Name: "balance_for_tminus1", Data: &balanceForTMinus1},
+		),
+		OnResult: func(_ context.Context, block proto.Block) error {
+			for ix := 0; ix < block.Rows; ix++ {
+				res[(&id).Row(ix)] = (&balanceForTMinus1).Row(ix)
+			}
+			(&id).Reset()
+			(&balanceForTMinus1).Reset()
+
+			return nil
+		},
+		Secret:      "",
+		InitialUser: "",
+	}); err != nil {
+		return nil, errors.Wrapf(err, "failed to call clickhouse for balance_for_tminus1 at %v, offset %v", validBalanceForTMinus1DateTime, offset)
+	}
 
 	return res, nil
 }

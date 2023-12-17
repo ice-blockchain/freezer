@@ -4,6 +4,7 @@ package miner
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -40,13 +42,24 @@ const (
 	applicationYamlKey       = "miner"
 	parentApplicationYamlKey = "tokenomics"
 	requestDeadline          = 30 * stdlibtime.Second
-	balanceBugFixEnabled     = true
+
+	startRecalculationsFrom = "2023-11-20T14:00:00"
+	timeLayout              = "2006-01-02T15:04:05"
+
+	balanceForTMinusBugfixEnabled       = true
+	balanceForTMinusBugfixDryRunEnabled = true
+
+	balanceT2BugfixDryRunEnabled = false
+	balanceT2BugfixEnabled       = false
 )
 
 // .
 var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
+
+	//go:embed .testdata/DDL.sql
+	eskimoDDL string
 )
 
 type (
@@ -119,10 +132,15 @@ type (
 	}
 
 	recalculateReferral struct {
-		model.BalanceForT0Field
 		model.BalanceForTMinus1Field
 		model.UserIDField
 		model.DeserializedUsersKey
+	}
+
+	recalculated struct {
+		model.RecalculatedBalanceForTMinus1AtField
+		model.RecalculatedBalanceT2AtField
+		model.DeserializedRecalculatedUsersKey
 	}
 
 	referralCountGuardUpdatedUser struct {
@@ -143,6 +161,7 @@ type (
 		telemetry                     *telemetry
 		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
+		dbPG                          *storagePG.DB
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 	}
 	config struct {
