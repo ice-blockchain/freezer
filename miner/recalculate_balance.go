@@ -354,32 +354,33 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 				}
 				updatedUser.BalanceForTMinus1 += updatedUser.SlashingRateForTMinus1 * resurrectDelta
 				isResurrected = true
-			}
+			} else {
 
-			/******************************************************************************************************************************************************
-				2. Slashing.
-			******************************************************************************************************************************************************/
-			if !tminus1Range.MiningSessionSoloPreviouslyEndedAt.IsNil() && !tminus1Range.MiningSessionSoloPreviouslyEndedAt.IsZero() {
-				var (
-					elapsedTimeFraction float64
-					miningSessionRatio  float64
-				)
-				if tminus1Range.MiningSessionSoloPreviouslyEndedAt.Before(startTime) {
-					tminus1Range.MiningSessionSoloPreviouslyEndedAt = time.New(startTime)
-				}
-				if timeSpent := tminus1Range.MiningSessionSoloStartedAt.Sub(*tminus1Range.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
-					elapsedTimeFraction = timeSpent.Minutes()
-					miningSessionRatio = 1
-				} else {
-					elapsedTimeFraction = timeSpent.Hours()
-					miningSessionRatio = 24.
-				}
-
-				if elapsedTimeFraction > 0 {
-					if updatedUser.SlashingRateForTMinus1 == 0 {
-						updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
+				/******************************************************************************************************************************************************
+					2. Slashing.
+				******************************************************************************************************************************************************/
+				if !tminus1Range.MiningSessionSoloPreviouslyEndedAt.IsNil() && !tminus1Range.MiningSessionSoloPreviouslyEndedAt.IsZero() {
+					var (
+						elapsedTimeFraction float64
+						miningSessionRatio  float64
+					)
+					if tminus1Range.MiningSessionSoloPreviouslyEndedAt.Before(startTime) {
+						tminus1Range.MiningSessionSoloPreviouslyEndedAt = time.New(startTime)
 					}
-					updatedUser.BalanceForTMinus1 -= updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
+					if timeSpent := tminus1Range.MiningSessionSoloStartedAt.Sub(*tminus1Range.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
+						elapsedTimeFraction = timeSpent.Minutes()
+						miningSessionRatio = 1
+					} else {
+						elapsedTimeFraction = timeSpent.Hours()
+						miningSessionRatio = 24.
+					}
+
+					if elapsedTimeFraction > 0 {
+						if updatedUser.SlashingRateForTMinus1 == 0 {
+							updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
+						}
+						updatedUser.BalanceForTMinus1 -= updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
+					}
 				}
 			}
 
@@ -450,6 +451,9 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 					updatedUser.BalanceForTMinus1 -= updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
 				}
 			}
+		}
+		if updatedUser.BalanceForTMinus1 < 0 {
+			updatedUser.BalanceForTMinus1 = 0
 		}
 
 		return updatedUser
