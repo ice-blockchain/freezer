@@ -49,7 +49,7 @@ type (
 	}
 )
 
-func (m *miner) collectReferralsTier2(ctx context.Context, usersKeys []string) (
+func collectReferralsTier2(ctx context.Context, db *storagePG.DB, usersKeys []string) (
 	t2Referrals map[string][]string, err error,
 ) {
 	var offset int64 = 0
@@ -67,7 +67,7 @@ func (m *miner) collectReferralsTier2(ctx context.Context, usersKeys []string) (
 					AND t2.referred_by != t2.id
 					AND t2.username != t2.id
 				LIMIT $2 OFFSET $3`
-		rows, err := storagePG.Select[pgUser](ctx, m.dbPG, sql, usersKeys, maxLimit, offset)
+		rows, err := storagePG.Select[pgUser](ctx, db, sql, usersKeys, maxLimit, offset)
 		if err != nil {
 			return nil, errors.Wrap(err, "can't get referrals from pg for showing actual data")
 		}
@@ -167,7 +167,7 @@ func getReferrals(ctx context.Context, db storage.DB, keys ...string) (result []
 	return result, nil
 }
 
-func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (map[string]*recalculateReferral, map[string][]string, error) {
+func gatherReferralsInformation(ctx context.Context, dbPG *storagePG.DB, db storage.DB, users []*user) (map[string]*recalculateReferral, map[string][]string, error) {
 	if len(users) == 0 {
 		return nil, nil, nil
 	}
@@ -176,7 +176,7 @@ func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (
 	for _, usr := range users {
 		userIDs = append(userIDs, usr.UserID)
 	}
-	t2Referrals, err := m.collectReferralsTier2(ctx, userIDs)
+	t2Referrals, err := collectReferralsTier2(ctx, dbPG, userIDs)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "can't get users")
 	}
@@ -189,11 +189,11 @@ func (m *miner) gatherReferralsInformation(ctx context.Context, users []*user) (
 			serializedReferralsUserKeys = append(serializedReferralsUserKeys, model.SerializedUsersKey(id))
 		}
 	}
-	internalIDKeys, err := getInternalIDs(ctx, m.db, serializedReferralsUserKeys...)
+	internalIDKeys, err := getInternalIDs(ctx, db, serializedReferralsUserKeys...)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to get referrals internal id keys for:%v", users)
 	}
-	referrals, err := getReferrals(ctx, m.db, internalIDKeys...)
+	referrals, err := getReferrals(ctx, db, internalIDKeys...)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to get referrals for:%v", users)
 	}
@@ -287,7 +287,7 @@ func initializeEmptyUser(updatedUser, usr *user) *user {
 	return &newUser
 }
 
-func (m *miner) gatherHistory(ctx context.Context, users []*user, referralIDTMinus1Keys []string) (history map[int64][]*dwh.AdjustUserInfo, err error) {
+func gatherHistory(ctx context.Context, dwhClient dwh.Client, users []*user, referralIDTMinus1Keys []string) (history map[int64][]*dwh.AdjustUserInfo, err error) {
 	if len(users) == 0 {
 		return nil, nil
 	}
@@ -299,7 +299,7 @@ func (m *miner) gatherHistory(ctx context.Context, users []*user, referralIDTMin
 	offset := int64(0)
 	historyTimeRanges := make(map[int64][]*dwh.AdjustUserInfo, 0)
 	for {
-		historyInformation, err := m.dwhClient.GetAdjustUserInformation(ctx, keys, startRecalculationsFrom, maxLimit, offset)
+		historyInformation, err := dwhClient.GetAdjustUserInformation(ctx, keys, startRecalculationsFrom, maxLimit, offset)
 		if err != nil {
 			return nil, errors.Wrapf(err, "can't get adjust user information for ids:#%v", keys)
 		}
@@ -318,7 +318,7 @@ func (m *miner) gatherHistory(ctx context.Context, users []*user, referralIDTMin
 	return historyTimeRanges, nil
 }
 
-func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Adoption[float64], history map[int64][]*dwh.AdjustUserInfo, baseTMinus1Balances map[int64]float64) *user {
+func recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Adoption[float64], history map[int64][]*dwh.AdjustUserInfo, baseTMinus1Balances map[int64]float64) *user {
 	if history == nil || adoptions == nil {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Ado
 	return nil
 }
 
-func (m *miner) insertBalanceTMinus1RecalculationDryRunBatch(ctx context.Context, infos []*balanceTMinus1RecalculationDryRun) error {
+func insertBalanceTMinus1RecalculationDryRunBatch(ctx context.Context, db *storagePG.DB, infos []*balanceTMinus1RecalculationDryRun) error {
 	if len(infos) == 0 {
 		return nil
 	}
@@ -498,12 +498,12 @@ func (m *miner) insertBalanceTMinus1RecalculationDryRunBatch(ctx context.Context
 						)
 					VALUES %v
 					ON CONFLICT(user_id) DO NOTHING`, strings.Join(sqlParams, ","))
-	_, err := storagePG.Exec(ctx, m.dbPG, sql, params...)
+	_, err := storagePG.Exec(ctx, db, sql, params...)
 
 	return errors.Wrap(err, "failed to insert dry run balanceTMinus1 info")
 }
 
-func (m *miner) insertBalanceT2RecalculationDryRunBatch(ctx context.Context, infos []*balanceT2RecalculationDryRun) error {
+func insertBalanceT2RecalculationDryRunBatch(ctx context.Context, db *storagePG.DB, infos []*balanceT2RecalculationDryRun) error {
 	if len(infos) == 0 {
 		return nil
 	}
@@ -525,7 +525,7 @@ func (m *miner) insertBalanceT2RecalculationDryRunBatch(ctx context.Context, inf
 						)
 					VALUES %v
 					ON CONFLICT(user_id) DO NOTHING`, strings.Join(sqlParams, ","))
-	_, err := storagePG.Exec(ctx, m.dbPG, sql, params...)
+	_, err := storagePG.Exec(ctx, db, sql, params...)
 
 	return errors.Wrap(err, "failed to insert dry run info")
 }
