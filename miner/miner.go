@@ -391,12 +391,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 						if !balanceForTMinusBugfixDryRunEnabled {
 							usr.BalanceForTMinus1 = recalculatedUsr.BalanceForTMinus1
-						}
 
-						recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculated{
-							DeserializedRecalculatedUsersKey:     model.DeserializedRecalculatedUsersKey{ID: usr.ID},
-							RecalculatedBalanceForTMinus1AtField: model.RecalculatedBalanceForTMinus1AtField{RecalculatedBalanceForTMinus1At: now},
-						})
+							recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculated{
+								DeserializedRecalculatedUsersKey:     model.DeserializedRecalculatedUsersKey{ID: usr.ID},
+								RecalculatedBalanceForTMinus1AtField: model.RecalculatedBalanceForTMinus1AtField{RecalculatedBalanceForTMinus1At: now},
+							})
+						}
 					}
 				}
 			}
@@ -410,7 +410,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 							}
 						}
 					}
-
 					balanceT2RecalculationDryRunItems = append(balanceT2RecalculationDryRunItems, &balanceT2RecalculationDryRun{
 						OldT2Balance: usr.BalanceT2,
 						NewT2Balance: balanceT2,
@@ -419,12 +418,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 					if !balanceT2BugfixDryRunEnabled {
 						usr.BalanceT2 = balanceT2
-					}
 
-					recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculated{
-						DeserializedRecalculatedUsersKey: model.DeserializedRecalculatedUsersKey{ID: usr.ID},
-						RecalculatedBalanceT2AtField:     model.RecalculatedBalanceT2AtField{RecalculatedBalanceT2At: now},
-					})
+						recalculatedUsersUpdated = append(recalculatedUsersUpdated, &recalculated{
+							DeserializedRecalculatedUsersKey: model.DeserializedRecalculatedUsersKey{ID: usr.ID},
+							RecalculatedBalanceT2AtField:     model.RecalculatedBalanceT2AtField{RecalculatedBalanceT2At: now},
+						})
+					}
 				}
 			}
 
