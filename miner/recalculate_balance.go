@@ -37,6 +37,7 @@ type (
 		UpdatedAt                            *time.Time
 		OldTMinus1Balance, NewTMinus1Balance float64
 		UserID                               string
+		TMinus1ID                            string
 	}
 
 	balanceT2RecalculationDryRun struct {
@@ -481,16 +482,17 @@ func (m *miner) insertBalanceTMinus1RecalculationDryRunBatch(ctx context.Context
 	params := []any{}
 	sqlParams := []string{}
 	for _, info := range infos {
-		sqlParams = append(sqlParams, fmt.Sprintf("($%v, $%v, $%v, $%v)", paramCounter, paramCounter+1, paramCounter+2, paramCounter+3))
-		paramCounter += 4
-		params = append(params, now.Time, info.OldTMinus1Balance, info.NewTMinus1Balance, info.UserID)
+		sqlParams = append(sqlParams, fmt.Sprintf("($%v, $%v, $%v, $%v, $%v)", paramCounter, paramCounter+1, paramCounter+2, paramCounter+3, paramCounter+4))
+		paramCounter += 5
+		params = append(params, now.Time, info.OldTMinus1Balance, info.NewTMinus1Balance, info.UserID, info.TMinus1ID)
 	}
 
 	sql := fmt.Sprintf(`INSERT INTO balance_tminus1_recalculation_dry_run(
 							updated_at,
 							old_tminus1_balance,
 							new_tminus1_balance,
-							user_id
+							user_id,
+                            tminus1_id
 						)
 					VALUES %v
 					ON CONFLICT(user_id) DO NOTHING`, strings.Join(sqlParams, ","))

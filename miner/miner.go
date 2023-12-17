@@ -378,10 +378,15 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
 				if recalculatedVal, ok := recalculatedUsers[usr.ID]; !ok || (recalculatedVal != nil && recalculatedVal.RecalculatedBalanceForTMinus1At.IsNil()) {
 					if recalculatedUsr := m.recalculateBalanceTMinus1(usr, allAdoptions, history, balances); recalculatedUsr != nil {
+						tMinus1ID := ""
+						if tMinus1Ref != nil {
+							tMinus1ID = tMinus1Ref.UserID
+						}
 						balanceTMinus1RecalculationDryRunItems = append(balanceTMinus1RecalculationDryRunItems, &balanceTMinus1RecalculationDryRun{
 							OldTMinus1Balance: usr.BalanceForTMinus1,
 							NewTMinus1Balance: recalculatedUsr.BalanceForTMinus1,
 							UserID:            usr.UserID,
+							TMinus1ID:         tMinus1ID,
 						})
 
 						if !balanceForTMinusBugfixDryRunEnabled {

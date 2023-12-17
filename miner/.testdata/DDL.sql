@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS balance_tminus1_recalculation_dry_run (
                         updated_at                      timestamp NOT NULL,
                         old_tminus1_balance             DOUBLE PRECISION NOT NULL,
                         new_tminus1_balance             DOUBLE PRECISION NOT NULL,
-                        user_id                         text PRIMARY KEY
+                        user_id                         text PRIMARY KEY,
+                        tminus1_id                      text
                     ) WITH (fillfactor = 70);
 
 CREATE TABLE IF NOT EXISTS balance_t2_recalculation_dry_run (
