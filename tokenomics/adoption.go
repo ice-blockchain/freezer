@@ -30,7 +30,7 @@ func (r *repository) GetAdoptionSummary(ctx context.Context) (as *AdoptionSummar
 	if as.TotalActiveUsers, err = r.db.Get(ctx, r.totalActiveUsersKey(*time.Now().Time)).Uint64(); err != nil && !errors.Is(err, redis.Nil) {
 		return nil, errors.Wrap(err, "failed to get current totalActiveUsers")
 	}
-	if as.Milestones, err = GetAllAdoptions[string](ctx, r.db); err != nil {
+	if as.Milestones, err = getAllAdoptions[string](ctx, r.db); err != nil {
 		return nil, errors.Wrap(err, "failed to get all adoption milestones")
 	}
 
@@ -213,7 +213,7 @@ func getAdoption(ctx context.Context, db storage.DB, milestone uint64) (*Adoptio
 	return resp[0], nil
 }
 
-func GetAllAdoptions[DENOM ~string | ~float64](ctx context.Context, db storage.DB) ([]*Adoption[DENOM], error) {
+func getAllAdoptions[DENOM ~string | ~float64](ctx context.Context, db storage.DB) ([]*Adoption[DENOM], error) {
 	const max = 20 // We try to get 20 just to be sure we get all of them. We're never going to have more than 20 milestones.
 	keys := make([]string, max)
 	for ix := uint64(1); ix <= max; ix++ {
