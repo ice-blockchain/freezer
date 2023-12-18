@@ -208,8 +208,8 @@ github.com/hashicorp/go-version v1.6.0 h1:feTTfFNnjP967rlCxM/I9g701jU+RN74YKx2mO
 github.com/hashicorp/go-version v1.6.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
-github.com/ice-blockchain/eskimo v1.226.0 h1:mZw2efPMUUQVGw3Eh43G/XDE5JTmaX/50gZzaRv9cBk=
-github.com/ice-blockchain/eskimo v1.226.0/go.mod h1:Btj5U8KPf2+dkGtajQER1SjfXv40t8RqaihVNd4FE1s=
+github.com/ice-blockchain/eskimo v1.227.0 h1:w8TaGCJY7FfbOGOyQG2kp+weDkyJZEXLRujdCtsDr5w=
+github.com/ice-blockchain/eskimo v1.227.0/go.mod h1:Btj5U8KPf2+dkGtajQER1SjfXv40t8RqaihVNd4FE1s=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb h1:8TnFP3mc7O+tc44kv2e0/TpZKnEVUaKH+UstwfBwRkk=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb/go.mod h1:ZsQU7i3mxhgBBu43Oev7WPFbIjP4TniN/b1UPNGbrq8=
 github.com/ice-blockchain/wintr v1.127.0 h1:YuGfLCGu91mLtsH0AcdNKnDERZPD6+3er93T/m7vF2Q=
