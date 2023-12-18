@@ -180,7 +180,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			currentAdoption = m.getAdoption(ctx, m.db, workerNumber)
 		}
 		userKeys, userHistoryKeys, referralKeys, recalculatedKeys, dryRunKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0], recalculatedKeys[:0], dryRunKeys[:0]
-		userResults, referralResults, userRecalculatedResults, recalculatedUsersUpdated, dryrunResults = userResults[:0], referralResults[:0], userRecalculatedResults[:0], recalculatedUsersUpdated[:0], dryrunResults[:0]
+		userResults, referralResults, userRecalculatedResults, recalculatedUsersUpdated, dryrunResults, dryRunUsersUpdated = userResults[:0], referralResults[:0], userRecalculatedResults[:0], recalculatedUsersUpdated[:0], dryrunResults[:0], dryRunUsersUpdated[:0]
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
 		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
