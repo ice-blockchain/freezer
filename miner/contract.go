@@ -51,6 +51,8 @@ const (
 
 	balanceT2BugfixDryRunEnabled = false
 	balanceT2BugfixEnabled       = false
+
+	clearBugfixDebugInfoEnabled = false
 )
 
 // .
@@ -139,7 +141,6 @@ type (
 
 	recalculated struct {
 		model.RecalculatedBalanceForTMinus1AtField
-		model.RecalculatedBalanceT2AtField
 		model.DeserializedRecalculatedUsersKey
 	}
 
@@ -151,6 +152,12 @@ type (
 	referralThatStoppedMining struct {
 		StoppedMiningAt     *time.Time
 		ID, IDT0, IDTMinus1 int64
+	}
+
+	dryrunUser struct {
+		model.DeserializedDryRunUsersKey
+		model.IDTMinus1Field
+		model.RecalculatedBalanceForTMinus1AtField
 	}
 
 	miner struct {

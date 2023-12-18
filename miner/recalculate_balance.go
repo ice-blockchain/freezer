@@ -276,15 +276,10 @@ func calculateTimeBounds(refTimeRange, usrRange *dwh.AdjustUserInfo) (*time.Time
 	return startedAt, endedAt
 }
 
-func gatherHistory(ctx context.Context, dwhClient dwh.Client, users []*user, referralIDTMinus1Keys []string) (history map[int64][]*dwh.AdjustUserInfo, err error) {
-	if len(users) == 0 {
+func gatherHistory(ctx context.Context, dwhClient dwh.Client, keys []string) (history map[int64][]*dwh.AdjustUserInfo, err error) {
+	if len(keys) == 0 {
 		return nil, nil
 	}
-	var keys []string
-	for _, usr := range users {
-		keys = append(keys, fmt.Sprint(usr.ID))
-	}
-	keys = append(keys, referralIDTMinus1Keys...)
 	offset := int64(0)
 	historyTimeRanges := make(map[int64][]*dwh.AdjustUserInfo, 0)
 	for {
@@ -308,7 +303,7 @@ func gatherHistory(ctx context.Context, dwhClient dwh.Client, users []*user, ref
 }
 
 func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Adoption[float64], history map[int64][]*dwh.AdjustUserInfo, baseTMinus1Balances map[int64]float64) *user {
-	if history == nil || adoptions == nil {
+	if adoptions == nil || history == nil || baseTMinus1Balances == nil {
 		return nil
 	}
 	startTime, err := stdlibtime.Parse(timeLayout, startRecalculationsFrom)
