@@ -26,23 +26,10 @@ func MustStartCoinDistribution(ctx context.Context, cancel context.CancelFunc) C
 		db: storage.MustConnect(context.Background(), ddl, applicationYamlKey),
 		wg: new(sync.WaitGroup),
 	}
-	cd.wg.Add(int(cfg.Workers))
 	cd.cancel = cancel
-
-	for workerNumber := int64(0); workerNumber < cfg.Workers; workerNumber++ {
-		go func(wn int64) {
-			defer cd.wg.Done()
-			cd.distributeCoins(ctx, wn)
-		}(workerNumber)
-	}
+	go startPrepareCoinDistributionsForReviewMonitor(ctx, cd.db)
 
 	return cd
-}
-
-func NewRepository(ctx context.Context, _ context.CancelFunc) Repository {
-	repo := &repository{db: storage.MustConnect(ctx, ddl, applicationYamlKey)}
-
-	return repo
 }
 
 func (cd *coinDistributer) Close() error {
@@ -122,11 +109,4 @@ func (cd *coinDistributer) Disable(rooCtx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *repository) CheckHealth(ctx context.Context) error {
-	return errors.Wrap(r.db.Ping(ctx), "[health-check] failed to ping DB for coindistribution.repository")
-}
-func (r *repository) Close() error {
-	return errors.Wrap(r.db.Close(), "failed to close db")
 }

@@ -26,6 +26,9 @@ type (
 		GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (*CoinDistributionsForReview, error)
 		CheckHealth(ctx context.Context) error
 		ReviewCoinDistributions(ctx context.Context, reviewerUserID string, decision string) error
+		NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error
+		GetCollectorStatus(ctx context.Context) (latestCollectingDate *time.Time, collectorEnabled bool, err error)
+		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
 	}
 
 	CoinDistributionsForReview struct {
@@ -56,6 +59,17 @@ type (
 		Ice                float64    `json:"ice" db:"-" example:"1000"`
 		IceInternal        int64      `json:"-" db:"ice" swaggerignore:"true"`
 	}
+
+	ByEarnerForReview struct {
+		CreatedAt          *time.Time
+		Username           string
+		ReferredByUsername string
+		UserID             string
+		EarnerUserID       string
+		EthAddress         string
+		InternalID         int64
+		Balance            float64
+	}
 )
 
 // Private API.
@@ -80,13 +94,17 @@ type (
 		wg     *sync.WaitGroup
 	}
 	repository struct {
-		db *storage.DB
+		cfg *config
+		db  *storage.DB
 	}
 	config struct {
-		StartHours  int   `yaml:"startHours"`
-		EndHours    int   `yaml:"endHours"`
-		Workers     int64 `yaml:"workers"`
-		BatchSize   int64 `yaml:"batchSize"`
-		Development bool  `yaml:"development"`
+		AlertSlackWebhook string `yaml:"alert-slack-webhook" mapstructure:"alert-slack-webhook"` //nolint:tagliatelle // .
+		Environment       string `yaml:"environment" mapstructure:"environment"`
+		ReviewURL         string `yaml:"review-url" mapstructure:"review-url"`
+		StartHours        int    `yaml:"startHours"`
+		EndHours          int    `yaml:"endHours"`
+		Workers           int64  `yaml:"workers"`
+		BatchSize         int64  `yaml:"batchSize"`
+		Development       bool   `yaml:"development"`
 	}
 )

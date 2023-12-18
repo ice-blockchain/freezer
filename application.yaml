@@ -180,6 +180,9 @@ miner:
   batchSize: 100
   wintr/connectors/storage/v2: *db
 coin-distribution:
+  alert-slack-webhook: https://hooks.slack.com/services/dummy/dummy/dummy
+  environment: local
+  review-url: https://some.bogus.example.com/going/somewhere
   development: true
   workers: 2
   batchSize: 100

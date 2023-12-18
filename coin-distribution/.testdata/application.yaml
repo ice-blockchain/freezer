@@ -5,6 +5,9 @@ logger:
   encoder: console
   level: debug
 coin-distribution:
+  alert-slack-webhook: https://hooks.slack.com/services/dummy/dummy/dummy
+  environment: local
+  review-url: https://some.bogus.example.com/going/somewhere
   startHours: 12
   endHours: 17
   development: true

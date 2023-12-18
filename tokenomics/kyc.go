@@ -386,7 +386,7 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 			}
 		}).
 		SetRetryCondition(func(resp *req.Response, err error) bool {
-			return err != nil || (resp.GetStatusCode() != http.StatusOK && resp.GetStatusCode() != http.StatusUnauthorized && resp.GetStatusCode() != http.StatusForbidden) //nolint:lll // .
+			return err != nil || (resp.GetStatusCode() != http.StatusOK && resp.GetStatusCode() != http.StatusNotFound && resp.GetStatusCode() != http.StatusUnauthorized && resp.GetStatusCode() != http.StatusForbidden) //nolint:lll // .
 		}).
 		AddQueryParam("caller", "freezer-refrigerant").
 		SetHeader("Authorization", authorization(ctx)).

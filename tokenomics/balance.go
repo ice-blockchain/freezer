@@ -71,6 +71,10 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 		model.BalanceT0Field
 		model.BalanceT1Field
 		model.BalanceT2Field
+		model.BalanceSoloEthereumField
+		model.BalanceT0EthereumField
+		model.BalanceT1EthereumField
+		model.BalanceT2EthereumField
 		model.PreStakingBonusField
 		model.PreStakingAllocationField
 	}](ctx, r.db, model.SerializedUsersKey(id))
@@ -97,6 +101,7 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 			T1:                     fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking),
 			T2:                     fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
 			TotalReferrals:         fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
+			TotalMiningBlockchain:  fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum), //nolint:lll // .
 		},
 	}, nil
 }

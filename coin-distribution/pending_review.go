@@ -10,9 +10,38 @@ import (
 
 	"github.com/pkg/errors"
 
+	appcfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/time"
 )
+
+func NewRepository(ctx context.Context, _ context.CancelFunc) Repository {
+	var localCfg config
+	appcfg.MustLoadFromKey(applicationYamlKey, &localCfg)
+	if localCfg.AlertSlackWebhook == "" {
+		log.Panic("`alert-slack-webhook` is missing")
+	}
+	if localCfg.Environment == "" {
+		log.Panic("`environment` is missing")
+	}
+	if localCfg.ReviewURL == "" {
+		log.Panic("`review-url` is missing")
+	}
+
+	return &repository{
+		db:  storage.MustConnect(ctx, ddl, applicationYamlKey),
+		cfg: &localCfg,
+	}
+}
+
+func (r *repository) CheckHealth(ctx context.Context) error {
+	return errors.Wrap(r.db.Ping(ctx), "[health-check] failed to ping DB for coindistribution.repository")
+}
+
+func (r *repository) Close() error {
+	return errors.Wrap(r.db.Close(), "failed to close db")
+}
 
 //nolint:funlen // .
 func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *GetCoinDistributionsForReviewArg) (*CoinDistributionsForReview, error) { //nolint:lll // .
@@ -137,8 +166,147 @@ func (a *GetCoinDistributionsForReviewArg) totalsWhere() ([]string, []any) {
 	return conditions, args
 }
 
+//nolint:funlen // .
 func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID string, decision string) error {
-	log.Info(fmt.Sprintf("ReviewCoinDistributions(userID:`%v`, decision:`%v`)", reviewerUserID, decision))
+	const sqlToCheckIfAnythingNeedsApproving = "SELECT true AS bogus WHERE exists (select 1 FROM coin_distributions_pending_review LIMIT 1)"
+	switch strings.ToLower(decision) {
+	case "approve":
+		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
+			if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
+				if storage.IsErr(err, storage.ErrNotFound) {
+					err = nil
+				}
+
+				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
+			}
+			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,true)", reviewerUserID); err != nil {
+				return errors.Wrap(err, "failed to call approve_coin_distributions")
+			}
+
+			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx),
+				"failed to sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage")
+		})
+	case "deny":
+		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
+			if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
+				if storage.IsErr(err, storage.ErrNotFound) {
+					err = nil
+				}
+
+				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
+			}
+			if _, err := storage.Exec(ctx, conn, "call deny_coin_distributions($1,true)", reviewerUserID); err != nil {
+				return errors.Wrap(err, "failed to call deny_coin_distributions")
+			}
+
+			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreDeniedSlackMessage(ctx),
+				"failed to sendCurrentCoinDistributionsAvailableForReviewAreDeniedSlackMessage")
+		})
+	default:
+		log.Panic(fmt.Sprintf("unknown decision:`%v`", decision))
+	}
 
 	return ctx.Err()
+}
+
+func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error {
+	const columns = 9
+	values := make([]string, 0, len(records))
+	args := make([]any, 0, len(records)*columns)
+	for ix, record := range records {
+		values = append(values, generateValuesSQLParams(ix, columns))
+		args = append(args,
+			record.CreatedAt.Time,
+			record.CreatedAt.Time,
+			record.InternalID,
+			int64(record.Balance*100),
+			record.Username,
+			record.ReferredByUsername,
+			record.UserID,
+			record.EarnerUserID,
+			record.EthAddress)
+	}
+	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
+																 VALUES %v
+						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
+							SET balance = EXCLUDED.balance`, strings.Join(values, ",\n"))
+	_, err := storage.Exec(ctx, r.db, sql, args...)
+
+	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner %#v", records)
+}
+
+func generateValuesSQLParams(index, columns int) string {
+	params := make([]string, 0, columns)
+	for ii := 1; ii <= columns; ii++ {
+		params = append(params, fmt.Sprintf("$%v", index*columns+ii))
+	}
+
+	return fmt.Sprintf("(%v)", strings.Join(params, ","))
+}
+
+func (r *repository) NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error {
+	sql := `INSERT INTO global(key,value) 
+					   VALUES ('latest_collecting_date',$1),
+							  ('new_coin_distributions_pending','true')
+				ON CONFLICT (key) DO UPDATE
+					SET value = EXCLUDED.value`
+	_, err := storage.Exec(ctx, r.db, sql, time.Now().Format(stdlibtime.DateOnly))
+
+	return errors.Wrap(err, "failed to update global.value for latest_collecting_date to now and mark new_coin_distributions_pending")
+}
+
+func (r *repository) GetCollectorStatus(ctx context.Context) (latestCollectingDate *time.Time, collectorEnabled bool, err error) {
+	sql := `SELECT (SELECT value::timestamp FROM global WHERE key = $1) 			AS latest_collecting_date,
+				   coalesce((SELECT value::bool FROM global WHERE key = $2),false) 	AS coin_collector_enabled`
+	val, err := storage.ExecOne[struct {
+		LatestCollectingDate *time.Time
+		CoinCollectorEnabled bool
+	}](ctx, r.db, sql, "latest_collecting_date", "coin_collector_enabled")
+	if err != nil {
+		return nil, false, errors.Wrap(err, "failed to select info about latest_collecting_date, coin_collector_enabled")
+	}
+
+	return val.LatestCollectingDate, val.CoinCollectorEnabled, nil
+}
+
+func tryPrepareCoinDistributionsForReview(ctx context.Context, db *storage.DB) error {
+	return storage.DoInTransaction(ctx, db, func(conn storage.QueryExecer) error {
+		if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, "SELECT true AS bogus FROM global WHERE key = 'new_coin_distributions_pending' FOR UPDATE SKIP LOCKED"); err != nil {
+			if storage.IsErr(err, storage.ErrNotFound) {
+				err = nil
+			}
+
+			return errors.Wrap(err, "failed to check if we should start preparing new coin distributions for review")
+		}
+
+		if _, err := storage.Exec(ctx, conn, "call prepare_coin_distributions_for_review(true)"); err != nil {
+			return errors.Wrap(err, "failed to call prepare_coin_distributions_for_review")
+		}
+
+		if rowsDeleted, err := storage.Exec(ctx, conn, "DELETE FROM global where key = 'new_coin_distributions_pending'"); err != nil || rowsDeleted != 1 {
+			if err == nil {
+				err = errors.Errorf("expected 1 rowsDeleted, actual: %v", rowsDeleted)
+			}
+
+			return errors.Wrap(err, "failed to del global.key='new_coin_distributions_pending'")
+		}
+
+		return errors.Wrap(sendNewCoinDistributionsAvailableForReviewSlackMessage(ctx), "failed to sendNewCoinDistributionsAvailableForReviewSlackMessage")
+	})
+}
+
+func startPrepareCoinDistributionsForReviewMonitor(ctx context.Context, db *storage.DB) {
+	ticker := stdlibtime.NewTicker(30 * stdlibtime.Second) //nolint:gomnd // .
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			reqCtx, cancel := context.WithTimeout(ctx, 10*stdlibtime.Minute) //nolint:gomnd // .
+			log.Error(errors.Wrap(tryPrepareCoinDistributionsForReview(reqCtx, db), "failed to tryPrepareCoinDistributionsForReview"))
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
 }

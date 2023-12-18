@@ -770,6 +770,10 @@
                     "type": "string",
                     "example": "1,243.02"
                 },
+                "totalMiningBlockchain": {
+                    "type": "string",
+                    "example": "1,243.02"
+                },
                 "totalNoPreStakingBonus": {
                     "type": "string",
                     "example": "1,243.02"
