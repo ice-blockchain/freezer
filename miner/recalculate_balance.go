@@ -303,7 +303,7 @@ func gatherHistory(ctx context.Context, dwhClient dwh.Client, keys []string) (hi
 }
 
 func (m *miner) recalculateBalanceTMinus1(usr *user, adoptions []*tokenomics.Adoption[float64], history map[int64][]*dwh.AdjustUserInfo, baseTMinus1Balances map[int64]float64) *user {
-	if adoptions == nil || history == nil || baseTMinus1Balances == nil {
+	if adoptions == nil || history == nil || baseTMinus1Balances == nil || len(adoptions) == 0 || len(history) == 0 || len(baseTMinus1Balances) == 0 {
 		return nil
 	}
 	startTime, err := stdlibtime.Parse(timeLayout, startRecalculationsFrom)
