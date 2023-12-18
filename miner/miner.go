@@ -229,6 +229,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		for k := range clickhouseKeysMap {
 			delete(clickhouseKeysMap, k)
 		}
+		for k := range dryRunUsers {
+			delete(dryRunUsers, k)
+		}
 	}
 	for ctx.Err() == nil {
 		/******************************************************************************************************************************************************
