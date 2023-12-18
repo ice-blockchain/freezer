@@ -4,8 +4,6 @@ package coindistribution
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	stdlibtime "time"
 
 	"github.com/hashicorp/go-multierror"
@@ -14,80 +12,21 @@ import (
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
-	"github.com/ice-blockchain/wintr/time"
 )
 
-func init() {
-	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
-}
-
-func MustStartCoinDistribution(ctx context.Context, cancel context.CancelFunc) Client {
-	cd := &coinDistributer{
-		db: storage.MustConnect(context.Background(), ddl, applicationYamlKey),
-		wg: new(sync.WaitGroup),
-	}
-	cd.cancel = cancel
-	go startPrepareCoinDistributionsForReviewMonitor(ctx, cd.db)
-
-	return cd
-}
-
-func (cd *coinDistributer) Close() error {
-	cd.cancel()
-	cd.wg.Wait()
-
-	return multierror.Append(
-		errors.Wrap(cd.db.Close(), "failed to close db"),
-	).ErrorOrNil()
-}
-
-func (cd *coinDistributer) CheckHealth(ctx context.Context) error {
-	return errors.Wrap(cd.db.Ping(ctx), "[health-check] failed to ping DB")
-}
-
-func (cd *coinDistributer) distributeCoins(ctx context.Context, workerNumber int64) {
-	for ctx.Err() == nil {
-		if !cd.isEnabled(ctx) {
-			log.Info(fmt.Sprintf("coinDistributer[%v] is disabled", workerNumber))
-			stdlibtime.Sleep(requestDeadline)
-
-			continue
-		}
-		if currentHour := time.Now().Hour() + 1; (cfg.StartHours < cfg.EndHours && (currentHour < cfg.StartHours || currentHour > cfg.EndHours)) ||
-			(cfg.StartHours > cfg.EndHours && (currentHour < cfg.StartHours && currentHour > cfg.EndHours)) {
-			log.Info(fmt.Sprintf("coinDistributer[%v] is disabled until %v-%v", workerNumber, cfg.StartHours, cfg.EndHours))
-			stdlibtime.Sleep(requestDeadline)
-
-			continue
-		}
-		reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
-		err := storage.DoInTransaction(reqCtx, cd.db, func(conn storage.QueryExecer) error {
-			// Logic here
-
-			return nil
-		})
-		cancel()
-		if err == nil {
-			log.Info(fmt.Sprintf("TODO: add stuff here"))
-		} else {
-			log.Error(errors.Wrapf(err, "TODO: add stuff here"))
-		}
-
-		if false { // if call to ethereum failed or if transaction commit failed
-			// Send Slack message with as much info as possible
-
-			for err = cd.Disable(ctx); err != nil; err = cd.Disable(ctx) {
-			}
-		}
+func (d *databaseConfig) MustDisable(ctx context.Context) {
+	for err := d.Disable(ctx); err != nil; err = d.Disable(ctx) {
+		log.Error(err, "failed to disable coinDistributer")
+		stdlibtime.Sleep(stdlibtime.Millisecond)
 	}
 }
 
-func (cd *coinDistributer) isEnabled(rooCtx context.Context) bool {
-	ctx, cancel := context.WithTimeout(rooCtx, requestDeadline)
+func (d *databaseConfig) IsEnabled(ctx context.Context) bool {
+	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
 	val, err := storage.Get[struct {
 		Enabled bool
-	}](ctx, cd.db, `SELECT value::bool as enabled FROM global WHERE key = 'coin_distributer_enabled'`)
+	}](reqCtx, d.DB, `SELECT value::bool as enabled FROM global WHERE key = 'coin_distributer_enabled'`)
 	if err != nil {
 		log.Error(errors.Wrap(err, "failed to check if coinDistributer is enabled"))
 
@@ -97,10 +36,10 @@ func (cd *coinDistributer) isEnabled(rooCtx context.Context) bool {
 	return val.Enabled
 }
 
-func (cd *coinDistributer) Disable(rooCtx context.Context) error {
-	ctx, cancel := context.WithTimeout(rooCtx, requestDeadline)
+func (d *databaseConfig) Disable(ctx context.Context) error {
+	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
-	rows, err := storage.Exec(ctx, cd.db, `UPDATE global SET value = 'false' WHERE key = 'coin_distributer_enabled'`)
+	rows, err := storage.Exec(reqCtx, d.DB, `UPDATE global SET value = 'false' WHERE key = 'coin_distributer_enabled'`)
 	if err != nil {
 		return errors.Wrap(err, "failed to disable coinDistributer")
 	}
@@ -109,4 +48,48 @@ func (cd *coinDistributer) Disable(rooCtx context.Context) error {
 	}
 
 	return nil
+}
+
+func init() {
+	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+}
+
+func MustStartCoinDistribution(ctx context.Context, _ context.CancelFunc) Client {
+	cfg.EnsureValid()
+	eth := mustNewEthClient(ctx, cfg.Ethereum.RPC, cfg.Ethereum.PrivateKey, cfg.Ethereum.ContractAddress)
+
+	cd := mustCreateCoinDistributionFromConfig(ctx, &cfg, eth)
+	cd.MustStart(ctx, nil, nil)
+
+	return cd
+}
+
+func mustCreateCoinDistributionFromConfig(ctx context.Context, conf *config, ethClient ethClient) *coinDistributer {
+	db := storage.MustConnect(ctx, ddl, applicationYamlKey)
+	cd := &coinDistributer{
+		Client:    ethClient,
+		Processor: newCoinProcessor(ethClient, db, conf),
+		Tracker:   newCoinTracker(ethClient, db, conf),
+		DB:        db,
+	}
+
+	return cd
+}
+
+func (cd *coinDistributer) MustStart(ctx context.Context, notifyProcessed chan<- *batch, notifyTracked chan<- []*string) {
+	cd.Tracker.Start(ctx, notifyTracked)
+	cd.Processor.Start(ctx, notifyProcessed)
+}
+
+func (cd *coinDistributer) Close() error {
+	return multierror.Append( //nolint:wrapcheck //.
+		errors.Wrap(cd.Processor.Close(), "failed to close processor"),
+		errors.Wrap(cd.Tracker.Close(), "failed to close tracker"),
+		errors.Wrap(cd.Client.Close(), "failed to close eth client"),
+		errors.Wrap(cd.DB.Close(), "failed to close db"),
+	).ErrorOrNil()
+}
+
+func (cd *coinDistributer) CheckHealth(ctx context.Context) error {
+	return errors.Wrap(cd.DB.Ping(ctx), "[health-check] failed to ping DB")
 }

@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS pending_coin_distributions  (
 
 CREATE INDEX IF NOT EXISTS pending_coin_distributions_worker_number_ix ON pending_coin_distributions (eth_status, (internal_id % 10), created_at ASC);
 CREATE INDEX IF NOT EXISTS pending_coin_distributions_eth_status_tx_ix ON pending_coin_distributions (eth_status, eth_tx);
+CREATE INDEX IF NOT EXISTS pending_coin_distributions_eth_status_ix ON pending_coin_distributions (eth_status);
 
 CREATE TABLE IF NOT EXISTS global (
                     key       text NOT NULL primary key,
