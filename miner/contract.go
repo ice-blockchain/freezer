@@ -46,11 +46,13 @@ const (
 	startRecalculationsFrom = "2023-11-20T14:00:00"
 	timeLayout              = "2006-01-02T15:04:05"
 
-	balanceForTMinusBugfixEnabled       = false
+	// Dry run.
 	balanceForTMinusBugfixDryRunEnabled = true
+	balanceT2BugfixDryRunEnabled        = true
 
-	balanceT2BugfixDryRunEnabled = false
-	balanceT2BugfixEnabled       = true
+	// !!! [CRUCUAL] Real run.
+	balanceForTMinusBugfixEnabled = false
+	balanceT2BugfixEnabled        = false
 
 	clearBugfixDebugInfoEnabled = true
 )
