@@ -50,11 +50,11 @@ const (
 	balanceForTMinusBugfixDryRunEnabled = true
 	balanceT2BugfixDryRunEnabled        = true
 
-	// !!! [CRUCUAL] Real run.
-	balanceForTMinusBugfixEnabled = false
+	// !!! [CRUCUAL] Real run if this is TRUE and DRY RUN false.
+	balanceForTMinusBugfixEnabled = true
 	balanceT2BugfixEnabled        = false
 
-	clearBugfixDebugInfoEnabled = true
+	clearBugfixDebugInfoEnabled = false
 )
 
 // .
