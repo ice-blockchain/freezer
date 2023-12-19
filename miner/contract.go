@@ -47,7 +47,7 @@ const (
 	timeLayout              = "2006-01-02T15:04:05"
 
 	// Dry run.
-	balanceForTMinusBugfixDryRunEnabled = true
+	balanceForTMinusBugfixDryRunEnabled = false
 	balanceT2BugfixDryRunEnabled        = true
 
 	// !!! [CRUCUAL] Real run if this is TRUE and DRY RUN false.
