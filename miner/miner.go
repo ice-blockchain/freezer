@@ -296,6 +296,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						if _, ok := dryRunUsers[usr.ID]; !ok && usr.IDTMinus1 != 0 {
 							userInitialBalanceKeys = append(userInitialBalanceKeys, fmt.Sprint(usr.ID))
 							clickhouseKeysMap[fmt.Sprint(usr.ID)] = struct{}{}
+							idTminus1Key := usr.IDTMinus1
+							if idTminus1Key < 0 {
+								idTminus1Key *= -1
+							}
+							clickhouseKeysMap[fmt.Sprint(idTminus1Key)] = struct{}{}
 						}
 					}
 				}
@@ -313,6 +318,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						if _, ok := recalculatedUsers[usr.ID]; !ok && usr.IDTMinus1 != 0 {
 							userInitialBalanceKeys = append(userInitialBalanceKeys, fmt.Sprint(usr.ID))
 							clickhouseKeysMap[fmt.Sprint(usr.ID)] = struct{}{}
+							idTminus1Key := usr.IDTMinus1
+							if idTminus1Key < 0 {
+								idTminus1Key *= -1
+							}
+							clickhouseKeysMap[fmt.Sprint(idTminus1Key)] = struct{}{}
 						}
 					}
 				}
@@ -339,30 +349,20 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if usr.IDT0 < 0 {
 				t0Referrals[-usr.IDT0] = nil
 			}
-			idTMinus1Key := usr.IDTMinus1
 			if usr.IDTMinus1 > 0 {
 				tMinus1Referrals[usr.IDTMinus1] = nil
 			}
 			if usr.IDTMinus1 < 0 {
 				tMinus1Referrals[-usr.IDTMinus1] = nil
-				idTMinus1Key *= -1
-			}
-			if balanceForTMinusBugfixEnabled {
-				if balanceForTMinusBugfixDryRunEnabled {
-					if _, ok := dryRunUsers[usr.ID]; !ok {
-						clickhouseKeysMap[fmt.Sprint(idTMinus1Key)] = struct{}{}
-					}
-				} else {
-					if _, ok := recalculatedUsers[usr.ID]; !ok {
-						clickhouseKeysMap[fmt.Sprint(idTMinus1Key)] = struct{}{}
-					}
-				}
 			}
 		}
 		for idT0 := range t0Referrals {
 			referralKeys = append(referralKeys, model.SerializedUsersKey(idT0))
 		}
-		if balanceForTMinusBugfixEnabled || balanceForTMinusBugfixDryRunEnabled {
+		for idTMinus1 := range tMinus1Referrals {
+			referralKeys = append(referralKeys, model.SerializedUsersKey(idTMinus1))
+		}
+		if balanceForTMinusBugfixEnabled {
 			var err error
 			if len(clickhouseKeysMap) > 0 {
 				var clickhouseKeys []string
@@ -383,7 +383,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			reqCancel()
 		}
-		if (balanceT2BugfixEnabled || balanceT2BugfixDryRunEnabled) && !balanceForTMinusBugfixEnabled {
+		if balanceT2BugfixEnabled && !balanceForTMinusBugfixEnabled {
 			var err error
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			referralsCollection, t2Referrals, err = m.gatherReferralsInformation(reqCtx, userResults)
@@ -484,7 +484,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					}
 				}
 			}
-			if (balanceT2BugfixEnabled || balanceT2BugfixDryRunEnabled) && !balanceForTMinusBugfixEnabled {
+			if balanceT2BugfixEnabled && !balanceForTMinusBugfixEnabled {
 				balanceT2 := 0.0
 				if referralsT2, ok := t2Referrals[usr.UserID]; ok {
 					for _, ref := range referralsT2 {
@@ -744,7 +744,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				log.Error(err, fmt.Sprintf("can't insert balance tminus1 recalculation dry run information for users:%#v, workerNumber:%v", userResults, workerNumber))
 			}
 		}
-		if balanceT2BugfixDryRunEnabled {
+		if balanceT2BugfixEnabled {
 			if err := m.insertBalanceT2RecalculationDryRunBatch(ctx, balanceT2RecalculationDryRunItems); err != nil {
 				log.Error(err, fmt.Sprintf("can't insert balance t2 recalculation dry run information for users:%#v, workerNumber:%v", userResults, workerNumber))
 			}
