@@ -4,7 +4,6 @@ package miner
 
 import (
 	"context"
-	_ "embed"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
-	storagePG "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -42,28 +40,12 @@ const (
 	applicationYamlKey       = "miner"
 	parentApplicationYamlKey = "tokenomics"
 	requestDeadline          = 30 * stdlibtime.Second
-
-	startRecalculationsFrom = "2023-11-20T14:00:00"
-	timeLayout              = "2006-01-02T15:04:05"
-
-	// Dry run.
-	balanceForTMinusBugfixDryRunEnabled = false
-	balanceT2BugfixDryRunEnabled        = false
-
-	// !!! [CRUCUAL] Real run if this is TRUE and DRY RUN false.
-	balanceForTMinusBugfixEnabled = false
-	balanceT2BugfixEnabled        = false
-
-	clearBugfixDebugInfoEnabled = true
 )
 
 // .
 var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
-
-	//go:embed .testdata/DDL.sql
-	eskimoDDL string
 )
 
 type (
@@ -135,17 +117,6 @@ type (
 		model.DeserializedUsersKey
 	}
 
-	recalculateReferral struct {
-		model.BalanceForTMinus1Field
-		model.UserIDField
-		model.DeserializedUsersKey
-	}
-
-	recalculated struct {
-		model.RecalculatedBalanceForTMinus1AtField
-		model.DeserializedRecalculatedUsersKey
-	}
-
 	referralCountGuardUpdatedUser struct {
 		model.ReferralsCountChangeGuardUpdatedAtField
 		model.DeserializedUsersKey
@@ -156,12 +127,6 @@ type (
 		ID, IDT0, IDTMinus1 int64
 	}
 
-	dryrunUser struct {
-		model.DeserializedDryRunUsersKey
-		model.IDTMinus1Field
-		model.RecalculatedBalanceForTMinus1AtField
-	}
-
 	miner struct {
 		mb                            messagebroker.Client
 		db                            storage.DB
@@ -170,7 +135,6 @@ type (
 		telemetry                     *telemetry
 		wg                            *sync.WaitGroup
 		extraBonusStartDate           *time.Time
-		dbPG                          *storagePG.DB
 		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
 	}
 	config struct {

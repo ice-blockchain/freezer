@@ -299,19 +299,6 @@ type (
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
-	RecalculatedBalanceForTMinus1AtField struct {
-		RecalculatedBalanceForTMinus1At *time.Time `redis:"recalculated_balance_for_tminus1_at,omitempty"`
-	}
-	RecalculatedBalanceT2AtField struct {
-		RecalculatedBalanceT2At *time.Time `redis:"recalculated_balance_t2_at,omitempty"`
-	}
-	DeserializedRecalculatedUsersKey struct {
-		ID int64 `redis:"-"`
-	}
-
-	DeserializedDryRunUsersKey struct {
-		ID int64 `redis:"-"`
-	}
 )
 
 func (k *DeserializedUsersKey) Key() string {
@@ -496,82 +483,4 @@ func (t *TimeSlice) MarshalBinary() ([]byte, error) {
 	}
 
 	return text, nil
-}
-
-func (k *DeserializedRecalculatedUsersKey) Key() string {
-	if k == nil || k.ID == 0 {
-		return ""
-	}
-
-	return SerializedRecalculatedUsersKey(k.ID)
-}
-
-func (k *DeserializedRecalculatedUsersKey) SetKey(val string) {
-	if val == "" || val == "recalculated:" {
-		return
-	}
-	if val[0] == 'r' {
-		val = val[13:]
-	}
-	var err error
-	k.ID, err = strconv.ParseInt(val, 10, 64)
-	log.Panic(err)
-}
-
-func SerializedRecalculatedUsersKey(val any) string {
-	switch typedVal := val.(type) {
-	case string:
-		if typedVal == "" {
-			return ""
-		}
-
-		return "recalculated:" + typedVal
-	case int64:
-		if typedVal == 0 {
-			return ""
-		}
-
-		return "recalculated:" + strconv.FormatInt(typedVal, 10)
-	default:
-		panic(fmt.Sprintf("%#v cannot be used as recalculated key", val))
-	}
-}
-
-func (k *DeserializedDryRunUsersKey) Key() string {
-	if k == nil || k.ID == 0 {
-		return ""
-	}
-
-	return SerializedDryRunUsersKey(k.ID)
-}
-
-func (k *DeserializedDryRunUsersKey) SetKey(val string) {
-	if val == "" || val == "dryrun:" {
-		return
-	}
-	if val[0] == 'd' {
-		val = val[7:]
-	}
-	var err error
-	k.ID, err = strconv.ParseInt(val, 10, 64)
-	log.Panic(err)
-}
-
-func SerializedDryRunUsersKey(val any) string {
-	switch typedVal := val.(type) {
-	case string:
-		if typedVal == "" {
-			return ""
-		}
-
-		return "dryrun:" + typedVal
-	case int64:
-		if typedVal == 0 {
-			return ""
-		}
-
-		return "dryrun:" + strconv.FormatInt(typedVal, 10)
-	default:
-		panic(fmt.Sprintf("%#v cannot be used as dryrun key", val))
-	}
 }
