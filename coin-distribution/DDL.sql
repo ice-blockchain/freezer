@@ -86,20 +86,20 @@ CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup6_ix ON coin_
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_nulls_ix   ON coin_distributions_pending_review (internal_id NULLS FIRST);
 
 CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
-                    reviewed_at               timestamp NOT NULL,
-                    created_at                timestamp         ,
-                    ice                       bigint    NOT NULL,
-                    internal_id               bigint            ,
-                    day                       date      NOT NULL,
-                    review_day                date      NOT NULL,
-                    iceflakes                 uint256           ,
-                    username                  text      NOT NULL,
-                    referred_by_username      text      NOT NULL,
-                    user_id                   text      NOT NULL ,
-                    eth_address               text      NOT NULL,
-                    decision                  text      NOT NULL,
-                    reviewer_user_id          text              ,
-                    PRIMARY KEY(user_id, day, review_day));
+                                                            reviewed_at               timestamp NOT NULL,
+                                                            created_at                timestamp NOT NULL,
+                                                            internal_id               bigint    NOT NULL,
+                                                            ice                       bigint    NOT NULL,
+                                                            day                       date      NOT NULL,
+                                                            review_day                date      NOT NULL,
+                                                            iceflakes                 uint256           ,
+                                                            username                  text      NOT NULL,
+                                                            referred_by_username      text      NOT NULL,
+                                                            user_id                   text      NOT NULL ,
+                                                            eth_address               text      NOT NULL,
+                                                            reviewer_user_id          text      NOT NULL,
+                                                            decision                  text      NOT NULL,
+                                                            PRIMARY KEY(user_id, day, review_day));
 
 create or replace procedure approve_coin_distributions(reviewer_user_id text, nested boolean)
 language plpgsql
@@ -174,7 +174,7 @@ BEGIN
         DELETE FROM coin_distributions_pending_review WHERE internal_id IS NULL RETURNING *
     )
     insert into reviewed_coin_distributions(reviewed_at, created_at, internal_id, ice, day, review_day, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, decision)
-    select now, created_at, internal_id, ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, NULL, 'deny'
+    select now, COALESCE(created_at,to_timestamp(0)), COALESCE(internal_id,0), ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, '', 'deny'
     from del;
 
     IF nested is false THEN
