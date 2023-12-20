@@ -132,23 +132,18 @@ with records as (
 		created_at ASC
 	limit $2
 	for update skip locked
-),
-records_count as (
-	select count(*) as num from records
 )
 update pending_coin_distributions up
 set
 	eth_status = 'PENDING'
 from
-	records,
-	records_count
+	records
 where
-	records_count.num = $2 and
 	up.user_id = records.user_id
 returning up.*
 `
 
-	result, err := storage.Select[batchRecord](ctx, proc.DB, stmt, workerNumber, proc.Conf.BatchSize)
+	result, err := storage.Select[batchRecord](ctx, proc.DB, stmt, workerNumber, batchSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch pending coin distributions")
 	} else if len(result) == 0 {

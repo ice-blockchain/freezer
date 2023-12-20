@@ -98,7 +98,7 @@ const (
 	applicationYamlKey = "coin-distribution"
 	requestDeadline    = 25 * stdlibtime.Second
 
-	batchMaxSizeLimit = 1320
+	batchSize = 1320
 
 	gasLimit         = 300000
 	gasPriceCacheTTL = stdlibtime.Minute
@@ -197,7 +197,6 @@ type (
 		StartHours  int   `yaml:"startHours"  mapstructure:"start-hours"`
 		EndHours    int   `yaml:"endHours"    mapstructure:"end-hours"`
 		Workers     int64 `yaml:"workers"     mapstructure:"workers"`
-		BatchSize   int64 `yaml:"batchSize"   mapstructure:"batch-size"`
 		Development bool  `yaml:"development" mapstructure:"development"`
 	}
 )

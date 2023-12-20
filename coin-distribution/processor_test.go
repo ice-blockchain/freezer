@@ -53,12 +53,11 @@ func helperTruncatePendingTransactions(ctx context.Context, t *testing.T, db *st
 
 func TestBatchPrepareFetch(t *testing.T) { //nolint:paralleltest //.
 	ctx := context.TODO()
-	proc := newCoinProcessor(nil, storage.MustConnect(ctx, ddl, applicationYamlKey), &config{BatchSize: 99})
+	proc := newCoinProcessor(nil, storage.MustConnect(ctx, ddl, applicationYamlKey), &config{})
 	require.NotNil(t, proc)
 	defer proc.Close()
 
 	helperTruncatePendingTransactions(ctx, t, proc.DB)
-	helperAddNewPendingTransaction(ctx, t, proc, 10)
 
 	t.Run("NotEnoughData", func(t *testing.T) { //nolint:paralleltest //.
 		_, err := proc.BatchPrepareFetch(ctx, 1)
@@ -68,7 +67,7 @@ func TestBatchPrepareFetch(t *testing.T) { //nolint:paralleltest //.
 		helperAddNewPendingTransaction(ctx, t, proc, 100)
 		b, err := proc.BatchPrepareFetch(ctx, 1)
 		require.NoError(t, err)
-		require.Len(t, b.Records, int(proc.Conf.BatchSize))
+		require.Len(t, b.Records, 100)
 		for _, r := range b.Records {
 			require.Equal(t, ethApiStatusPending, r.EthStatus)
 		}
@@ -79,7 +78,7 @@ func TestGetGasPrice(t *testing.T) { //nolint:tparallel //.
 	t.Parallel()
 
 	ctx := context.TODO()
-	proc := newCoinProcessor(new(mockedDummyEthClient), nil, &config{BatchSize: 99})
+	proc := newCoinProcessor(new(mockedDummyEthClient), nil, &config{})
 	require.NotNil(t, proc)
 	defer proc.Close()
 
@@ -109,12 +108,12 @@ func TestGetGasPrice(t *testing.T) { //nolint:tparallel //.
 
 func TestProcessorDistributeAccepted(t *testing.T) { //nolint:paralleltest //.
 	ctx := context.TODO()
-	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{BatchSize: 10, Workers: 2})
+	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{Workers: 2})
 	require.NotNil(t, proc)
 	defer proc.Close()
 
 	helperTruncatePendingTransactions(ctx, t, proc.DB)
-	helperAddNewPendingTransaction(ctx, t, proc, 30)
+	helperAddNewPendingTransaction(ctx, t, proc, batchSize*3)
 
 	ch := make(chan *batch, 3)
 	proc.Start(ctx, ch)
@@ -131,7 +130,7 @@ func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
 	ctx := context.TODO()
 	proc := newCoinProcessor(&mockedDummyEthClient{dropErr: errors.New("drop error")}, //nolint:goerr113 //.
 		storage.MustConnect(ctx, ddl, applicationYamlKey),
-		&config{BatchSize: 10, Workers: 2},
+		&config{Workers: 2},
 	)
 	require.NotNil(t, proc)
 	defer proc.Close()

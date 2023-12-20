@@ -33,7 +33,6 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 	conf.Ethereum.ChainID = 5
 	conf.Ethereum.RPC = rpc
 	conf.Ethereum.PrivateKey = privateKey
-	conf.BatchSize = 1
 	conf.Workers = 2
 
 	t.Run("AddPendingEntry", func(t *testing.T) {
@@ -55,6 +54,7 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 
 	cd := mustCreateCoinDistributionFromConfig(context.TODO(), conf, cl)
 	require.NotNil(t, cd)
+	defer cd.Close()
 
 	chBatches := make(chan *batch, 1)
 	chTracker := make(chan []*string, 1)
