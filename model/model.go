@@ -201,7 +201,7 @@ type (
 		BalanceT1Ethereum float64 `redis:"balance_t1_ethereum"`
 	}
 	BalanceT1EthereumPendingField struct {
-		BalanceT1EthereumPending float64 `redis:"balance_t1_ethereum_pending"`
+		BalanceT1EthereumPending *FlexibleFloat64 `redis:"balance_t1_ethereum_pending,omitempty"`
 	}
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
@@ -210,7 +210,7 @@ type (
 		BalanceT2Ethereum float64 `redis:"balance_t2_ethereum"`
 	}
 	BalanceT2EthereumPendingField struct {
-		BalanceT2EthereumPending float64 `redis:"balance_t2_ethereum_pending"`
+		BalanceT2EthereumPending *FlexibleFloat64 `redis:"balance_t2_ethereum_pending,omitempty"`
 	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
@@ -300,6 +300,36 @@ type (
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
 )
+
+type (
+	FlexibleFloat64 float64
+)
+
+func (ff *FlexibleFloat64) UnmarshalBinary(data []byte) error {
+	return ff.UnmarshalText(data)
+}
+
+func (ff *FlexibleFloat64) MarshalBinary() ([]byte, error) {
+	return ff.MarshalText()
+}
+
+func (ff *FlexibleFloat64) MarshalText() ([]byte, error) {
+	if ff == nil {
+		return nil, nil
+	}
+
+	return []byte(fmt.Sprint(*ff)), nil
+}
+
+func (ff *FlexibleFloat64) UnmarshalText(text []byte) error {
+	val, err := strconv.ParseFloat(string(text), 64)
+	if err != nil {
+		return errors.Wrapf(err, "failed to ParseFloat `%v`", text)
+	}
+	*ff = FlexibleFloat64(val)
+
+	return nil
+}
 
 func (k *DeserializedUsersKey) Key() string {
 	if k == nil || k.ID == 0 {

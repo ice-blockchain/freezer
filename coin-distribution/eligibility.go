@@ -3,6 +3,7 @@
 package coindistribution
 
 import (
+	"strings"
 	stdlibtime "time"
 
 	"github.com/ice-blockchain/eskimo/users"
@@ -24,8 +25,7 @@ func CalculateEthereumDistributionICEBalance(
 		return standardBalance
 	}
 
-	//TODO: should this be fractional or natural?
-	return standardBalance / (float64(delta.Nanoseconds()) / float64(ethereumDistributionFrequencyMax.Nanoseconds()))
+	return standardBalance / float64(int64(delta/ethereumDistributionFrequencyMax)+1)
 }
 
 func IsEligibleForEthereumDistribution(
@@ -37,7 +37,7 @@ func IsEligibleForEthereumDistribution(
 	kycState model.KYCState,
 	miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	var countryAllowed bool
-	if _, countryDenied := distributionDeniedCountries[country]; country != "" && !countryDenied {
+	if _, countryDenied := distributionDeniedCountries[strings.ToLower(country)]; country != "" && !countryDenied {
 		countryAllowed = true
 	}
 
@@ -47,6 +47,44 @@ func IsEligibleForEthereumDistribution(
 		CalculateEthereumDistributionICEBalance(standardBalance, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, ethereumDistributionEndDate) >= minEthereumDistributionICEBalanceRequired && //nolint:lll // .
 		model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, miningSessionDuration) >= minMiningStreaksRequired &&
 		kycState.KYCStepPassedCorrectly(users.QuizKYCStep)
+}
+
+//nolint:funlen // .
+func IsEligibleForCoinDistributionNow(id int64,
+	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate *time.Time,
+	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
+	var (
+		reservationIsTodayAndIsOutsideOfFirstCycle, secondReservationIsWithinFirstDistributionCycle bool
+		truncatedLastEthereumCoinDistributionProcessedAt                                            *time.Time
+		ethereumDistributionStartDate                                                               = coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin)          //nolint:lll // .
+		ethereumDistributionDayAfterStartDate                                                       = ethereumDistributionStartDate.Add(ethereumDistributionFrequencyMin)           //nolint:lll // .
+		ethereumDistributionFirstCycleEndDate                                                       = ethereumDistributionDayAfterStartDate.Add(ethereumDistributionFrequencyMax)   //nolint:lll // .
+		userReservedDayForEthereumCoinDistributionIndex                                             = id % int64(ethereumDistributionFrequencyMax/ethereumDistributionFrequencyMin) //nolint:lll // .
+		today                                                                                       = now.Truncate(ethereumDistributionFrequencyMin)
+		neverDoneItBeforeAndTodayIsNotEthereumDistributionStartDateButReservationIsToday            = userReservedDayForEthereumCoinDistributionIndex == int64((today.Sub(ethereumDistributionDayAfterStartDate)%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin) //nolint:lll // .
+	)
+	if !lastEthereumCoinDistributionProcessedAt.IsNil() {
+		truncatedLastEthereumCoinDistributionProcessedAt = time.New(lastEthereumCoinDistributionProcessedAt.Truncate(ethereumDistributionFrequencyMin))
+		reservationIsTodayAndIsOutsideOfFirstCycle = today.Sub(*truncatedLastEthereumCoinDistributionProcessedAt.Time)%ethereumDistributionFrequencyMax == 0                                                                                                                                                              //nolint:lll // .
+		secondReservationIsWithinFirstDistributionCycle = userReservedDayForEthereumCoinDistributionIndex == int64((truncatedLastEthereumCoinDistributionProcessedAt.Add(ethereumDistributionFrequencyMin).Sub(ethereumDistributionDayAfterStartDate)%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin) //nolint:lll // .
+	}
+	switch {
+	case lastEthereumCoinDistributionProcessedAt.IsNil() && today.Equal(ethereumDistributionStartDate):
+		return true
+	case !lastEthereumCoinDistributionProcessedAt.IsNil() && today.Equal(ethereumDistributionStartDate):
+		return false
+	case lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate):
+		return neverDoneItBeforeAndTodayIsNotEthereumDistributionStartDateButReservationIsToday
+	case !lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate):
+		switch {
+		case today.Before(ethereumDistributionFirstCycleEndDate):
+			return secondReservationIsWithinFirstDistributionCycle
+		default:
+			return reservationIsTodayAndIsOutsideOfFirstCycle
+		}
+	default:
+		return false
+	}
 }
 
 func isEthereumAddressValid(ethAddress string) bool {

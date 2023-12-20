@@ -10,6 +10,7 @@ import (
 	stdlibtime "time"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
+	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
@@ -55,6 +56,11 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ExtraBonusStartedAtField
+		model.ReferralsCountChangeGuardUpdatedAtField
+		model.KYCState
+		model.MiningBlockchainAccountAddressField
+		model.CountryField
+		model.UsernameField
 		model.LatestDeviceField
 		model.UserIDField
 		UpdatedUser
@@ -67,7 +73,6 @@ type (
 		model.PreStakingAllocationField
 		model.ExtraBonusField
 		model.UTCOffsetField
-		model.ReferralsCountChangeGuardUpdatedAtField
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
@@ -76,6 +81,11 @@ type (
 		model.ResurrectSoloUsedAtField
 		model.ResurrectT0UsedAtField
 		model.ResurrectTMinus1UsedAtField
+		model.SoloLastEthereumCoinDistributionProcessedAtField
+		model.ForT0LastEthereumCoinDistributionProcessedAtField
+		model.ForTMinus1LastEthereumCoinDistributionProcessedAtField
+		model.BalanceT1EthereumPendingField
+		model.BalanceT2EthereumPendingField
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field
@@ -92,6 +102,12 @@ type (
 		model.BalanceT2Field
 		model.BalanceForT0Field
 		model.BalanceForTMinus1Field
+		model.BalanceSoloEthereumField
+		model.BalanceT0EthereumField
+		model.BalanceT1EthereumField
+		model.BalanceT2EthereumField
+		model.BalanceForT0EthereumField
+		model.BalanceForTMinus1EthereumField
 		model.SlashingRateSoloField
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
@@ -112,9 +128,21 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ResurrectSoloUsedAtField
+		model.SoloLastEthereumCoinDistributionProcessedAtField
 		model.UserIDField
+		model.CountryField
+		model.UsernameField
+		model.MiningBlockchainAccountAddressField
+		model.KYCState
 		model.IDT0Field
 		model.DeserializedUsersKey
+		model.BalanceTotalStandardField
+		model.BalanceSoloEthereumField
+		model.BalanceT0EthereumField
+		model.BalanceT1EthereumField
+		model.BalanceT2EthereumField
+		model.PreStakingAllocationField
+		model.PreStakingBonusField
 	}
 
 	referralCountGuardUpdatedUser struct {
@@ -128,20 +156,30 @@ type (
 	}
 
 	miner struct {
-		mb                            messagebroker.Client
-		db                            storage.DB
-		dwhClient                     dwh.Client
-		cancel                        context.CancelFunc
-		telemetry                     *telemetry
-		wg                            *sync.WaitGroup
-		extraBonusStartDate           *time.Time
-		extraBonusIndicesDistribution map[uint16]map[uint16]uint16
+		coinDistributionStartedSignaler             chan struct{}
+		coinDistributionEndedSignaler               chan struct{}
+		stopCoinDistributionCollectionWorkerManager chan struct{}
+		coinDistributionWorkerMX                    *sync.Mutex
+		coinDistributionRepository                  coindistribution.Repository
+		mb                                          messagebroker.Client
+		db                                          storage.DB
+		dwhClient                                   dwh.Client
+		cancel                                      context.CancelFunc
+		telemetry                                   *telemetry
+		wg                                          *sync.WaitGroup
+		extraBonusStartDate                         *time.Time
+		extraBonusIndicesDistribution               map[uint16]map[uint16]uint16
 	}
 	config struct {
-		disableAdvancedTeam *atomic.Pointer[[]string]
-		tokenomics.Config   `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		Workers             int64                    `yaml:"workers"`
-		BatchSize           int64                    `yaml:"batchSize"`
-		Development         bool                     `yaml:"development"`
+		disableAdvancedTeam               *atomic.Pointer[[]string]
+		coinDistributionCollectorSettings *atomic.Pointer[coindistribution.CollectorSettings]
+		tokenomics.Config                 `mapstructure:",squash"` //nolint:tagliatelle // Nope.
+		EthereumDistributionFrequency     struct {
+			Min stdlibtime.Duration `yaml:"min"`
+			Max stdlibtime.Duration `yaml:"max"`
+		} `yaml:"ethereumDistributionFrequency" mapstructure:"ethereumDistributionFrequency"`
+		Workers     int64 `yaml:"workers"`
+		BatchSize   int64 `yaml:"batchSize"`
+		Development bool  `yaml:"development"`
 	}
 )

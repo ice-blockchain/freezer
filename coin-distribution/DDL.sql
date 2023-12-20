@@ -37,7 +37,14 @@ CREATE TABLE IF NOT EXISTS global (
                     WITH (FILLFACTOR = 70);
 INSERT INTO global (key,value)
             VALUES ('coin_distributer_enabled','true'),
-                   ('coin_collector_enabled','true')
+                   ('coin_collector_enabled','true'),
+                   ('coin_collector_forced_execution','false'),
+                   ('coin_collector_start_date','2023-12-20T10:54:20.657949659Z'),
+                   ('coin_collector_end_date','2024-10-24T10:54:20.657949659Z'),
+                   ('coin_collector_min_mining_streaks_required','0'),
+                   ('coin_collector_start_hour','0'),
+                   ('coin_collector_min_balance_required','0'),
+                   ('coin_collector_denied_countries','')
          ON CONFLICT(key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS coin_distributions_by_earner (

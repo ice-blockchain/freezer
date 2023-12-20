@@ -9,6 +9,8 @@ import (
 	stdlibtime "time"
 
 	"github.com/rcrowley/go-metrics"
+
+	"github.com/ice-blockchain/wintr/log"
 )
 
 func init() {
@@ -16,9 +18,10 @@ func init() {
 }
 
 type telemetry struct {
-	registry metrics.Registry
-	steps    [8]string
-	cfg      config
+	registry        metrics.Registry
+	steps           [9]string
+	currentStepName string
+	cfg             config
 }
 
 func (t *telemetry) mustInit(cfg config) *telemetry {
@@ -28,17 +31,15 @@ func (t *telemetry) mustInit(cfg config) *telemetry {
 	)
 	t.cfg = cfg
 	t.registry = metrics.NewRegistry()
-	t.steps = [8]string{"mine[full iteration]", "mine", "get_users", "get_referrals", "send_messages", "get_history", "insert_history", "update_users"}
+	t.steps = [9]string{"mine[full iteration]", "mine", "get_users", "get_referrals", "send_messages", "get_history", "insert_history", "collect_coin_distributions", "update_users"} //nolint:lll // .
 	for ix := range &t.steps {
 		if ix > 1 {
 			t.steps[ix] = fmt.Sprintf("[%v]mine.%v", ix-1, t.steps[ix])
 		}
-		if err := t.registry.Register(t.steps[ix], metrics.NewCustomTimer(metrics.NewHistogram(metrics.NewExpDecaySample(reservoirSize, decayAlpha)), metrics.NewMeter())); err != nil { //nolint:lll // .
-			panic(err)
-		}
+		log.Panic(t.registry.Register(t.steps[ix], metrics.NewCustomTimer(metrics.NewHistogram(metrics.NewExpDecaySample(reservoirSize, decayAlpha)), metrics.NewMeter()))) //nolint:lll // .
 	}
 
-	go metrics.LogScaled(t.registry, 60*stdlibtime.Minute, stdlibtime.Millisecond, t)
+	go metrics.LogScaled(t.registry, 15*stdlibtime.Minute, stdlibtime.Millisecond, t) //nolint:gomnd // .
 
 	return t
 }
@@ -114,6 +115,10 @@ func (t *telemetry) shouldSynchronizeBalanceFunc(workerNumber, totalBatches, ite
 	}
 }
 
-func (*telemetry) Printf(format string, args ...interface{}) {
-	stdlog.Printf(strings.ReplaceAll(format, "timer ", ""), args...)
+func (t *telemetry) Printf(format string, args ...interface{}) {
+	const prefixMarker = "timer "
+	if strings.HasPrefix(format, prefixMarker) {
+		t.currentStepName = fmt.Sprintf(format[len(prefixMarker):strings.IndexRune(format, '\n')], args...)
+	}
+	stdlog.Printf("["+t.currentStepName+"]"+strings.ReplaceAll(format, prefixMarker, ""), args...)
 }

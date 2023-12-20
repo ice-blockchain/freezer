@@ -52,7 +52,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 						  AND %[1]v
 						ORDER BY %[2]v 
 						LIMIT $2 OFFSET $1`, strings.Join(append(conditions, "1=1"), " AND "), strings.Join(append(arg.orderBy(), "internal_id asc"), ", "))
-	result, err := storage.Select[struct {
+	result, err := storage.ExecMany[struct {
 		*PendingReview
 		Day        stdlibtime.Time
 		InternalID uint64
@@ -71,7 +71,7 @@ func (r *repository) GetCoinDistributionsForReview(ctx context.Context, arg *Get
 					   FROM coin_distributions_pending_review 
 					   WHERE 1=1
 						 AND %[1]v`, strings.Join(append(conditions, "1=1"), " AND "))
-	total, err := storage.Get[struct {
+	total, err := storage.ExecOne[struct {
 		Rows uint64
 		Ice  uint64
 	}](ctx, r.db, sql, whereArgs...)
@@ -172,7 +172,7 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 	switch strings.ToLower(decision) {
 	case "approve":
 		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
-			if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
+			if _, err := storage.ExecOne[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
 				if storage.IsErr(err, storage.ErrNotFound) {
 					err = nil
 				}
@@ -188,7 +188,7 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 		})
 	case "deny":
 		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
-			if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
+			if _, err := storage.ExecOne[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
 				if storage.IsErr(err, storage.ErrNotFound) {
 					err = nil
 				}
@@ -210,6 +210,9 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 }
 
 func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error {
+	if len(records) == 0 {
+		return nil
+	}
 	const columns = 9
 	values := make([]string, 0, len(records))
 	args := make([]any, 0, len(records)*columns)
@@ -229,7 +232,12 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
 																 VALUES %v
 						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
-							SET balance = EXCLUDED.balance`, strings.Join(values, ",\n"))
+							SET 
+								created_at = EXCLUDED.created_at,
+								balance = EXCLUDED.balance,
+								username = EXCLUDED.username,
+								referred_by_username = EXCLUDED.referred_by_username,
+								eth_address = EXCLUDED.eth_address`, strings.Join(values, ",\n"))
 	_, err := storage.Exec(ctx, r.db, sql, args...)
 
 	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner %#v", records)
@@ -246,32 +254,71 @@ func generateValuesSQLParams(index, columns int) string {
 
 func (r *repository) NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error {
 	sql := `INSERT INTO global(key,value) 
-					   VALUES ('latest_collecting_date',$1),
-							  ('new_coin_distributions_pending','true')
+					   VALUES ('coin_collector_latest_collecting_date',$1),
+							  ('new_coin_distributions_pending','true'),
+							  ('coin_collector_forced_execution','false')
 				ON CONFLICT (key) DO UPDATE
 					SET value = EXCLUDED.value`
 	_, err := storage.Exec(ctx, r.db, sql, time.Now().Format(stdlibtime.DateOnly))
 
-	return errors.Wrap(err, "failed to update global.value for latest_collecting_date to now and mark new_coin_distributions_pending")
+	return errors.Wrap(err, "failed to update global.value for coin_collector_latest_collecting_date to now and mark new_coin_distributions_pending")
 }
 
-func (r *repository) GetCollectorStatus(ctx context.Context) (latestCollectingDate *time.Time, collectorEnabled bool, err error) {
-	sql := `SELECT (SELECT value::timestamp FROM global WHERE key = $1) 			AS latest_collecting_date,
-				   coalesce((SELECT value::bool FROM global WHERE key = $2),false) 	AS coin_collector_enabled`
+func (r *repository) GetCollectorSettings(ctx context.Context) (*CollectorSettings, error) {
+	sql := `SELECT (SELECT value::timestamp FROM global WHERE key = $1) 				AS coin_collector_latest_collecting_date,
+				   (SELECT value::timestamp FROM global WHERE key = $2) 				AS coin_collector_start_date,
+				   (SELECT value::timestamp FROM global WHERE key = $3) 				AS coin_collector_end_date,
+				   coalesce((SELECT value::bool FROM global WHERE key = $4),false) 		AS coin_collector_enabled,
+				   coalesce((SELECT value::bool FROM global WHERE key = $5),false) 		AS coin_collector_forced_execution,
+				   coalesce((SELECT value::int FROM global WHERE key = $6),0) 			AS coin_collector_min_mining_streaks_required,
+				   coalesce((SELECT value::int FROM global WHERE key = $7),0) 			AS coin_collector_start_hour,
+				   coalesce((SELECT value::int FROM global WHERE key = $8),0) 			AS coin_collector_min_balance_required,
+				   coalesce((SELECT value FROM global WHERE key = $9),'') 				AS coin_collector_denied_countries`
 	val, err := storage.ExecOne[struct {
-		LatestCollectingDate *time.Time
-		CoinCollectorEnabled bool
-	}](ctx, r.db, sql, "latest_collecting_date", "coin_collector_enabled")
+		CoinCollectorLatestCollectingDate     *time.Time
+		CoinCollectorStartDate                *time.Time
+		CoinCollectorEndDate                  *time.Time
+		CoinCollectorDeniedCountries          string
+		CoinCollectorMinMiningStreaksRequired int
+		CoinCollectorStartHour                int
+		CoinCollectorMinBalanceRequired       int
+		CoinCollectorEnabled                  bool
+		CoinCollectorForcedExecution          bool
+	}](ctx, r.db, sql,
+		"coin_collector_latest_collecting_date",
+		"coin_collector_start_date",
+		"coin_collector_end_date",
+		"coin_collector_enabled",
+		"coin_collector_forced_execution",
+		"coin_collector_min_mining_streaks_required",
+		"coin_collector_start_hour",
+		"coin_collector_min_balance_required",
+		"coin_collector_denied_countries")
 	if err != nil {
-		return nil, false, errors.Wrap(err, "failed to select info about latest_collecting_date, coin_collector_enabled")
+		return nil, errors.Wrap(err, "failed to select info about GetCollectorSettings")
+	}
+	countries := strings.Split(strings.ToLower(val.CoinCollectorDeniedCountries), ",")
+	mappedCountries := make(map[string]struct{}, len(countries))
+	for ix := range countries {
+		mappedCountries[countries[ix]] = struct{}{}
 	}
 
-	return val.LatestCollectingDate, val.CoinCollectorEnabled, nil
+	return &CollectorSettings{
+		DeniedCountries:          mappedCountries,
+		LatestDate:               val.CoinCollectorLatestCollectingDate,
+		StartDate:                val.CoinCollectorStartDate,
+		EndDate:                  val.CoinCollectorEndDate,
+		MinBalanceRequired:       float64(val.CoinCollectorMinBalanceRequired),
+		StartHour:                val.CoinCollectorStartHour,
+		MinMiningStreaksRequired: uint64(val.CoinCollectorMinMiningStreaksRequired),
+		Enabled:                  val.CoinCollectorEnabled,
+		ForcedExecution:          val.CoinCollectorForcedExecution,
+	}, nil
 }
 
 func tryPrepareCoinDistributionsForReview(ctx context.Context, db *storage.DB) error {
 	return storage.DoInTransaction(ctx, db, func(conn storage.QueryExecer) error {
-		if _, err := storage.Get[struct{ Bogus bool }](ctx, conn, "SELECT true AS bogus FROM global WHERE key = 'new_coin_distributions_pending' FOR UPDATE SKIP LOCKED"); err != nil {
+		if _, err := storage.ExecOne[struct{ Bogus bool }](ctx, conn, "SELECT true AS bogus FROM global WHERE key = 'new_coin_distributions_pending' FOR UPDATE SKIP LOCKED"); err != nil {
 			if storage.IsErr(err, storage.ErrNotFound) {
 				err = nil
 			}

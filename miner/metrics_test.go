@@ -172,6 +172,8 @@ func slowTelemetry(workers int64) *telemetry {
 	tel.collectElapsed(4, stdlibtime.Now().Add(-20*stdlibtime.Second))
 	tel.collectElapsed(5, stdlibtime.Now().Add(-10*stdlibtime.Second))
 	tel.collectElapsed(6, stdlibtime.Now().Add(-1*stdlibtime.Second))
+	tel.collectElapsed(7, stdlibtime.Now().Add(-1*stdlibtime.Second))
+	tel.collectElapsed(8, stdlibtime.Now().Add(-1*stdlibtime.Second))
 
 	return tel
 }

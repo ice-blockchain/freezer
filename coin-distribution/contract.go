@@ -27,8 +27,19 @@ type (
 		CheckHealth(ctx context.Context) error
 		ReviewCoinDistributions(ctx context.Context, reviewerUserID string, decision string) error
 		NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error
-		GetCollectorStatus(ctx context.Context) (latestCollectingDate *time.Time, collectorEnabled bool, err error)
+		GetCollectorSettings(ctx context.Context) (*CollectorSettings, error)
 		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
+	}
+	CollectorSettings struct {
+		DeniedCountries          map[string]struct{}
+		LatestDate               *time.Time
+		StartDate                *time.Time
+		EndDate                  *time.Time
+		MinBalanceRequired       float64
+		StartHour                int
+		MinMiningStreaksRequired uint64
+		Enabled                  bool
+		ForcedExecution          bool
 	}
 
 	CoinDistributionsForReview struct {

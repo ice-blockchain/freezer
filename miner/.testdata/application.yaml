@@ -9,3 +9,7 @@ tokenomics:
     max: 24h
   extraBonuses:
     duration: 24h
+miner:
+  ethereumDistributionFrequency:
+    min: 24h
+    max: 672h
