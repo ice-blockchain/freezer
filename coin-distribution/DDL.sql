@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS global (
                     value     text NOT NULL )
                     WITH (FILLFACTOR = 70);
 INSERT INTO global (key,value)
-            VALUES ('coin_distributer_enabled','true'),
-                   ('coin_collector_enabled','true'),
+            VALUES ('coin_distributer_enabled','false'),
+                   ('coin_collector_enabled','false'),
                    ('coin_collector_forced_execution','false'),
                    ('coin_collector_start_date','2023-12-21T00:00:00Z'),
                    ('coin_collector_end_date','2024-10-07T00:00:00Z'),

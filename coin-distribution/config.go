@@ -4,6 +4,7 @@ package coindistribution
 
 import (
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/log"
 )
@@ -22,7 +23,7 @@ func (cfg *config) EnsureValid() {
 		log.Panic("ethereum.privateKey must not be empty")
 	}
 	_, err := crypto.HexToECDSA(cfg.Ethereum.PrivateKey)
-	log.Panic(err, "ethereum.privateKey is invalid") //nolint:revive,nolintlint //.
+	log.Panic(errors.Wrap(err, "ethereum.privateKey is invalid")) //nolint:revive,nolintlint //.
 
 	if cfg.Ethereum.ContractAddress == "" {
 		log.Panic("ethereum.contractAddress must not be empty")

@@ -171,14 +171,14 @@ func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batc
 
 	price, err := proc.GetGasPrice(ctx)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("worker [%v]: batch %v: failed to get gas price", num, data.ID))
+		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to get gas price", num, data.ID))
 
 		return "", err
 	}
 
 	txHash, err := proc.Client.Airdrop(ctx, price, big.NewInt(proc.Conf.Ethereum.ChainID), recipients, amounts)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("worker [%v]: batch %v: failed to run contract", num, data.ID))
+		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to run contract", num, data.ID))
 
 		return "", errors.Wrapf(err, "failed to run contract on batch %v", data.ID)
 	}
@@ -196,11 +196,12 @@ func (proc *coinProcessor) Do(ctx context.Context, num int64) (*batch, error) {
 
 	txHash, err := proc.Distribute(ctx, num, data)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("worker [%v]: failed to distribute batch", num))
-		if err = proc.BatchMarkRejected(ctx, num, data); err != nil {
-			log.Error(errors.Wrapf(err, "worker [%v]: failed to mark batch %v as rejected", num, data.ID))
+		err = errors.Wrapf(err, "worker [%v]: failed to distribute batch", num)
+		log.Error(err)
+		if err2 := proc.BatchMarkRejected(ctx, num, data); err2 != nil {
+			log.Error(errors.Wrapf(err2, "worker [%v]: failed to mark batch %v as rejected", num, data.ID))
 		}
-		proc.MustDisable(ctx)
+		proc.MustDisable(ctx, err.Error())
 
 		return data, err
 	}

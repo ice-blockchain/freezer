@@ -314,6 +314,10 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 	for ctx.Err() == nil {
 		select {
 		case <-m.coinDistributionStartedSignaler:
+			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleStartedSlackMessage(reqCtx),
+				"failed to SendNewCoinDistributionCollectionCycleStartedSlackMessage"))
+			cancel()
 			log.Info("started collecting coin distributions")
 			m.coinDistributionWorkerMX.Lock()
 			workersStarted := int64(1)

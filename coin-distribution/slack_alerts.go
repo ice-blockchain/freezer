@@ -7,22 +7,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	stdlibtime "time"
 
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
 )
-
-func (r *repository) sendNewCoinDistributionsAvailableForReviewSlackMessage(ctx context.Context) error {
-	text := fmt.Sprintf(":eyes:`%v` <%v|new coin distributions are available for review> :eyes:", r.cfg.Environment, r.cfg.ReviewURL)
-
-	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
-}
-
-func sendNewCoinDistributionsAvailableForReviewSlackMessage(ctx context.Context) error {
-	text := fmt.Sprintf(":eyes:`%v` <%v|new coin distributions are available for review> :eyes:", cfg.Environment, cfg.ReviewURL)
-
-	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
-}
 
 func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":white_check_mark:`%v` current pending coin distributions are approved and are going to be processed as soon as the coin-distributer comes online :white_check_mark:", r.cfg.Environment) //nolint:lll // .
@@ -36,8 +25,38 @@ func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreDeniedSlac
 	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
+func sendNewCoinDistributionsAvailableForReviewSlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":eyes:`%v` <%v|new coin distributions are available for review> :eyes:", cfg.Environment, cfg.ReviewURL)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func SendNewCoinDistributionCollectionCycleStartedSlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":money_mouth_face:`%v` started to collect coins for ethereum distribution :money_mouth_face:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func sendCoinDistributerIsNowOnlineSlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":sun_with_face:`%v` coin distributer is now online :sun_with_face:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func sendCoinDistributerIsNowOfflineSlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":sleeping:`%v` coin distributer is now offline :sleeping:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
 func sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":rocket:`%v` all pending coin distributions have been processed successfully :rocket:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":tada:`%v` all coin distributions have been committed successfully in ethereum :tada:", cfg.Environment)
 
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
@@ -48,7 +67,6 @@ func sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
-//nolint:funlen // .
 func sendSlackMessage(ctx context.Context, text, alertSlackWebhook string) error {
 	message := struct {
 		Text string `json:"text,omitempty"`
@@ -64,7 +82,14 @@ func sendSlackMessage(ctx context.Context, text, alertSlackWebhook string) error
 		return errors.Wrap(err, "newRequestWithContext failed")
 	}
 
-	resp, err := new(http.Client).Do(req)
+	const retries = 10
+	var resp *http.Response
+	for ix := 0; ix < retries; ix++ {
+		if resp, err = new(http.Client).Do(req); err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		stdlibtime.Sleep(stdlibtime.Second)
+	}
 	if err != nil {
 		return errors.Wrap(err, "slack webhook request failed")
 	}
