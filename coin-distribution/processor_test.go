@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"os"
 	"testing"
 	stdlibtime "time"
 
@@ -14,6 +15,13 @@ import (
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/time"
 )
+
+func maybeSkipTest(t *testing.T) {
+	run := os.Getenv("TEST_RUN_WITH_DATABASE")
+	if run != "yes" {
+		t.Skip("TEST_RUN_WITH_DATABASE is not set to 'yes'")
+	}
+}
 
 func RandStringBytes(n int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -52,6 +60,7 @@ func helperTruncatePendingTransactions(ctx context.Context, t *testing.T, db *st
 }
 
 func TestBatchPrepareFetch(t *testing.T) { //nolint:paralleltest //.
+	maybeSkipTest(t)
 	ctx := context.TODO()
 	proc := newCoinProcessor(nil, storage.MustConnect(ctx, ddl, applicationYamlKey), &config{})
 	require.NotNil(t, proc)
@@ -107,6 +116,7 @@ func TestGetGasPrice(t *testing.T) { //nolint:tparallel //.
 }
 
 func TestProcessorDistributeAccepted(t *testing.T) { //nolint:paralleltest //.
+	maybeSkipTest(t)
 	ctx := context.TODO()
 	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{Workers: 2})
 	require.NotNil(t, proc)
@@ -127,6 +137,7 @@ func TestProcessorDistributeAccepted(t *testing.T) { //nolint:paralleltest //.
 }
 
 func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
+	maybeSkipTest(t)
 	ctx := context.TODO()
 	proc := newCoinProcessor(&mockedDummyEthClient{dropErr: errors.New("drop error")}, //nolint:goerr113 //.
 		storage.MustConnect(ctx, ddl, applicationYamlKey),

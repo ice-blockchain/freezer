@@ -15,6 +15,8 @@ import (
 func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 	const testUserName = "testUser"
 
+	maybeSkipTest(t)
+
 	rpc, privateKey, contractAddr, targetAddr :=
 		os.Getenv("TEST_ETH_ENDPOINT_RPC"),
 		os.Getenv("TEST_ETH_PRIVATE_KEY"),
