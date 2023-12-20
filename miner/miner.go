@@ -171,7 +171,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				m.coinDistributionEndedSignaler <- struct{}{}
 				m.coinDistributionWorkerMX.Lock()
 				m.coinDistributionWorkerMX.Unlock()
-				startedCoinDistributionCollecting = true
+				startedCoinDistributionCollecting = false
 			}
 			lastIterationStartedAt = time.Now()
 			iteration++
