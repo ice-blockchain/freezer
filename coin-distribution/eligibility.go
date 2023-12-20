@@ -6,6 +6,8 @@ import (
 	"strings"
 	stdlibtime "time"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/time"
@@ -14,6 +16,16 @@ import (
 const (
 	miningSessionSoloEndedAtNetworkDelayAdjustment = 20 * stdlibtime.Second
 )
+
+func IsCoinDistributionCollectorEnabled(now *time.Time, ethereumDistributionFrequencyMin stdlibtime.Duration, cs *CollectorSettings) bool {
+	return cs.Enabled &&
+		(cs.ForcedExecution ||
+			(now.Hour() >= cs.StartHour &&
+				now.After(*cs.StartDate.Time) &&
+				now.Before(*cs.EndDate.Time) &&
+				(cs.LatestDate.IsNil() ||
+					!now.Truncate(ethereumDistributionFrequencyMin).Equal(cs.LatestDate.Truncate(ethereumDistributionFrequencyMin)))))
+}
 
 func CalculateEthereumDistributionICEBalance(
 	standardBalance float64,
@@ -50,7 +62,7 @@ func IsEligibleForEthereumDistribution(
 }
 
 //nolint:funlen // .
-func IsEligibleForCoinDistributionNow(id int64,
+func IsEligibleForEthereumDistributionNow(id int64,
 	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate *time.Time,
 	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	var (
@@ -95,5 +107,5 @@ func isEthereumAddressValid(ethAddress string) bool {
 		return true
 	}
 
-	return true
+	return common.IsHexAddress(ethAddress)
 }

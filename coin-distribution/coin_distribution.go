@@ -24,7 +24,7 @@ func (d *databaseConfig) MustDisable(ctx context.Context) {
 func (d *databaseConfig) IsEnabled(ctx context.Context) bool {
 	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
-	val, err := storage.Get[struct {
+	val, err := storage.ExecOne[struct {
 		Enabled bool
 	}](reqCtx, d.DB, `SELECT value::bool as enabled FROM global WHERE key = 'coin_distributer_enabled'`)
 	if err != nil {
@@ -60,6 +60,8 @@ func MustStartCoinDistribution(ctx context.Context, _ context.CancelFunc) Client
 
 	cd := mustCreateCoinDistributionFromConfig(ctx, &cfg, eth)
 	cd.MustStart(ctx, nil, nil)
+
+	go startPrepareCoinDistributionsForReviewMonitor(ctx, cd.DB)
 
 	return cd
 }

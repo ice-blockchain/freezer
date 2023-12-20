@@ -143,7 +143,7 @@ where
 returning up.*
 `
 
-	result, err := storage.Select[batchRecord](ctx, proc.DB, stmt, workerNumber, batchSize)
+	result, err := storage.ExecMany[batchRecord](ctx, proc.DB, stmt, workerNumber, batchSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch pending coin distributions")
 	} else if len(result) == 0 {

@@ -40,8 +40,8 @@ INSERT INTO global (key,value)
             VALUES ('coin_distributer_enabled','true'),
                    ('coin_collector_enabled','true'),
                    ('coin_collector_forced_execution','false'),
-                   ('coin_collector_start_date','2023-12-20T10:54:20.657949659Z'),
-                   ('coin_collector_end_date','2024-10-24T10:54:20.657949659Z'),
+                   ('coin_collector_start_date','2023-12-21T00:00:00Z'),
+                   ('coin_collector_end_date','2024-10-07T00:00:00Z'),
                    ('coin_collector_min_mining_streaks_required','0'),
                    ('coin_collector_start_hour','0'),
                    ('coin_collector_min_balance_required','0'),
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS coin_distributions_by_earner (
                     WITH (FILLFACTOR = 70);
 
 CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
-                    created_at                timestamp NOT NULL,
-                    internal_id               bigint    NOT NULL,
+                    created_at                timestamp ,
+                    internal_id               bigint    ,
                     ice                       bigint    NOT NULL,
                     day                       date      NOT NULL,
                     iceflakes                 uint256           ,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
                     eth_address               text      NOT NULL,
                     PRIMARY KEY(day, user_id));
 
-CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_internal_id_ix ON coin_distributions_pending_review (internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_internal_id_ix ON coin_distributions_pending_review (internal_id NULLS FIRST);
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_created_at_ix ON coin_distributions_pending_review (created_at);
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_ice_ix ON coin_distributions_pending_review (ice);
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_username_ix ON coin_distributions_pending_review (username);
@@ -150,6 +150,7 @@ language plpgsql
     as $$
 declare
          zeros text := '0000000000000000';
+         now timestamp := current_timestamp;
 BEGIN
     delete from coin_distributions_by_earner WHERE balance = 0;
 
@@ -159,7 +160,7 @@ BEGIN
                    min (created_at) filter ( where user_id=earner_user_id )  AS created_at,
                    min (internal_id) filter ( where user_id=earner_user_id )  AS internal_id,
                    sum(balance) AS ice,
-                   min (day) filter ( where user_id=earner_user_id ) AS day,
+                   COALESCE(min (day) filter ( where user_id=earner_user_id ),to_timestamp(0)::date) AS day,
                    string_agg(username,'') AS username,
                    string_agg(referred_by_username,'') AS referred_by_username,
                    user_id,
@@ -168,6 +169,13 @@ BEGIN
                 group by day,user_id) AS X;
 
     delete from coin_distributions_by_earner where 1=1;
+
+    WITH del as (
+       DELETE FROM coin_distributions_pending_review WHERE internal_id IS NULL RETURNING *
+    )
+    insert into reviewed_coin_distributions(reviewed_at, created_at, internal_id, ice, day, review_day, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, decision)
+    select now, COALESCE(created_at,to_timestamp(0)), COALESCE(internal_id,0), ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, 'system', 'deny due to incomplete data'
+    from del;
 
     IF nested is false THEN
         commit;

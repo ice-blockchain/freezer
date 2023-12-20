@@ -33,7 +33,7 @@ func (ref *referral) isEligibleForSelfForEthereumDistribution(now *time.Time) bo
 
 	return ref != nil &&
 		ref.ID != 0 &&
-		coindistribution.IsEligibleForCoinDistributionNow(
+		coindistribution.IsEligibleForEthereumDistributionNow(
 			ref.ID,
 			now,
 			ref.SoloLastEthereumCoinDistributionProcessedAt,
@@ -84,7 +84,7 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 
 	return u != nil &&
 		u.ID != 0 &&
-		coindistribution.IsEligibleForCoinDistributionNow(
+		coindistribution.IsEligibleForEthereumDistributionNow(
 			u.ID,
 			now,
 			u.SoloLastEthereumCoinDistributionProcessedAt,
@@ -111,7 +111,7 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time) bool {
 	return u != nil &&
 		u.ID != 0 &&
-		coindistribution.IsEligibleForCoinDistributionNow(
+		coindistribution.IsEligibleForEthereumDistributionNow(
 			u.ID,
 			now,
 			u.ForT0LastEthereumCoinDistributionProcessedAt,
@@ -124,7 +124,7 @@ func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time) bool {
 func (u *user) isEligibleForTMinus1ForEthereumDistribution(now *time.Time) bool {
 	return u != nil &&
 		u.ID != 0 &&
-		coindistribution.IsEligibleForCoinDistributionNow(
+		coindistribution.IsEligibleForEthereumDistributionNow(
 			u.ID,
 			now,
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt,
@@ -305,14 +305,7 @@ func (u *user) processEthereumCoinDistributionForForTMinus1(tMinus1 *referral, n
 }
 
 func isCoinDistributionCollectorEnabled(now *time.Time) bool {
-	coinDistributionCollectorSettings := cfg.coinDistributionCollectorSettings.Load()
-
-	return coinDistributionCollectorSettings.Enabled &&
-		(coinDistributionCollectorSettings.ForcedExecution ||
-			(now.Hour() >= coinDistributionCollectorSettings.StartHour &&
-				now.After(*coinDistributionCollectorSettings.StartDate.Time) &&
-				(coinDistributionCollectorSettings.LatestDate.IsNil() ||
-					!now.Truncate(cfg.EthereumDistributionFrequency.Min).Equal(coinDistributionCollectorSettings.LatestDate.Truncate(cfg.EthereumDistributionFrequency.Min)))))
+	return coindistribution.IsCoinDistributionCollectorEnabled(now, cfg.EthereumDistributionFrequency.Min, cfg.coinDistributionCollectorSettings.Load())
 }
 
 func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context) {

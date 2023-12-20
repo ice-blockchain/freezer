@@ -176,7 +176,7 @@ limit $1
 offset $2
 `
 
-	rows, err := storage.Select[string](ctx, ct.DB, stmt, limit, offset)
+	rows, err := storage.ExecMany[string](ctx, ct.DB, stmt, limit, offset)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch transactions")
 	} else if len(rows) == 0 {
