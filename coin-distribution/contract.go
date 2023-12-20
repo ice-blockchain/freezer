@@ -185,19 +185,19 @@ type (
 		db  *storage.DB
 	}
 	config struct {
-		AlertSlackWebhook string `yaml:"alert-slack-webhook" mapstructure:"alert-slack-webhook"` //nolint:tagliatelle,tagalign // .
-		Environment       string `yaml:"environment" mapstructure:"environment"`                 //nolint:tagalign // .
-		ReviewURL         string `yaml:"review-url"  mapstructure:"review-url"`                  //nolint:tagliatelle,tagalign // .
+		AlertSlackWebhook string `yaml:"alert-slack-webhook" mapstructure:"alert-slack-webhook"`
+		Environment       string `yaml:"environment"         mapstructure:"environment"`
+		ReviewURL         string `yaml:"review-url"          mapstructure:"review-url"`
 		Ethereum          struct {
-			RPC             string `yaml:"rpc"             mapstructure:"rpc"`             //nolint:tagalign // .
-			PrivateKey      string `yaml:"privateKey"      mapstructure:"privateKey"`      //nolint:tagalign // .
-			ContractAddress string `yaml:"contractAddress" mapstructure:"contractAddress"` //nolint:tagalign // .
-			ChainID         int64  `yaml:"chainId"         mapstructure:"chainId"`         //nolint:tagalign // .
+			RPC             string `yaml:"rpc"             mapstructure:"rpc"`
+			PrivateKey      string `yaml:"privateKey"      mapstructure:"private-key"`
+			ContractAddress string `yaml:"contractAddress" mapstructure:"contract-address"`
+			ChainID         int64  `yaml:"chainId"         mapstructure:"chain-id"`
 		} `yaml:"ethereum" mapstructure:"ethereum"`
-		StartHours  int   `yaml:"startHours"  mapstructure:"startHours"`  //nolint:tagalign // .
-		EndHours    int   `yaml:"endHours"    mapstructure:"endHours"`    //nolint:tagalign // .
-		Workers     int64 `yaml:"workers"     mapstructure:"workers"`     //nolint:tagalign // .
-		BatchSize   int64 `yaml:"batchSize"   mapstructure:"batchSize"`   //nolint:tagalign // .
-		Development bool  `yaml:"development" mapstructure:"development"` //nolint:tagalign // .
+		StartHours  int   `yaml:"startHours"  mapstructure:"start-hours"`
+		EndHours    int   `yaml:"endHours"    mapstructure:"end-hours"`
+		Workers     int64 `yaml:"workers"     mapstructure:"workers"`
+		BatchSize   int64 `yaml:"batchSize"   mapstructure:"batch-size"`
+		Development bool  `yaml:"development" mapstructure:"development"`
 	}
 )

@@ -37,6 +37,7 @@ func (proc *coinProcessor) Start(ctx context.Context, notify chan<- *batch) {
 	log.Info(fmt.Sprintf("starting [%d] worker(s) ...", proc.Conf.Workers))
 
 	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
+		log.Info(fmt.Sprintf("starting worker [%v]", workerNumber))
 		go func(wn int64) {
 			defer proc.WG.Done()
 			proc.Worker(ctx, notify, wn)
@@ -67,7 +68,7 @@ func (proc *coinProcessor) GetGasPrice(ctx context.Context) (value *big.Int, err
 			break
 		}
 
-		log.Error(err, fmt.Sprintf("failed to get gas price (attempt %v of %v)", attempt, retryAttempts))
+		log.Error(errors.Wrapf(err, "failed to get gas price (attempt %v of %v)", attempt, retryAttempts))
 		stdlibtime.Sleep(stdlibtime.Second)
 	}
 
@@ -202,7 +203,7 @@ func (proc *coinProcessor) Do(ctx context.Context, num int64) (*batch, error) {
 	if err != nil {
 		log.Error(err, fmt.Sprintf("worker [%v]: failed to distribute batch", num))
 		if err = proc.BatchMarkRejected(ctx, num, data); err != nil {
-			log.Error(err, fmt.Sprintf("worker [%v]: failed to mark batch %v as rejected", num, data.ID))
+			log.Error(errors.Wrapf(err, "worker [%v]: failed to mark batch %v as rejected", num, data.ID))
 		}
 		proc.MustDisable(ctx)
 
@@ -210,7 +211,7 @@ func (proc *coinProcessor) Do(ctx context.Context, num int64) (*batch, error) {
 	}
 
 	if err = proc.BatchMarkAccepted(ctx, num, data, txHash); err != nil {
-		log.Error(err, fmt.Sprintf("worker [%v]: failed to mark batch %v as accepted", num, data.ID))
+		log.Error(errors.Wrapf(err, "worker [%v]: failed to mark batch %v as accepted", num, data.ID))
 
 		return data, err
 	}
@@ -232,7 +233,7 @@ func sendNotify[DataType any, DestType chan<- DataType](dest DestType, data Data
 func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num int64) { //nolint:funlen //.
 	const tickInternal = stdlibtime.Second * 30
 
-	log.Info(fmt.Sprintf("starting worker [%v] with internal %s", num, tickInternal))
+	log.Info(fmt.Sprintf("started worker [%v] with internal %s", num, tickInternal))
 	defer log.Info(fmt.Sprintf("worker [%v]: stopped", num))
 
 	ticker := stdlibtime.NewTicker(tickInternal)
@@ -276,7 +277,7 @@ func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num
 			}
 			if err != nil {
 				if !errors.Is(err, errNotEnoughData) {
-					log.Error(err, fmt.Sprintf("worker [%v]: failed to process batch %v", num, data.ID))
+					log.Error(errors.Wrapf(err, "worker [%v]: failed to process batch %v", num, data.ID))
 				}
 
 				continue
@@ -290,11 +291,23 @@ func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num
 	}
 }
 
-func (proc *coinProcessor) isBlocked() bool {
-	currentHour := time.Now().Hour() + 1
+// isInTimeWindow checks if current hour is in time window [startHour, endHour].
+func isInTimeWindow(currentHour, startHour, endHour int) bool {
+	for _, v := range []int{currentHour, startHour, endHour} {
+		if v < 0 || v > 23 {
+			log.Panic(fmt.Sprintf("invalid hour: %v", v))
+		}
+	}
 
-	return (proc.Conf.StartHours < proc.Conf.EndHours && (currentHour < proc.Conf.StartHours || currentHour > proc.Conf.EndHours)) ||
-		(proc.Conf.StartHours > proc.Conf.EndHours && (currentHour < proc.Conf.StartHours && currentHour > proc.Conf.EndHours))
+	if startHour < endHour {
+		return currentHour >= startHour && currentHour <= endHour
+	}
+
+	return currentHour >= startHour || currentHour <= endHour
+}
+
+func (proc *coinProcessor) isBlocked() bool {
+	return !isInTimeWindow(time.Now().Hour(), proc.Conf.StartHours, proc.Conf.EndHours)
 }
 
 func (proc *coinProcessor) Close() error {

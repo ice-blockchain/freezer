@@ -4,10 +4,8 @@ package coindistribution
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution/internal"
 	"github.com/ice-blockchain/wintr/log"
@@ -25,13 +24,13 @@ import (
 
 func mustNewEthClient(ctx context.Context, endpoint, privateKey, contract string) *ethClientImpl {
 	key, err := crypto.HexToECDSA(privateKey)
-	log.Panic(err, "failed to parse private key") //nolint:revive,nolintlint //.
+	log.Panic(errors.Wrap(err, "failed to parse private key")) //nolint:revive,nolintlint //.
 
 	rpcClient, err := ethclient.DialContext(ctx, endpoint)
-	log.Panic(err, "failed to connect to ethereum RPC") //nolint:revive,nolintlint //.
+	log.Panic(errors.Wrap(err, "failed to connect to ethereum RPC")) //nolint:revive,nolintlint //.
 
 	distributor, err := coindistribution.NewCoindistribution(common.HexToAddress(contract), rpcClient)
-	log.Panic(err, "failed to create contract instance") //nolint:revive,nolintlint //.
+	log.Panic(errors.Wrap(err, "failed to create contract instance")) //nolint:revive,nolintlint //.
 
 	return &ethClientImpl{
 		RPC:        rpcClient,
@@ -50,7 +49,7 @@ func maybeRetryRPCRequest[T any](ctx context.Context, fn func() (T, error)) (val
 			return val, nil
 		}
 
-		log.Error(err, "failed to call ethereum RPC (attempt "+strconv.Itoa(attempt)+")")
+		log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v)", attempt))
 		if errors.As(err, &httpErr) {
 			switch httpErr.StatusCode {
 			case http.StatusInternalServerError, http.StatusTooManyRequests:
@@ -82,7 +81,7 @@ func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []
 
 func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, chanID *big.Int) *bind.TransactOpts {
 	opts, err := bind.NewKeyedTransactorWithChainID(ec.Key, chanID)
-	log.Panic(err, "failed to create transaction options") //nolint:revive,nolintlint //.
+	log.Panic(errors.Wrap(err, "failed to create transaction options")) //nolint:revive,nolintlint //.
 	opts.Context = ctx
 	opts.Value = big.NewInt(0)
 	opts.GasLimit = gasLimit

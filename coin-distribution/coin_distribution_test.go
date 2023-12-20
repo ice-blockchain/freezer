@@ -60,6 +60,7 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 	chTracker := make(chan []*string, 1)
 	cd.MustStart(context.TODO(), chBatches, chTracker)
 
+	t.Logf("waiting for batch to be processed")
 	var processedBatch *batch
 	for {
 		select {

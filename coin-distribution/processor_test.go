@@ -154,3 +154,28 @@ func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
 	default:
 	}
 }
+
+func TestIsInTimeWindow(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, isInTimeWindow(10, 10, 22))
+	require.True(t, isInTimeWindow(23, 22, 6))
+	require.True(t, isInTimeWindow(6, 22, 6))
+	require.True(t, isInTimeWindow(0, 22, 6))
+	require.False(t, isInTimeWindow(17, 22, 6))
+	require.False(t, isInTimeWindow(23, 10, 22))
+	require.False(t, isInTimeWindow(9, 10, 22))
+	require.True(t, isInTimeWindow(2, 0, 23))
+	require.True(t, isInTimeWindow(0, 0, 0))
+	require.True(t, isInTimeWindow(1, 0, 0))
+
+	require.Panics(t, func() {
+		isInTimeWindow(24, 0, 0)
+	})
+	require.Panics(t, func() {
+		isInTimeWindow(0, -1, 0)
+	})
+	require.Panics(t, func() {
+		isInTimeWindow(0, 0, 24)
+	})
+}

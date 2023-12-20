@@ -16,7 +16,7 @@ import (
 
 func (d *databaseConfig) MustDisable(ctx context.Context) {
 	for err := d.Disable(ctx); err != nil; err = d.Disable(ctx) {
-		log.Error(err, "failed to disable coinDistributer")
+		log.Error(errors.Wrap(err, "failed to disable coinDistributer"))
 		stdlibtime.Sleep(stdlibtime.Millisecond)
 	}
 }

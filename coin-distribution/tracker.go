@@ -124,7 +124,7 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 
 		case <-signals:
 			if err := ct.Do(ctx, notify); err != nil {
-				log.Error(err, "failed to check accepted transactions")
+				log.Error(errors.Wrap(err, "failed to check accepted transactions"))
 			}
 		}
 	}
@@ -148,7 +148,7 @@ func (ct *coinTracker) Do(ctx context.Context, notify chan<- []*string) error {
 		ct.Workers.Submit(func() {
 			err = ct.ProcessTransactionsHashes(ctx, hashes)
 			if err != nil {
-				log.Error(err, "failed to process transactions")
+				log.Error(errors.Wrap(err, "failed to process transactions"))
 
 				return
 			}
