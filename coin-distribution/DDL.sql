@@ -61,9 +61,9 @@ CREATE TABLE IF NOT EXISTS coin_distributions_by_earner (
                     WITH (FILLFACTOR = 70);
 
 CREATE TABLE IF NOT EXISTS coin_distributions_pending_review  (
-                    created_at                timestamp NOT NULL,
-                    internal_id               bigint    NOT NULL,
+                    created_at                timestamp         ,
                     ice                       bigint    NOT NULL,
+                    internal_id               bigint            ,
                     day                       date      NOT NULL,
                     iceflakes                 uint256           ,
                     username                  text      NOT NULL,
@@ -83,12 +83,13 @@ CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup3_ix ON coin_
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup4_ix ON coin_distributions_pending_review (ice,username,internal_id);
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup5_ix ON coin_distributions_pending_review (referred_by_username,internal_id);
 CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_lookup6_ix ON coin_distributions_pending_review (ice,referred_by_username,internal_id);
+CREATE INDEX IF NOT EXISTS coin_distributions_pending_review_nulls_ix   ON coin_distributions_pending_review (internal_id NULLS FIRST);
 
 CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     reviewed_at               timestamp NOT NULL,
-                    created_at                timestamp NOT NULL,
-                    internal_id               bigint    NOT NULL,
+                    created_at                timestamp         ,
                     ice                       bigint    NOT NULL,
+                    internal_id               bigint            ,
                     day                       date      NOT NULL,
                     review_day                date      NOT NULL,
                     iceflakes                 uint256           ,
@@ -96,8 +97,8 @@ CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     referred_by_username      text      NOT NULL,
                     user_id                   text      NOT NULL ,
                     eth_address               text      NOT NULL,
-                    reviewer_user_id          text      NOT NULL,
                     decision                  text      NOT NULL,
+                    reviewer_user_id          text              ,
                     PRIMARY KEY(user_id, day, review_day));
 
 create or replace procedure approve_coin_distributions(reviewer_user_id text, nested boolean)
@@ -149,6 +150,7 @@ language plpgsql
     as $$
 declare
          zeros text := '0000000000000000';
+         now timestamp := current_timestamp;
 BEGIN
     delete from coin_distributions_by_earner WHERE balance = 0;
 
@@ -158,7 +160,7 @@ BEGIN
                    min (created_at) filter ( where user_id=earner_user_id )  AS created_at,
                    min (internal_id) filter ( where user_id=earner_user_id )  AS internal_id,
                    sum(balance) AS ice,
-                   min (day) filter ( where user_id=earner_user_id ) AS day,
+                   COALESCE(min (day) filter ( where user_id=earner_user_id ),to_timestamp(0)::date) AS day,
                    string_agg(username,'') AS username,
                    string_agg(referred_by_username,'') AS referred_by_username,
                    user_id,
@@ -167,6 +169,13 @@ BEGIN
                 group by day,user_id) AS X;
 
     delete from coin_distributions_by_earner where 1=1;
+
+    WITH del as (
+        DELETE FROM coin_distributions_pending_review WHERE internal_id IS NULL RETURNING *
+    )
+    insert into reviewed_coin_distributions(reviewed_at, created_at, internal_id, ice, day, review_day, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, decision)
+    select now, created_at, internal_id, ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, NULL, 'deny'
+    from del;
 
     IF nested is false THEN
         commit;
