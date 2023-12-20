@@ -50,6 +50,14 @@ checkIfAllDependenciesAreUpToDate: updateAllDependencies
 	fi; \
 	true;
 
+checkIfERC20ContractIsUpToDate:
+	$(MAKE) -C coin-distribution/internal refresh TOKEN=$(TOKEN)
+	@if git status --porcelain | grep -q coin-distribution/internal/ice_token.go; then \
+		echo "Outdated ERC contract detected. Please update it and make sure everything works correctly and tests pass then commit the changes."; \
+		exit 1; \
+	fi; \
+	true;
+
 generate-swagger:
 	swag init --parseDependency --parseInternal -d ${SERVICE} -g $(shell echo "$${SERVICE##*/}" | sed 's/-/_/g').go -o ${SERVICE}/api;
 

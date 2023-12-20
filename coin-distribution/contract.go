@@ -4,10 +4,19 @@ package coindistribution
 
 import (
 	"context"
+	"crypto/ecdsa"
 	_ "embed"
+	"errors"
 	"io"
+	"math/big"
 	"sync"
 	stdlibtime "time"
+
+	"github.com/alitto/pond"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/time"
@@ -88,6 +97,18 @@ type (
 const (
 	applicationYamlKey = "coin-distribution"
 	requestDeadline    = 25 * stdlibtime.Second
+
+	batchSize = 1320
+
+	gasLimit         = 300000
+	gasPriceCacheTTL = stdlibtime.Minute
+
+	ethApiStatusPending  ethApiStatus = "PENDING"
+	ethApiStatusAccepted ethApiStatus = "ACCEPTED"
+	ethApiStatusRejected ethApiStatus = "REJECTED"
+
+	ethTxStatusSuccessful ethTxStatus = "SUCCESSFUL"
+	ethTxStatusFailed     ethTxStatus = "FAILED"
 )
 
 // .
@@ -95,27 +116,87 @@ var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
 	//go:embed DDL.sql
-	ddl string
+	ddl              string
+	errNotEnoughData = errors.New("not enough data")
 )
 
 type (
+	ethTxStatus  string
+	ethApiStatus string
+	ethClient    interface {
+		SuggestGasPrice(ctx context.Context) (*big.Int, error)
+		TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error)
+		Airdrop(ctx context.Context, gasPrice, chanID *big.Int, recipients []common.Address, amounts []*big.Int) (string, error)
+		io.Closer
+	}
+	airDropper interface {
+		AirdropToWallets(opts *bind.TransactOpts, recipients []common.Address, amounts []*big.Int) (*types.Transaction, error)
+	}
+	batchRecord struct {
+		CreatedAt  *time.Time   `db:"created_at"`
+		Day        *time.Time   `db:"day"`
+		EthTX      *string      `db:"eth_tx"`
+		UserID     string       `db:"user_id"`
+		EthAddress string       `db:"eth_address"`
+		EthStatus  ethApiStatus `db:"eth_status"`
+		Iceflakes  string       `db:"iceflakes"`
+		InternalID int64        `db:"internal_id"`
+	}
+	batch struct {
+		ID      string
+		Records []*batchRecord
+	}
+	databaseConfig struct {
+		DB *storage.DB
+	}
+	coinTracker struct {
+		*databaseConfig
+		Client       ethClient
+		Conf         *config
+		Workers      *pond.WorkerPool
+		CancelSignal chan struct{}
+	}
+	coinProcessor struct {
+		*databaseConfig
+		Client        ethClient
+		Conf          *config
+		WG            *sync.WaitGroup
+		CancelSignal  chan struct{}
+		gasPriceCache struct {
+			price *big.Int
+			time  *time.Time
+			mu    *sync.RWMutex
+		}
+	}
+	ethClientImpl struct {
+		RPC        *ethclient.Client
+		Mutex      *sync.Mutex
+		Key        *ecdsa.PrivateKey
+		AirDropper airDropper
+	}
 	coinDistributer struct {
-		db     *storage.DB
-		cancel context.CancelFunc
-		wg     *sync.WaitGroup
+		Client    ethClient
+		DB        *storage.DB
+		Processor *coinProcessor
+		Tracker   *coinTracker
 	}
 	repository struct {
 		cfg *config
 		db  *storage.DB
 	}
 	config struct {
-		AlertSlackWebhook string `yaml:"alert-slack-webhook" mapstructure:"alert-slack-webhook"` //nolint:tagliatelle // .
-		Environment       string `yaml:"environment" mapstructure:"environment"`
-		ReviewURL         string `yaml:"review-url" mapstructure:"review-url"`
-		StartHours        int    `yaml:"startHours"`
-		EndHours          int    `yaml:"endHours"`
-		Workers           int64  `yaml:"workers"`
-		BatchSize         int64  `yaml:"batchSize"`
-		Development       bool   `yaml:"development"`
+		AlertSlackWebhook string `yaml:"alert-slack-webhook" mapstructure:"alert-slack-webhook"`
+		Environment       string `yaml:"environment"         mapstructure:"environment"`
+		ReviewURL         string `yaml:"review-url"          mapstructure:"review-url"`
+		Ethereum          struct {
+			RPC             string `yaml:"rpc"             mapstructure:"rpc"`
+			PrivateKey      string `yaml:"privateKey"      mapstructure:"private-key"`
+			ContractAddress string `yaml:"contractAddress" mapstructure:"contract-address"`
+			ChainID         int64  `yaml:"chainId"         mapstructure:"chain-id"`
+		} `yaml:"ethereum" mapstructure:"ethereum"`
+		StartHours  int   `yaml:"startHours"  mapstructure:"start-hours"`
+		EndHours    int   `yaml:"endHours"    mapstructure:"end-hours"`
+		Workers     int64 `yaml:"workers"     mapstructure:"workers"`
+		Development bool  `yaml:"development" mapstructure:"development"`
 	}
 )
