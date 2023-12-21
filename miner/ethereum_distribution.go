@@ -153,6 +153,14 @@ func (u *user) isEligibleForReferralForEthereumDistribution(now *time.Time) bool
 		cfg.EthereumDistributionFrequency.Max)
 }
 
+func (u *user) couldHaveBeenEligibleForEthereumDistributionRecently(now *time.Time) bool {
+	return u != nil && !u.MiningSessionSoloEndedAt.IsNil() && u.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8)))
+}
+
+func (ref *referral) couldHaveBeenEligibleForEthereumDistributionRecently(now *time.Time) bool {
+	return ref != nil && !ref.MiningSessionSoloEndedAt.IsNil() && ref.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8)))
+}
+
 //nolint:funlen // .
 func (u *user) processEthereumCoinDistribution(
 	now *time.Time, t0, tMinus1 *referral,
@@ -174,11 +182,15 @@ func (u *user) processEthereumCoinDistribution(
 	}
 	u.BalanceT1EthereumPending = nil
 	u.BalanceT2EthereumPending = nil
+	records = make([]*coindistribution.ByEarnerForReview, 0, 1+1+1+1)
 	var (
 		t0CD         *coindistribution.ByEarnerForReview
 		forT0CD      *coindistribution.ByEarnerForReview
 		forTMinus1CD *coindistribution.ByEarnerForReview
-		soloCD       = &coindistribution.ByEarnerForReview{
+		soloCD       *coindistribution.ByEarnerForReview
+	)
+	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) {
+		soloCD = &coindistribution.ByEarnerForReview{
 			CreatedAt:          now,
 			Username:           u.Username,
 			ReferredByUsername: t0.username(),
@@ -188,9 +200,9 @@ func (u *user) processEthereumCoinDistribution(
 			InternalID:         u.ID,
 			Balance:            0,
 		}
-	)
-	records = append(make([]*coindistribution.ByEarnerForReview, 0, 1+1+1+1), soloCD)
-	if t0 != nil && t0.UserID != u.UserID {
+		records = append(records, soloCD)
+	}
+	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0 != nil && t0.UserID != u.UserID { //nolint:lll // .
 		t0CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       u.UserID,
@@ -205,7 +217,7 @@ func (u *user) processEthereumCoinDistribution(
 		}
 		records = append(records, t0CD, forT0CD)
 	}
-	if tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID {
+	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && tMinus1.couldHaveBeenEligibleForEthereumDistributionRecently(now) && tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID { //nolint:lll // .
 		forTMinus1CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       tMinus1.UserID,
