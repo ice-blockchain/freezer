@@ -37,6 +37,12 @@ func SendNewCoinDistributionCollectionCycleStartedSlackMessage(ctx context.Conte
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
+func SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":recycle:`%v` collecting coins for ethereum distribution stopped prematurely :recycle:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
 func sendCoinDistributerIsNowOnlineSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":sun_with_face:`%v` coin distributer is now online :sun_with_face:", cfg.Environment)
 

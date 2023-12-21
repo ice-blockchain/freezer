@@ -314,12 +314,12 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 	for ctx.Err() == nil {
 		select {
 		case <-m.coinDistributionStartedSignaler:
-			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			m.coinDistributionWorkerMX.Lock()
+			log.Info("started collecting coin distributions")
+			reqCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
 			log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleStartedSlackMessage(reqCtx),
 				"failed to SendNewCoinDistributionCollectionCycleStartedSlackMessage"))
 			cancel()
-			log.Info("started collecting coin distributions")
-			m.coinDistributionWorkerMX.Lock()
 			workersStarted := int64(1)
 		outerStarted:
 			for ctx.Err() == nil {
@@ -330,7 +330,12 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 						break outerStarted
 					}
 				case <-ctx.Done():
+					reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
+					log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage(reqCtx),
+						"failed to SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage"))
+					cancel()
 					m.coinDistributionWorkerMX.Unlock()
+
 					return
 				}
 			}
@@ -344,13 +349,29 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 						break outerEnded
 					}
 				case <-ctx.Done():
+					reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
+					log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage(reqCtx),
+						"failed to SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage"))
+					cancel()
 					m.coinDistributionWorkerMX.Unlock()
+
 					return
 				}
 			}
-			m.notifyCoinDistributionCollectionCycleEnded(ctx)
-			m.coinDistributionWorkerMX.Unlock()
+			if ctx.Err() != nil {
+				reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
+				log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage(reqCtx),
+					"failed to SendNewCoinDistributionCollectionCycleEndedPrematurelySlackMessage"))
+				cancel()
+				m.coinDistributionWorkerMX.Unlock()
+
+				return
+			}
+			reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
+			m.notifyCoinDistributionCollectionCycleEnded(reqCtx)
+			cancel()
 			log.Info("stopped collecting coin distributions")
+			m.coinDistributionWorkerMX.Unlock()
 		case <-ctx.Done():
 			return
 		}

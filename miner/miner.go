@@ -38,7 +38,7 @@ func init() {
 
 func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi := &miner{
-		coinDistributionRepository: coindistribution.NewRepository(ctx, cancel),
+		coinDistributionRepository: coindistribution.NewRepository(context.Background(), func() {}),
 		mb:                         messagebroker.MustConnect(context.Background(), parentApplicationYamlKey),
 		db:                         storage.MustConnect(context.Background(), parentApplicationYamlKey, int(cfg.Workers)),
 		dwhClient:                  dwh.MustConnect(context.Background(), applicationYamlKey),

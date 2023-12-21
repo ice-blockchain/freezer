@@ -318,7 +318,7 @@ func (ff *FlexibleFloat64) MarshalText() ([]byte, error) {
 		return nil, nil
 	}
 
-	return []byte(fmt.Sprint(*ff)), nil
+	return []byte(strconv.FormatFloat(float64(*ff), 'f', -1, 64)), nil
 }
 
 func (ff *FlexibleFloat64) UnmarshalText(text []byte) error {
