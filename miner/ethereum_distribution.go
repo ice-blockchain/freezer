@@ -190,7 +190,7 @@ func (u *user) processEthereumCoinDistribution(
 		}
 	)
 	records = append(make([]*coindistribution.ByEarnerForReview, 0, 1+1+1+1), soloCD)
-	if t0 != nil {
+	if t0 != nil && t0.UserID != u.UserID {
 		t0CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       u.UserID,
@@ -205,7 +205,7 @@ func (u *user) processEthereumCoinDistribution(
 		}
 		records = append(records, t0CD, forT0CD)
 	}
-	if tMinus1 != nil {
+	if tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID {
 		forTMinus1CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       tMinus1.UserID,
@@ -231,7 +231,7 @@ func (u *user) processEthereumCoinDistribution(
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now) {
+	if t0 != nil && t0.UserID != u.UserID && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now) {
 		// Amount I've earned for my T0.
 		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
 		forT0CD.Balance = balanceDistributedForT0
@@ -245,7 +245,7 @@ func (u *user) processEthereumCoinDistribution(
 		u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if u.isEligibleForTMinus1ForEthereumDistribution(now) && tMinus1.isEligibleForSelfForEthereumDistribution(now) {
+	if tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID && u.isEligibleForTMinus1ForEthereumDistribution(now) && tMinus1.isEligibleForSelfForEthereumDistribution(now) { //nolint:lll // .
 		// Amount I've earned for my T-1.
 		balanceDistributedForTMinus1 = u.processEthereumCoinDistributionForForTMinus1(tMinus1, now)
 		forTMinus1CD.Balance = balanceDistributedForTMinus1
