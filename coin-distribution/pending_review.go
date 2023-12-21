@@ -216,9 +216,7 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 	const columns = 9
 	values := make([]string, 0, len(records))
 	args := make([]any, 0, len(records)*columns)
-	pks := make([]string, 0, len(records))
 	for ix, record := range records {
-		pks = append(pks, fmt.Sprintf("(%v,%v)", record.UserID, record.EarnerUserID))
 		values = append(values, generateValuesSQLParams(ix, columns))
 		args = append(args,
 			record.CreatedAt.Time,
@@ -242,7 +240,7 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 								eth_address = EXCLUDED.eth_address`, strings.Join(values, ",\n"))
 	_, err := storage.Exec(ctx, r.db, sql, args...)
 
-	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner [%v] %v", len(records), strings.Join(pks, ","))
+	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner [%v]", len(records))
 }
 
 func generateValuesSQLParams(index, columns int) string {

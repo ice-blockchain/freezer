@@ -202,7 +202,7 @@ func (u *user) processEthereumCoinDistribution(
 		}
 		records = append(records, soloCD)
 	}
-	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0 != nil && t0.UserID != u.UserID { //nolint:lll // .
+	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) { //nolint:lll // .
 		t0CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       u.UserID,
@@ -243,7 +243,7 @@ func (u *user) processEthereumCoinDistribution(
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if t0 != nil && t0.UserID != u.UserID && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now) {
+	if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now) { //nolint:lll // .
 		// Amount I've earned for my T0.
 		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
 		forT0CD.Balance = balanceDistributedForT0
