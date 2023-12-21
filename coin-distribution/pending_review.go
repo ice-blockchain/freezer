@@ -240,7 +240,7 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 								eth_address = EXCLUDED.eth_address`, strings.Join(values, ",\n"))
 	_, err := storage.Exec(ctx, r.db, sql, args...)
 
-	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner %#v", records)
+	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner [%v]", len(records))
 }
 
 func generateValuesSQLParams(index, columns int) string {
