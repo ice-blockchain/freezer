@@ -116,6 +116,9 @@ const (
 var (
 	//go:embed ddl.sql
 	ddl string
+
+	//go:embed select_total_coins.sql
+	selectTotalCoinsSQL string
 )
 
 type (

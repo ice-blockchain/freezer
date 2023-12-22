@@ -32,10 +32,10 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 		truncationInterval                = r.cfg.GlobalAggregationInterval.Child
 		dayInterval                       = r.cfg.GlobalAggregationInterval.Parent
 	)
-	if cached, err := r.cachedTotalCoins(ctx, now, days); err == nil && cached != nil {
+	if cached, err := r.getCachedTotalCoins(ctx, days); err == nil && cached != nil {
 		return cached, nil
 	} else if err != nil {
-		log.Error(errors.Wrapf(err, "failed to get coinStats from cache %v %v", now.Truncate(truncationInterval), days))
+		return nil, errors.Wrapf(err, "failed to get coinStats from cache %v %v", now.Truncate(truncationInterval), days)
 	}
 	for day := uint64(0); day < days; day++ {
 		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(adjustForLatencyToProcessAllUsers).Truncate(truncationInterval)
@@ -59,8 +59,8 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 		child.Date = child.Date.In(location)
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
-	if err = r.cacheTotalCoins(ctx, now, days, res); err != nil {
-		log.Error(errors.Wrapf(err, "failed to place cache for coinStats %v %v", now.Truncate(truncationInterval), days))
+	if err = r.cacheTotalCoins(ctx, days, res); err != nil {
+		return nil, errors.Wrapf(err, "failed to place cache for coinStats %v %v", now.Truncate(truncationInterval), days)
 	}
 
 	return res, nil
@@ -352,10 +352,10 @@ func ApplyPreStaking(amount, preStakingAllocation, preStakingBonus float64) (flo
 	return standardAmount, preStakingAmount
 }
 
-func (r *repository) cachedTotalCoins(ctx context.Context, now *time.Time, days uint64) (cached *TotalCoinsSummary, err error) {
-	cachedData, err := r.db.Get(ctx, coinStatsCacheKey(now.UTC().Truncate(r.cfg.GlobalAggregationInterval.Child), days)).Bytes()
+func (r *repository) getCachedTotalCoins(ctx context.Context, days uint64) (cached *TotalCoinsSummary, err error) {
+	cachedData, err := r.db.Get(ctx, coinStatsCacheKey(days)).Bytes()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		return nil, errors.Wrapf(err, "failed to get cached value for coinStats for %v %v", now, days)
+		return nil, errors.Wrapf(err, "failed to get cached value for coinStats for %v", days)
 	}
 	if len(cachedData) == 0 {
 		return nil, nil
@@ -367,7 +367,7 @@ func (r *repository) cachedTotalCoins(ctx context.Context, now *time.Time, days 
 	return cached, nil
 }
 
-func (r *repository) cacheTotalCoins(ctx context.Context, now *time.Time, days uint64, summary *TotalCoinsSummary) error {
+func (r *repository) cacheTotalCoins(ctx context.Context, days uint64, summary *TotalCoinsSummary) error {
 	cacheData, err := json.MarshalContext(ctx, summary)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize cache value %v", summary)
@@ -375,9 +375,9 @@ func (r *repository) cacheTotalCoins(ctx context.Context, now *time.Time, days u
 	expiration := r.cfg.GlobalAggregationInterval.Child
 
 	return errors.Wrapf(
-		r.db.SetNX(ctx, coinStatsCacheKey(now.UTC().Truncate(r.cfg.GlobalAggregationInterval.Child), days), cacheData, expiration).Err(),
-		"failed to save cache with coin stats (%v,%v) %+v", now, days, summary)
+		r.db.SetNX(ctx, coinStatsCacheKey(days), cacheData, expiration).Err(),
+		"failed to save cache with coin stats (%v) %+v", days, summary)
 }
-func coinStatsCacheKey(nowTruncated stdlibtime.Time, days uint64) string {
-	return fmt.Sprintf("coinStats:%v:%v", nowTruncated.Format(stdlibtime.RFC3339), days)
+func coinStatsCacheKey(days uint64) string {
+	return fmt.Sprintf("coinStats:%v", days)
 }
