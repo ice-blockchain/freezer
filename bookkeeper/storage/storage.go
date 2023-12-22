@@ -541,14 +541,10 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		format := date.UTC().Format(stdlibtime.RFC3339)
 		createdAtArray = append(createdAtArray, format[0:len(format)-1])
 	}
+	sql := fmt.Sprintf(selectTotalCoinsSQL, tableName, strings.Join(createdAtArray, "','"), kycStepToCalculateTotals)
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
-		Body: fmt.Sprintf(`SELECT created_at,
-								  sum(balance_total_standard) AS balance_total_standard,
-								  sum(balance_total_pre_staking) AS balance_total_pre_staking, 
-								  sum(balance_solo_ethereum)+sum(balance_t0_ethereum)+sum(balance_t1_ethereum)+sum(balance_t2_ethereum) AS balance_total_ethereum
-						   FROM %[1]v
-						   WHERE created_at IN ['%[2]v']
-						   GROUP BY created_at`, tableName, strings.Join(createdAtArray, "','")),
+		Body: sql,
+
 		Result: append(make(proto.Results, 0, 4),
 			proto.ResultColumn{Name: "created_at", Data: &createdAt},
 			proto.ResultColumn{Name: "balance_total_standard", Data: &balanceTotalStandard},

@@ -106,13 +106,17 @@ type (
 // Private API.
 
 const (
-	tableName = "freezer_user_history"
+	tableName                = "freezer_user_history"
+	kycStepToCalculateTotals = 2
 )
 
 // .
 var (
 	//go:embed ddl.sql
 	ddl string
+
+	//go:embed select_total_coins.sql
+	selectTotalCoinsSQL string
 )
 
 type (
