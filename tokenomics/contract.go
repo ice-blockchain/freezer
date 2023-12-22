@@ -280,6 +280,11 @@ type (
 			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
 			Enabled            bool     `json:"enabled"`
 		} `json:"social2-kyc"`
+		Social3KYC struct {
+			DisabledVersions   []string `json:"disabledVersions"`
+			ForceKYCForUserIds []string `json:"forceKYCForUserIds"`
+			Enabled            bool     `json:"enabled"`
+		} `json:"social3-kyc"`
 		WebFaceAuth struct {
 			Enabled bool `json:"enabled"`
 		} `json:"web-face-auth"`
@@ -292,6 +297,9 @@ type (
 		WebSocial2KYC struct {
 			Enabled bool `json:"enabled"`
 		} `json:"web-social2-kyc"`
+		WebSocial3KYC struct {
+			Enabled bool `json:"enabled"`
+		} `json:"web-social3-kyc"`
 	}
 
 	Config struct {
@@ -305,6 +313,7 @@ type (
 			LivenessDelay                      stdlibtime.Duration `yaml:"liveness-delay" mapstructure:"liveness-delay"`
 			Social1Delay                       stdlibtime.Duration `yaml:"social1-delay" mapstructure:"social1-delay"`
 			Social2Delay                       stdlibtime.Duration `yaml:"social2-delay" mapstructure:"social2-delay"`
+			Social3Delay                       stdlibtime.Duration `yaml:"social3-delay" mapstructure:"social3-delay"`
 			QuizDelay                          stdlibtime.Duration `yaml:"quiz-delay" mapstructure:"quiz-delay"`
 		} `yaml:"kyc" mapstructure:"kyc"`
 		AdoptionMilestoneSwitch struct {

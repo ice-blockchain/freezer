@@ -777,7 +777,8 @@
                 2,
                 3,
                 4,
-                5
+                5,
+                6
             ],
             "x-enum-varnames": [
                 "NoneKYCStep",
@@ -785,7 +786,8 @@
                 "LivenessDetectionKYCStep",
                 "Social1KYCStep",
                 "QuizKYCStep",
-                "Social2KYCStep"
+                "Social2KYCStep",
+                "Social3KYCStep"
             ]
         }
     }

@@ -39,6 +39,7 @@ tokenomics: &tokenomics
     social1-delay: 3m
     quiz-delay: 3m
     social2-delay: 3m
+    social3-delay: 3m
     #    require-quiz-only-on-specific-day-of-week: 1
   bookkeeper/storage: &bookkeeperStorage
     runDDL: true

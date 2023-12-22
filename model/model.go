@@ -380,7 +380,7 @@ func CalculateMiningStreak(now, start, end *time.Time, miningSessionDuration std
 
 func (kyc *KYCState) KYCStepPassedCorrectly(kycStep users.KYCStep) bool {
 	return (kyc.KYCStepBlocked == users.NoneKYCStep || kyc.KYCStepBlocked > kycStep) &&
-		kycStep == kyc.KYCStepPassed &&
+		kyc.KYCStepPassed >= kycStep &&
 		kyc.KYCStepAttempted(kycStep)
 }
 
