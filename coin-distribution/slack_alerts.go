@@ -73,6 +73,12 @@ func sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx cont
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
+func sendEthereumGasLimitTooLowSlackMessage(ctx context.Context, actual, expected uint64) error {
+	text := fmt.Sprintf(":warning:`%v` ethereum gas limit `%v` is insufficient, minimum required is `%v`. We can wait for gas prices to go down, but it could take days, or we could change the gas limit :warning:", cfg.Environment, actual, expected) //nolint:lll // .
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
 func sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage(ctx context.Context, reason string) error {
 	text := fmt.Sprintf(":bangbang:`%v` coin distribution processing stopped due to failure :bangbang:\n:rotating_light: reason: `%v` :rotating_light:", cfg.Environment, reason) //nolint:lll // .
 
