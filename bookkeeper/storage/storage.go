@@ -528,7 +528,7 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 	return res, nil
 }
 
-func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error) {
+func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time, kycStepToCalculateTotals uint8) ([]*TotalCoins, error) {
 	var (
 		createdAt              = proto.ColDateTime{Data: make([]proto.DateTime, 0, len(createdAts)), Location: stdlibtime.UTC}
 		balanceTotalStandard   = make(proto.ColFloat64, 0, len(createdAts))
@@ -542,13 +542,30 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		createdAtArray = append(createdAtArray, format[0:len(format)-1])
 	}
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
-		Body: fmt.Sprintf(`SELECT created_at,
-								  sum(balance_total_standard) AS balance_total_standard,
-								  sum(balance_total_pre_staking) AS balance_total_pre_staking, 
-								  sum(balance_solo_ethereum)+sum(balance_t0_ethereum)+sum(balance_t1_ethereum)+sum(balance_t2_ethereum) AS balance_total_ethereum
-						   FROM %[1]v
-						   WHERE created_at IN ['%[2]v']
-						   GROUP BY created_at`, tableName, strings.Join(createdAtArray, "','")),
+		Body: fmt.Sprintf(`
+			SELECT u.created_at as created_at,
+				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)*(100.0-u.pre_staking_allocation)/100.0)  AS balance_total_standard,
+				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)* (100 + u.pre_staking_bonus) * u.pre_staking_allocation / 10000) AS balance_total_pre_staking,
+				   sum(u.balance_solo_ethereum)+sum(u.balance_t0_ethereum)+sum(verified_balance_t1.ethereum)+sum(verified_balance_t2.ethereum) AS balance_total_ethereum
+			FROM %[1]v u
+			GLOBAL LEFT JOIN
+				 (SELECT DISTINCT ON (id_t0, created_at) id_t0, created_at, sum(balance_for_t0) AS balance, sum(balance_for_t0_ethereum) AS ethereum
+				  FROM %[1]v
+				  WHERE created_at IN ['%[2]v']
+					AND kyc_step_passed >= %[3]v AND (kyc_step_blocked = 0 OR kyc_step_blocked >= %[4]v)
+				  GROUP BY id_t0, created_at) AS verified_balance_t1
+					 ON verified_balance_t1.id_t0 = u.id AND verified_balance_t1.created_at = u.created_at
+			GLOBAL LEFT JOIN
+				 (SELECT DISTINCT ON (id_tminus1, created_at) id_tminus1, created_at, sum(balance_for_tminus1) AS balance, sum(balance_for_tminus1_ethereum) AS ethereum
+				  FROM %[1]v
+				  WHERE created_at IN ['%[2]v']
+					AND kyc_step_passed >= %[3]v AND ( kyc_step_blocked = 0 OR kyc_step_blocked >= %[4]v)
+				 GROUP BY id_tminus1, created_at) AS verified_balance_t2 ON verified_balance_t2.id_tminus1 = u.id AND verified_balance_t2.created_at = u.created_at
+			WHERE u.created_at IN ['%[2]v']
+				AND u.kyc_step_passed >= %[3]v AND ( u.kyc_step_blocked = 0 OR u.kyc_step_blocked >= %[4]v)
+			GROUP BY u.created_at
+`, tableName, strings.Join(createdAtArray, "','"), kycStepToCalculateTotals, kycStepToCalculateTotals+1),
+
 		Result: append(make(proto.Results, 0, 4),
 			proto.ResultColumn{Name: "created_at", Data: &createdAt},
 			proto.ResultColumn{Name: "balance_total_standard", Data: &balanceTotalStandard},

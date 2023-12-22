@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"github.com/ice-blockchain/eskimo/users"
 	"math"
 	"sort"
 	stdlibtime "time"
@@ -36,7 +37,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 		dates = append(dates, date)
 		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
-	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
+	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates, uint8(users.LivenessDetectionKYCStep))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to SelectTotalCoins for createdAts:%#v", dates)
 	}
