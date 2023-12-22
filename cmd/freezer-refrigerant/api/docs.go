@@ -184,6 +184,7 @@ const docTemplate = `{
                     {
                         "enum": [
                             "approve",
+                            "approve-and-process-immediately",
                             "deny"
                         ],
                         "type": "string",

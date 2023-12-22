@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS global (
                     WITH (FILLFACTOR = 70);
 INSERT INTO global (key,value)
             VALUES ('coin_distributer_enabled','false'),
+                   ('coin_distributer_forced_execution','false'),
                    ('coin_collector_enabled','false'),
                    ('coin_collector_forced_execution','false'),
                    ('coin_collector_start_date','2023-12-21T00:00:00Z'),
@@ -101,7 +102,7 @@ CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     decision                  text      NOT NULL,
                     PRIMARY KEY(user_id, day, review_day));
 
-create or replace procedure approve_coin_distributions(reviewer_user_id text, nested boolean)
+create or replace procedure approve_coin_distributions(reviewer_user_id text, process_immediately boolean, nested boolean)
 language plpgsql
     as $$
 declare
@@ -112,8 +113,16 @@ BEGIN
     from coin_distributions_pending_review;
 
     insert into reviewed_coin_distributions(reviewed_at, created_at, internal_id, ice, day, review_day, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, decision)
-    select now, created_at, internal_id, ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, 'approve'
+    select now, created_at, internal_id, ice, day, now::date, iceflakes, username, referred_by_username, user_id, eth_address, reviewer_user_id, (case when process_immediately is true then 'approve-and-process-immediately' else 'approve' end) AS reason
     from coin_distributions_pending_review;
+
+    IF process_immediately is true THEN
+        INSERT INTO global (key,value)
+                    VALUES ('coin_distributer_enabled','true'),
+                           ('coin_distributer_forced_execution','true')
+        ON CONFLICT (key) DO UPDATE
+                    SET value = EXCLUDED.value;
+     END IF;
 
     delete from coin_distributions_pending_review where 1=1;
 

@@ -19,6 +19,12 @@ func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSl
 	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
+func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx context.Context) error {
+	text := fmt.Sprintf(":white_check_mark::zap:`%v` current pending coin distributions are approved and are going to be processed immediately :zap::white_check_mark:", r.cfg.Environment) //nolint:lll // .
+
+	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
 func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreDeniedSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":no_entry:`%v` current pending coin distributions are denied and will not be processed :no_entry:", r.cfg.Environment)
 

@@ -231,7 +231,7 @@ func (u *user) processEthereumCoinDistribution(
 		// Amount I've earned for myself.
 		soloCD.Balance = u.processEthereumCoinDistributionForSolo(now)
 
-		if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && t0.isEligibleForReferralForEthereumDistribution(now) {
+		if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && t0.isEligibleForReferralForEthereumDistribution(now) { //nolint:lll // .
 			// Amount my T0 earned for me.
 			t0CD.Balance = u.processEthereumCoinDistributionForT0(now)
 		}

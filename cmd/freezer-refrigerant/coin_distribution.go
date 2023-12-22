@@ -82,7 +82,7 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 //	@Produce		json
 //	@Param			Authorization	header	string	true	"Insert your access token"	default(Bearer <Add access token here>)
 //	@Param			x_client_type	query	string	false	"the type of the client calling this API. I.E. `web`"
-//	@Param			decision		query	string	true	"the decision for the current coin distributions"	Enums(approve,deny)
+//	@Param			decision		query	string	true	"the decision for the current coin distributions"	Enums(approve,approve-and-process-immediately,deny)
 //	@Success		200				"OK"
 //	@Failure		401				{object}	server.ErrorResponse	"if not authorized"
 //	@Failure		403				{object}	server.ErrorResponse	"if not allowed"
@@ -93,14 +93,16 @@ func (s *service) GetCoinDistributionsForReview( //nolint:gocritic // .
 func (s *service) ReviewCoinDistributions( //nolint:gocritic // .
 	ctx context.Context,
 	req *server.Request[struct {
-		Decision string `form:"decision" required:"true" swaggerignore:"true" enums:"approve,deny"`
+		Decision string `form:"decision" required:"true" swaggerignore:"true" enums:"approve,approve-and-process-immediately,deny"`
 	}, any],
 ) (*server.Response[any], *server.Response[server.ErrorResponse]) {
 	if req.AuthenticatedUser.Role != adminRole {
 		return nil, server.Forbidden(errors.Errorf("insufficient role: %v, admin role required", req.AuthenticatedUser.Role))
 	}
-	if !strings.EqualFold(req.Data.Decision, "approve") && !strings.EqualFold(req.Data.Decision, "deny") {
-		return nil, server.UnprocessableEntity(errors.Errorf("`decision` has to be `approve` or `deny`"), "invalid params")
+	if !strings.EqualFold(req.Data.Decision, "approve") &&
+		!strings.EqualFold(req.Data.Decision, "approve-and-process-immediately") &&
+		!strings.EqualFold(req.Data.Decision, "deny") {
+		return nil, server.UnprocessableEntity(errors.Errorf("`decision` has to be `approve`, `approve-and-process-immediately` or `deny`"), "invalid params")
 	}
 	if err := s.coinDistributionRepository.ReviewCoinDistributions(ctx, req.AuthenticatedUser.UserID, req.Data.Decision); err != nil {
 		return nil, server.Unexpected(errors.Wrapf(err, "failed to ReviewCoinDistributions for adminUserID:%v,decision:%v", req.AuthenticatedUser.UserID, req.Data.Decision)) //nolint:lll // .

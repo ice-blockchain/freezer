@@ -327,6 +327,7 @@ paths:
       - description: the decision for the current coin distributions
         enum:
         - approve
+        - approve-and-process-immediately
         - deny
         in: query
         name: decision

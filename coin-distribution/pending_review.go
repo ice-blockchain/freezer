@@ -179,12 +179,28 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 
 				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
 			}
-			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,true)", reviewerUserID); err != nil {
+			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,false,true)", reviewerUserID); err != nil {
 				return errors.Wrap(err, "failed to call approve_coin_distributions")
 			}
 
 			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx),
 				"failed to sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage")
+		})
+	case "approve-and-process-immediately":
+		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
+			if _, err := storage.ExecOne[struct{ Bogus bool }](ctx, conn, sqlToCheckIfAnythingNeedsApproving); err != nil {
+				if storage.IsErr(err, storage.ErrNotFound) {
+					err = nil
+				}
+
+				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
+			}
+			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,true,true)", reviewerUserID); err != nil {
+				return errors.Wrap(err, "failed to call approve_coin_distributions")
+			}
+
+			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx),
+				"failed to sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage")
 		})
 	case "deny":
 		return storage.DoInTransaction(ctx, r.db, func(conn storage.QueryExecer) error {
