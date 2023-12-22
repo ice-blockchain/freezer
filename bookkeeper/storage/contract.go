@@ -24,7 +24,7 @@ type (
 		Ping(ctx context.Context) error
 		Insert(ctx context.Context, columns *Columns, input InsertMetadata, usrs []*model.User) error
 		SelectBalanceHistory(ctx context.Context, id int64, createdAts []stdlibtime.Time) ([]*BalanceHistory, error)
-		SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time, kycStepToCalculateTotals uint8) ([]*TotalCoins, error)
+		SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error)
 	}
 	BalanceHistory struct {
 		CreatedAt                               *time.Time
@@ -108,7 +108,8 @@ type (
 // Private API.
 
 const (
-	tableName = "freezer_user_history"
+	tableName                = "freezer_user_history"
+	kycStepToCalculateTotals = 2
 )
 
 // .

@@ -528,7 +528,7 @@ func (db *db) SelectBalanceHistory(ctx context.Context, id int64, createdAts []s
 	return res, nil
 }
 
-func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time, kycStepToCalculateTotals uint8) ([]*TotalCoins, error) {
+func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time) ([]*TotalCoins, error) {
 	var (
 		createdAt              = proto.ColDateTime{Data: make([]proto.DateTime, 0, len(createdAts)), Location: stdlibtime.UTC}
 		balanceTotalStandard   = make(proto.ColFloat64, 0, len(createdAts))
@@ -543,10 +543,17 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 	}
 	sql := fmt.Sprintf(`
 			SELECT u.created_at as created_at,
-				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)*(100.0-u.pre_staking_allocation)/100.0)  AS balance_total_standard,
-				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)* (100 + u.pre_staking_bonus) * u.pre_staking_allocation / 10000) AS balance_total_pre_staking,
-				   sum(u.balance_solo_ethereum)+sum(u.balance_t0_ethereum)+sum(verified_balance_t1.ethereum)+sum(verified_balance_t2.ethereum) AS balance_total_ethereum
+				   sum((u.balance_solo + (if(t0.id != 0, u.balance_t0, 0)) + verified_balance_t1.balance + verified_balance_t2.balance)*(100.0-u.pre_staking_allocation)/100.0)  AS balance_total_standard,
+				   sum((u.balance_solo + (if(t0.id != 0, u.balance_t0, 0)) + verified_balance_t1.balance + verified_balance_t2.balance) * (100 + u.pre_staking_bonus) * u.pre_staking_allocation / 10000) AS balance_total_pre_staking,
+				   sum(u.balance_solo_ethereum + (if(t0.id != 0, u.balance_t0_ethereum, 0)) + verified_balance_t1.ethereum + verified_balance_t2.ethereum) AS balance_total_ethereum
 			FROM %[1]v u
+			GLOBAL LEFT JOIN
+				 (select DISTINCT ON (id, created_at) id, created_at
+				  from freezer_user_history
+				  where created_at IN ['%[2]v']
+					AND kyc_step_passed >= %[3]v AND (kyc_step_blocked = 0 OR kyc_step_blocked >= %[4]v)
+				  group by id, created_at) as t0
+					 ON t0.id = u.id_t0 AND t0.created_at = u.created_at
 			GLOBAL LEFT JOIN
 				 (SELECT DISTINCT ON (id_t0, created_at) id_t0, created_at, sum(balance_for_t0) AS balance, sum(balance_for_t0_ethereum) AS ethereum
 				  FROM %[1]v
