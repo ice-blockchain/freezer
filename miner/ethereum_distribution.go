@@ -4,6 +4,7 @@ package miner
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	stdlibtime "time"
 
@@ -328,6 +329,7 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 		case <-m.coinDistributionStartedSignaler:
 			m.coinDistributionWorkerMX.Lock()
 			log.Info("started collecting coin distributions")
+			before := time.Now()
 			reqCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
 			log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleStartedSlackMessage(reqCtx),
 				"failed to SendNewCoinDistributionCollectionCycleStartedSlackMessage"))
@@ -379,10 +381,11 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 
 				return
 			}
+			after := time.Now()
 			reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
 			m.notifyCoinDistributionCollectionCycleEnded(reqCtx)
 			cancel()
-			log.Info("stopped collecting coin distributions")
+			log.Info(fmt.Sprintf("finished collecting coin distributions in %v", after.Sub(*before.Time)))
 			m.coinDistributionWorkerMX.Unlock()
 		case <-ctx.Done():
 			return

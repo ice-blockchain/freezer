@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 
+	"github.com/ice-blockchain/eskimo/users"
 	"github.com/ice-blockchain/freezer/model"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/log"
@@ -541,10 +542,8 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		format := date.UTC().Format(stdlibtime.RFC3339)
 		createdAtArray = append(createdAtArray, format[0:len(format)-1])
 	}
-	sql := fmt.Sprintf(selectTotalCoinsSQL, tableName, strings.Join(createdAtArray, "','"), kycStepToCalculateTotals)
 	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
-		Body: sql,
-
+		Body: fmt.Sprintf(selectTotalCoinsSQL, tableName, strings.Join(createdAtArray, "','"), users.LivenessDetectionKYCStep),
 		Result: append(make(proto.Results, 0, 4),
 			proto.ResultColumn{Name: "created_at", Data: &createdAt},
 			proto.ResultColumn{Name: "balance_total_standard", Data: &balanceTotalStandard},

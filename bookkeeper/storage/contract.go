@@ -106,8 +106,7 @@ type (
 // Private API.
 
 const (
-	tableName                = "freezer_user_history"
-	kycStepToCalculateTotals = 2
+	tableName = "freezer_user_history"
 )
 
 // .
