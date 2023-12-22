@@ -4,6 +4,7 @@ package coindistribution
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -11,6 +12,14 @@ import (
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 )
+
+func pointerToString[T any](v *T) string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	return fmt.Sprintf("%v", *v)
+}
 
 func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 	const testUserName = "testUser"
@@ -69,7 +78,7 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 		case b := <-chBatches:
 			t.Logf("batch: %+v processed", b)
 			for i := range b.Records {
-				t.Logf("record: %+v processed: %v", b.Records[i].EthTX, b.Records[i].EthStatus)
+				t.Logf("record: %v processed: %v", pointerToString(b.Records[i].EthTX), b.Records[i].EthStatus)
 				require.Equal(t, ethApiStatusAccepted, b.Records[i].EthStatus)
 			}
 			processedBatch = b
@@ -92,4 +101,27 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 			return
 		}
 	}
+}
+
+func TestDatabaseSetGetValues(t *testing.T) {
+	var boolValue bool
+
+	maybeSkipTest(t)
+
+	db := storage.MustConnect(context.TODO(), ddl, applicationYamlKey)
+	defer db.Close()
+
+	err := databaseSetValue(context.TODO(), db, configKeyCoinDistributerEnabled, false)
+	require.NoError(t, err)
+
+	err = databaseGetValue(context.TODO(), db, configKeyCoinDistributerEnabled, &boolValue)
+	require.NoError(t, err)
+	require.False(t, boolValue)
+
+	err = databaseSetValue(context.TODO(), db, configKeyCoinDistributerEnabled, true)
+	require.NoError(t, err)
+
+	err = databaseGetValue(context.TODO(), db, configKeyCoinDistributerEnabled, &boolValue)
+	require.NoError(t, err)
+	require.True(t, boolValue)
 }

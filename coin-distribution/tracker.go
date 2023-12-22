@@ -125,6 +125,8 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 		case <-signals:
 			if err := ct.Do(ctx, notify); err != nil {
 				log.Error(errors.Wrap(err, "failed to check accepted transactions"))
+			} else if !ct.HasPendingTransactions(ctx, ethApiStatusAccepted) {
+				sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx)
 			}
 		}
 	}

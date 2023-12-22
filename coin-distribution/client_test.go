@@ -8,9 +8,7 @@ import (
 	"math/big"
 	"math/rand"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type (
@@ -18,17 +16,7 @@ type (
 		dropErr error
 		gas     int64
 	}
-	mockedEthSubscription struct{}
 )
-
-func (*mockedEthSubscription) Unsubscribe() {}
-
-func (*mockedEthSubscription) Err() <-chan error {
-	ch := make(chan error)
-	close(ch)
-
-	return ch
-}
 
 func (m *mockedDummyEthClient) SuggestGasPrice(context.Context) (*big.Int, error) {
 	if m.gas == 0 {
@@ -40,7 +28,7 @@ func (m *mockedDummyEthClient) SuggestGasPrice(context.Context) (*big.Int, error
 	return big.NewInt(m.gas), nil
 }
 
-func (m *mockedDummyEthClient) Airdrop(context.Context, *big.Int, *big.Int, []common.Address, []*big.Int) (string, error) {
+func (m *mockedDummyEthClient) Airdrop(context.Context, *big.Int, *big.Int, uint64, []common.Address, []*big.Int) (string, error) {
 	if m.dropErr != nil {
 		return "", m.dropErr
 	}
@@ -50,18 +38,6 @@ func (m *mockedDummyEthClient) Airdrop(context.Context, *big.Int, *big.Int, []co
 
 func (*mockedDummyEthClient) Close() error {
 	return nil
-}
-
-func (*mockedDummyEthClient) ListenForBlocks(context.Context, chan<- *types.Header) (ethereum.Subscription, error) {
-	return new(mockedEthSubscription), nil
-}
-
-func (*mockedDummyEthClient) TransactionsInBlockByHash(context.Context, common.Hash) (types.Transactions, error) {
-	return nil, nil
-}
-
-func (*mockedDummyEthClient) TransactionStatus(context.Context, common.Hash) (successful bool, err error) {
-	return true, nil
 }
 
 func (*mockedDummyEthClient) TransactionsStatus(context.Context, []*string) (map[ethTxStatus][]string, error) {

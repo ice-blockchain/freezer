@@ -23,10 +23,15 @@ func newCoinProcessor(client ethClient, db *storage.DB, conf *config) *coinProce
 		Conf:           conf,
 		WG:             new(sync.WaitGroup),
 		CancelSignal:   make(chan struct{}),
+		ProcessSignal:  make([]chan coinProcessorWorkerTask, conf.Workers),
 		databaseConfig: &databaseConfig{DB: db},
 	}
 	proc.gasPriceCache.mu = new(sync.RWMutex)
 	proc.gasPriceCache.time = time.New(stdlibtime.Time{})
+
+	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
+		proc.ProcessSignal[workerNumber] = make(chan coinProcessorWorkerTask, 1)
+	}
 
 	return proc
 }
@@ -43,6 +48,13 @@ func (proc *coinProcessor) Start(ctx context.Context, notify chan<- *batch) {
 			proc.Worker(ctx, notify, wn)
 		}(workerNumber)
 	}
+
+	log.Info("starting controller ...")
+	proc.WG.Add(1)
+	go func() {
+		defer proc.WG.Done()
+		proc.Controller(ctx)
+	}()
 }
 
 func (proc *coinProcessor) GetGasPrice(ctx context.Context) (value *big.Int, err error) { //nolint:funlen //.
@@ -157,8 +169,12 @@ returning up.*
 }
 
 func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batch) (string, error) {
-	recipients, amounts := data.Prepare()
+	gasLimit, err := proc.GetGasLimit(ctx)
+	if err != nil {
+		return "", err
+	}
 
+	recipients, amounts := data.Prepare()
 	for recordNum := range data.Records {
 		log.Info(fmt.Sprintf("worker [%v]: batch %v: distributing %v iceflakes to address %v for user %q",
 			num,
@@ -175,8 +191,9 @@ func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batc
 
 		return "", err
 	}
+	log.Info(fmt.Sprintf("worker [%v]: batch %v: gas price: %v, limit %v", num, data.ID, price.String(), gasLimit))
 
-	txHash, err := proc.Client.Airdrop(ctx, price, big.NewInt(proc.Conf.Ethereum.ChainID), recipients, amounts)
+	txHash, err := proc.Client.Airdrop(ctx, price, big.NewInt(proc.Conf.Ethereum.ChainID), gasLimit, recipients, amounts)
 	if err != nil {
 		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to run contract", num, data.ID))
 
@@ -226,11 +243,26 @@ func sendNotify[DataType any, DestType chan<- DataType](dest DestType, data Data
 	}
 }
 
-func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num int64) { //nolint:funlen //.
+func (proc *coinProcessor) GetAction(ctx context.Context) workerAction {
+	switch {
+	case !proc.IsEnabled(ctx):
+		return workerActionDisabled
+
+	case proc.IsOnDemandMode(ctx):
+		return workerActionOnDemand
+
+	case proc.isBlocked():
+		return workerActionBlocked
+	}
+
+	return workerActionRun
+}
+
+func (proc *coinProcessor) Controller(ctx context.Context) {
 	const tickInternal = stdlibtime.Second * 30
 
-	log.Info(fmt.Sprintf("started worker [%v] with internal %s", num, tickInternal))
-	defer log.Info(fmt.Sprintf("worker [%v]: stopped", num))
+	log.Info("controller started")
+	defer log.Info("controller stopped")
 
 	ticker := stdlibtime.NewTicker(tickInternal)
 	defer ticker.Stop()
@@ -243,11 +275,123 @@ func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num
 			select {
 			case signals <- struct{}{}:
 			default:
+				log.Warn("controller: signal channel is full")
+			}
+		}
+	}()
+
+	prevAction := workerActionDisabled
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info(fmt.Sprintf("controller: context: %v", ctx.Err()))
+
+			return
+
+		case <-proc.CancelSignal:
+			log.Info("controller: exit signal")
+
+			return
+
+		case <-signals:
+			action := proc.GetAction(ctx)
+			if action == workerActionDisabled || action == workerActionBlocked {
+				if action == workerActionBlocked && prevAction == workerActionRun {
+					sendCoinDistributerIsNowOfflineSlackMessage(ctx)
+				}
+				prevAction = action
+				log.Info(fmt.Sprintf("controller: disabled or blocked (%v)", action))
+
+				continue
+			}
+
+			if prevAction == workerActionBlocked && action == workerActionRun {
+				log.Info("controller: unblocked")
+				sendCoinDistributerIsNowOnlineSlackMessage(ctx)
+			}
+			prevAction = action
+
+			if action == workerActionOnDemand {
+				log.Info("controller: on demand mode trigger")
+				proc.DisableOnDemand(ctx)
+			}
+
+			if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
+				log.Info("controller: no pending transactions")
+
+				continue
+			}
+
+			log.Info(fmt.Sprintf("controller: running action %v", action))
+			err := proc.RunWorkers(ctx)
+			if err != nil {
+				log.Error(errors.Wrapf(err, "controller: worker(s) failed"))
+				proc.MustDisable(ctx, err.Error())
+			} else if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
+				sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx)
+			}
+		}
+	}
+}
+
+func (proc *coinProcessor) RunWorkers(ctx context.Context) error {
+	taskContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	reports := make(chan error, proc.Conf.Workers)
+	task := coinProcessorWorkerTask{Context: taskContext, Result: reports}
+
+	notified := 0
+	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
+		select {
+		case proc.ProcessSignal[workerNumber] <- task:
+			log.Info(fmt.Sprintf("controller: worker [%v]: notified", workerNumber))
+			notified++
+
+		default:
+			log.Info(fmt.Sprintf("controller: worker [%v]: channel is full", workerNumber))
+		}
+	}
+
+	log.Info(fmt.Sprintf("controller: waiting for %v worker(s) to finish ...", notified))
+	for i := 0; i < notified; i++ {
+		err := <-reports
+		switch {
+		case err == nil || errors.Is(err, errNotEnoughData):
+			// Expected, do nothing.
+
+		case errors.Is(err, errClientUncoverable):
+			log.Error(errors.Wrap(err, "controller: unrecoverable error detected, stopping workers"))
+			cancel()
+
+			return err
+
+		default:
+			log.Error(errors.Wrapf(err, "controller: failed to process batch"))
+		}
+	}
+
+	log.Info("controller: all workers finished")
+
+	return nil
+}
+
+func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num int64) { //nolint:funlen //.
+	log.Info(fmt.Sprintf("worker [%v]: started", num))
+	defer log.Info(fmt.Sprintf("worker [%v]: stopped", num))
+
+	signals := make(chan coinProcessorWorkerTask, 1)
+	go func() {
+		for val := range proc.ProcessSignal[num] {
+			select {
+			case signals <- val:
+			default:
 				log.Warn(fmt.Sprintf("worker [%v]: signal channel is full", num))
 			}
 		}
 	}()
 
+main:
 	for {
 		select {
 		case <-ctx.Done():
@@ -260,28 +404,34 @@ func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num
 
 			return
 
-		case <-signals:
-			if !proc.IsEnabled(ctx) || proc.isBlocked() {
-				log.Info(fmt.Sprintf("worker [%v]: coinDistributer is disabled or blocked", num))
-
-				continue
-			}
-
-			data, err := proc.Do(ctx, num)
+		case task := <-signals:
+			data, err := proc.Do(task.Context, num)
 			if data != nil {
 				sendNotify(notify, data)
 			}
 			if err != nil {
 				if !errors.Is(err, errNotEnoughData) {
-					log.Error(errors.Wrapf(err, "worker [%v]: failed to process batch %v", num, data.ID))
+					err = errors.Wrapf(err, "worker [%v]: failed to process batch %v", num, data.ID)
+					log.Error(err)
+				}
+
+				select {
+				case task.Result <- err:
+				case <-task.Context.Done():
+					log.Warn(fmt.Sprintf("worker [%v]: cannot send error report: %v: %v", num, err, task.Context.Err()))
+
+					continue main
 				}
 
 				continue
 			}
 
 			select {
-			case signals <- struct{}{}:
-			default:
+			case signals <- task:
+			case <-task.Context.Done():
+				log.Info(fmt.Sprintf("worker [%v]: action context: %v", num, task.Context.Err()))
+
+				continue main
 			}
 		}
 	}
@@ -308,6 +458,9 @@ func (proc *coinProcessor) isBlocked() bool {
 
 func (proc *coinProcessor) Close() error {
 	close(proc.CancelSignal)
+	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
+		close(proc.ProcessSignal[workerNumber])
+	}
 
 	log.Info("waiting for workers to stop ...")
 	proc.WG.Wait()
