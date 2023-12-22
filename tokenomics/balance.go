@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ice-blockchain/eskimo/users"
+	"github.com/redis/go-redis/v9"
 	"math"
 	"sort"
 	stdlibtime "time"
@@ -37,9 +38,22 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 		dates = append(dates, date)
 		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
-	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates, uint8(users.LivenessDetectionKYCStep))
+	totalCoins, misses, err := r.cachedTotalCoins(ctx, dates)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to SelectTotalCoins for createdAts:%#v", dates)
+		misses = dates
+		log.Warn("%v", errors.Wrapf(err, "failed to fetch from totalCoinStats from cache, fetching from CH, misses: %v", misses))
+	}
+	if len(misses) > 0 {
+		extraCoins, err := r.dwh.SelectTotalCoins(ctx, misses, uint8(users.LivenessDetectionKYCStep))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to SelectTotalCoins for createdAts:%#v", dates)
+		}
+		if len(extraCoins) > 0 {
+			if err := r.cacheTotalCoins(ctx, extraCoins); err != nil {
+				log.Error(errors.Wrapf(err, "failed to save total coins stats into cache for dates %v", dates))
+			}
+			totalCoins = append(totalCoins, extraCoins...)
+		}
 	}
 	for _, child := range res.TimeSeries {
 		for _, stats := range totalCoins {
@@ -342,4 +356,64 @@ func ApplyPreStaking(amount, preStakingAllocation, preStakingBonus float64) (flo
 	preStakingAmount := (amount * (100 + preStakingBonus) * preStakingAllocation) / 10000
 
 	return standardAmount, preStakingAmount
+}
+
+func (r *repository) cachedTotalCoins(ctx context.Context, dates []stdlibtime.Time) (cached []*dwh.TotalCoins, misses []stdlibtime.Time, err error) {
+	keys := make([]string, 0, len(dates))
+	for _, d := range dates {
+		keys = append(keys, coinStatsCacheKey(d))
+	}
+	cached, err = storage.Get[dwh.TotalCoins](ctx, r.db, keys...)
+	if err != nil {
+		return nil, dates, errors.Wrapf(err, "failed to get cached coinStats for dates %v", dates)
+	}
+	if len(cached) != len(keys) {
+		misses = make([]stdlibtime.Time, 0, len(keys)-len(cached))
+		for _, d := range dates {
+			found := false
+			for _, c := range cached {
+				if c.CreatedAt.Equal(d) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				misses = append(misses, d)
+			}
+		}
+	}
+	return cached, misses, nil
+}
+func (r *repository) cacheTotalCoins(ctx context.Context, coins []*dwh.TotalCoins) error {
+	expiration := r.cfg.CoinStatsCacheDuration
+	if expiration == 0 {
+		expiration = 5 * stdlibtime.Minute
+	}
+
+	if responses, err := r.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		var err error
+		for _, tc := range coins {
+			err = multierror.Append(err,
+				r.db.HSet(ctx, coinStatsCacheKey(*tc.CreatedAt.Time), storage.SerializeValue(tc)...).Err(),
+				r.db.Expire(ctx, coinStatsCacheKey(*tc.CreatedAt.Time), expiration).Err(),
+			).ErrorOrNil()
+		}
+		return err
+	}); err != nil {
+		return errors.Wrapf(err, "failed to save to totalCoinsCache: %+v", coins)
+	} else {
+		errs := make([]error, 0, 1+1)
+		for _, response := range responses {
+			if err = response.Err(); err != nil {
+				errs = append(errs, errors.Wrapf(err, "failed to `%v`", response.FullName()))
+			} else if boolCmd, ok := response.(*redis.BoolCmd); ok && !boolCmd.Val() {
+				errs = append(errs, errors.Wrapf(ErrNotFound, "failed to `%v`", response.FullName()))
+			}
+		}
+
+		return multierror.Append(nil, errs...).ErrorOrNil() //nolint:wrapcheck // .
+	}
+}
+func coinStatsCacheKey(date stdlibtime.Time) string {
+	return fmt.Sprintf("coinStats:%v", date.UTC().Format(stdlibtime.RFC3339))
 }

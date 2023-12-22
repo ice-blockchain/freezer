@@ -541,8 +541,7 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		format := date.UTC().Format(stdlibtime.RFC3339)
 		createdAtArray = append(createdAtArray, format[0:len(format)-1])
 	}
-	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
-		Body: fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 			SELECT u.created_at as created_at,
 				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)*(100.0-u.pre_staking_allocation)/100.0)  AS balance_total_standard,
 				   sum((u.balance_solo + u.balance_t0 + verified_balance_t1.balance + verified_balance_t2.balance)* (100 + u.pre_staking_bonus) * u.pre_staking_allocation / 10000) AS balance_total_pre_staking,
@@ -564,7 +563,9 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 			WHERE u.created_at IN ['%[2]v']
 				AND u.kyc_step_passed >= %[3]v AND ( u.kyc_step_blocked = 0 OR u.kyc_step_blocked >= %[4]v)
 			GROUP BY u.created_at
-`, tableName, strings.Join(createdAtArray, "','"), kycStepToCalculateTotals, kycStepToCalculateTotals+1),
+`, tableName, strings.Join(createdAtArray, "','"), kycStepToCalculateTotals, kycStepToCalculateTotals+1)
+	if err := db.pools[atomic.AddUint64(&db.currentIndex, 1)%uint64(len(db.pools))].Do(ctx, ch.Query{
+		Body: sql,
 
 		Result: append(make(proto.Results, 0, 4),
 			proto.ResultColumn{Name: "created_at", Data: &createdAt},

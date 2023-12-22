@@ -350,5 +350,6 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
+		CoinStatsCacheDuration stdlibtime.Duration `yaml:"coinStatsCacheDuration"`
 	}
 )
