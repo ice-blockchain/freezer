@@ -588,3 +588,7 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 
 	return res, nil
 }
+
+func (t *TotalCoins) Key() string {
+	return fmt.Sprintf("totalCoinStats:%v", t.CreatedAt.Format(stdlibtime.RFC3339))
+}
