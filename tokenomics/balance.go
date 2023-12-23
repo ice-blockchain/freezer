@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"github.com/cenkalti/backoff/v4"
 	"math"
 	"sort"
 	stdlibtime "time"
@@ -24,31 +25,21 @@ import (
 
 func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcOffset stdlibtime.Duration) (*TotalCoinsSummary, error) {
 	var (
-		dates                             = make([]stdlibtime.Time, 0, days)
-		res                               = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
-		now                               = time.Now()
-		location                          = stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
-		adjustForLatencyToProcessAllUsers = -(r.cfg.GlobalAggregationInterval.Child / 4)
-		truncationInterval                = r.cfg.GlobalAggregationInterval.Child
-		dayInterval                       = r.cfg.GlobalAggregationInterval.Parent
+		dates    []stdlibtime.Time
+		res      = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
+		now      = time.Now()
+		location = stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
 	)
-	if cached, err := r.getCachedTotalCoins(ctx, days); err == nil && cached != nil {
-		return cached, nil
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to get coinStats from cache %v %v", now.Truncate(truncationInterval), days)
-	}
-	for day := uint64(0); day < days; day++ {
-		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(adjustForLatencyToProcessAllUsers).Truncate(truncationInterval)
-		dates = append(dates, date)
-		res.TimeSeries = append(res.TimeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
-	}
-	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
+
+	dates, res.TimeSeries = r.totalCoinsDates(now, days)
+	totalCoins, err := r.getCachedTotalCoins(ctx, dates)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to SelectTotalCoins for createdAts:%#v", dates)
+		return nil, errors.Wrapf(err, "failed to getCachedTotalCoins for createdAts:%#v", dates)
 	}
 	for _, child := range res.TimeSeries {
 		for _, stats := range totalCoins {
-			if stats.CreatedAt.Equal(child.Date) {
+			dayMatch := stats.CreatedAt.Truncate(r.cfg.GlobalAggregationInterval.Parent).Equal(child.Date.Truncate(r.cfg.GlobalAggregationInterval.Parent))
+			if dayMatch {
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
@@ -59,9 +50,6 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 		child.Date = child.Date.In(location)
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
-	if err = r.cacheTotalCoins(ctx, days, res); err != nil {
-		return nil, errors.Wrapf(err, "failed to place cache for coinStats %v %v", now.Truncate(truncationInterval), days)
-	}
 
 	return res, nil
 }
@@ -352,32 +340,170 @@ func ApplyPreStaking(amount, preStakingAllocation, preStakingBonus float64) (flo
 	return standardAmount, preStakingAmount
 }
 
-func (r *repository) getCachedTotalCoins(ctx context.Context, days uint64) (cached *TotalCoinsSummary, err error) {
-	cachedData, err := r.db.Get(ctx, coinStatsCacheKey(days)).Bytes()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return nil, errors.Wrapf(err, "failed to get cached value for coinStats for %v", days)
+func (r *repository) totalCoinsDates(now *time.Time, days uint64) ([]stdlibtime.Time, []*TotalCoinsTimeSeriesDataPoint) {
+	var (
+		adjustForLatencyToProcessAllUsers = -(r.cfg.GlobalAggregationInterval.Child / 4)
+		truncationInterval                = r.cfg.GlobalAggregationInterval.Child
+		dayInterval                       = r.cfg.GlobalAggregationInterval.Parent
+		dates                             = make([]stdlibtime.Time, 0, days)
+		timeSeries                        = make([]*TotalCoinsTimeSeriesDataPoint, 0, days)
+	)
+	for day := uint64(0); day < days; day++ {
+		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(adjustForLatencyToProcessAllUsers).Truncate(truncationInterval)
+		dates = append(dates, date)
+		timeSeries = append(timeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
-	if len(cachedData) == 0 {
-		return nil, nil
+	return dates, timeSeries
+}
+
+func (r *repository) cacheTotalCoins(ctx context.Context, coins []*dwh.TotalCoins) error {
+	now := time.Now()
+	if responses, err := r.db.TxPipelined(ctx, func(pipeliner redis.Pipeliner) error {
+		var err error
+		for _, tc := range coins {
+			key := r.totalCoinsCacheKey(*tc.CreatedAt.Time)
+			lastRecordCurrentlyUpdating := now.Truncate(r.cfg.GlobalAggregationInterval.Parent).Equal(tc.CreatedAt.Time.Truncate(r.cfg.GlobalAggregationInterval.Parent))
+			if lastRecordCurrentlyUpdating {
+				err = multierror.Append(err,
+					r.db.HSet(ctx, key, "created_at", tc.CreatedAt,
+						"blockchain", tc.BalanceTotalEthereum,
+						"standard", tc.BalanceTotalStandard,
+						"pre_staking", tc.BalanceTotalPreStaking).Err(),
+				).ErrorOrNil()
+			} else {
+				err = multierror.Append(err,
+					r.db.HSetNX(ctx, key, "created_at", tc.CreatedAt).Err(),
+					r.db.HSetNX(ctx, key, "blockchain", tc.BalanceTotalEthereum).Err(),
+					r.db.HSetNX(ctx, key, "standard", tc.BalanceTotalStandard).Err(),
+					r.db.HSetNX(ctx, key, "pre_staking", tc.BalanceTotalPreStaking).Err(),
+				).ErrorOrNil()
+			}
+		}
+
+		return err
+	}); err != nil {
+		return errors.Wrapf(err, "failed to save to totalCoinsCache: %+v", coins)
+	} else {
+		errs := make([]error, 0, 1+1)
+		for _, response := range responses {
+			if err = response.Err(); err != nil {
+				errs = append(errs, errors.Wrapf(err, "failed to `%v`", response.FullName()))
+			}
+		}
+		return multierror.Append(nil, errs...).ErrorOrNil() //nolint:wrapcheck // .
 	}
-	cached = new(TotalCoinsSummary)
-	if err = json.Unmarshal(cachedData, cached); err != nil {
-		return nil, errors.Wrapf(err, "failed to deserialize cached data for coinStats: %v info %+v", string(cachedData), cached)
+}
+
+func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime.Time) ([]*dwh.TotalCoins, error) {
+	keys := make([]string, 0, len(dates))
+	for _, d := range dates {
+		keys = append(keys, r.totalCoinsCacheKey(d))
 	}
+	cacheResult, err := storage.Get[struct {
+		CreatedAt              *time.Time `redis:"created_at"`
+		BalanceTotalStandard   float64    `redis:"standard"`
+		BalanceTotalPreStaking float64    `redis:"pre_staking"`
+		BalanceTotalEthereum   float64    `redis:"blockchain"`
+	}](ctx, r.db, keys...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get cached coinStats for dates %v", dates)
+	}
+	cached := make([]*dwh.TotalCoins, 0, len(cacheResult))
+	for _, c := range cacheResult {
+		cached = append(cached, &dwh.TotalCoins{
+			CreatedAt:              c.CreatedAt,
+			BalanceTotalStandard:   c.BalanceTotalStandard,
+			BalanceTotalPreStaking: c.BalanceTotalPreStaking,
+			BalanceTotalEthereum:   c.BalanceTotalEthereum,
+		})
+	}
+
 	return cached, nil
 }
 
-func (r *repository) cacheTotalCoins(ctx context.Context, days uint64, summary *TotalCoinsSummary) error {
-	cacheData, err := json.MarshalContext(ctx, summary)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize cache value %v", summary)
-	}
-	expiration := r.cfg.GlobalAggregationInterval.Child
-
-	return errors.Wrapf(
-		r.db.SetNX(ctx, coinStatsCacheKey(days), cacheData, expiration).Err(),
-		"failed to save cache with coin stats (%v) %+v", days, summary)
+func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
+	return fmt.Sprintf("totalCoinStats:%v", date.Truncate(r.cfg.GlobalAggregationInterval.Parent).Format(stdlibtime.RFC3339))
 }
-func coinStatsCacheKey(days uint64) string {
-	return fmt.Sprintf("coinStats:%v", days)
+
+func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context) {
+	for ctx.Err() == nil {
+		now := time.Now()
+		if now.Sub(now.Truncate(r.cfg.GlobalAggregationInterval.Child)) >= stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child)*0.75) {
+			dwhCtx, cancel := context.WithTimeout(ctx, stdlibtime.Duration(0.20*float64(r.cfg.GlobalAggregationInterval.Child)))
+			if err := r.buildTotalCoinCache(dwhCtx, now.Truncate(r.cfg.GlobalAggregationInterval.Child)); err != nil {
+				log.Error(errors.Wrapf(err, "failed to update total coin stats cache for date %v", *now.Time))
+			}
+			cancel()
+		} else {
+			stdlibtime.Sleep(stdlibtime.Second)
+		}
+	}
+}
+
+func (r *repository) buildTotalCoinCache(ctx context.Context, dates ...stdlibtime.Time) error {
+	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read total coin stats cacheable values for dates %v", dates)
+	}
+	for _, d := range dates {
+		found := false
+		for _, stats := range totalCoins {
+			if stats.CreatedAt.Equal(d) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			totalCoins = append(totalCoins, &dwh.TotalCoins{
+				CreatedAt:              time.New(d),
+				BalanceTotalStandard:   0,
+				BalanceTotalPreStaking: 0,
+				BalanceTotalEthereum:   0,
+			})
+		}
+	}
+	return errors.Wrapf(
+		r.cacheTotalCoins(ctx, totalCoins),
+		"failed to save total coin stats cache for dates %v", dates)
+}
+
+func (r *repository) mustInitTotalCoinsCache(ctx context.Context) {
+	now := time.Now()
+	dates, _ := r.totalCoinsDates(now, daysCountToInitCoinsCacheOnStartup)
+	alreadyCached, err := r.getCachedTotalCoins(ctx, dates)
+	if err != nil {
+		log.Panic(errors.Wrapf(err, "failed to init total coin stats cache"))
+	}
+	for _, cached := range alreadyCached {
+		for dateIdx, date := range dates {
+			daysMatch := cached.CreatedAt.Truncate(r.cfg.GlobalAggregationInterval.Parent).Equal(date.Truncate(r.cfg.GlobalAggregationInterval.Parent))
+			if daysMatch {
+				dates = append(dates[:dateIdx], dates[dateIdx+1:]...)
+
+				break
+			}
+		}
+	}
+	for _, d := range dates {
+		if err = backoff.RetryNotify(
+			func() error {
+				return errors.Wrapf(r.buildTotalCoinCache(ctx, d), "failed to build/init total coins cache for %v", d)
+			},
+			backoff.WithContext(&backoff.ExponentialBackOff{
+				InitialInterval:     500 * stdlibtime.Millisecond,
+				RandomizationFactor: 0.5,
+				Multiplier:          2.5,
+				MaxInterval:         2 * stdlibtime.Minute,
+				MaxElapsedTime:      30 * stdlibtime.Second,
+				Stop:                backoff.Stop,
+				Clock:               backoff.SystemClock,
+			}, ctx),
+			func(e error, next stdlibtime.Duration) {
+				log.Error(errors.Wrapf(e, "failed to init total coins cache retrying in %v... ", next))
+			}); err != nil {
+			log.Panic(errors.Wrapf(err,
+				"failed to init total coin stats cache for %v days (%v)", daysCountToInitCoinsCacheOnStartup, dates))
+		}
+
+	}
 }
