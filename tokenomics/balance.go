@@ -5,11 +5,11 @@ package tokenomics
 import (
 	"context"
 	"fmt"
-	"github.com/cenkalti/backoff/v4"
 	"math"
 	"sort"
 	stdlibtime "time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/goccy/go-json"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
