@@ -142,7 +142,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
 		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining           = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
 		balanceT1EthereumIncr, balanceT2EthereumIncr                         = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
-		slashingsToApplyForTMinus1, slashingsToApplyForT0                    = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
+		pendingBalancesForTMinus1, pendingBalancesForT0                      = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
 		referralsThatStoppedMining                                           = make([]*referralThatStoppedMining, 0, batchSize)
 		coinDistributions                                                    = make([]*coindistribution.ByEarnerForReview, 0, 4*batchSize)
 		msgResponder                                                         = make(chan error, 3*batchSize)
@@ -226,11 +226,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		for k := range balanceT2EthereumIncr {
 			delete(balanceT2EthereumIncr, k)
 		}
-		for k := range slashingsToApplyForTMinus1 {
-			delete(slashingsToApplyForTMinus1, k)
+		for k := range pendingBalancesForTMinus1 {
+			delete(pendingBalancesForTMinus1, k)
 		}
-		for k := range slashingsToApplyForT0 {
-			delete(slashingsToApplyForT0, k)
+		for k := range pendingBalancesForT0 {
+			delete(pendingBalancesForT0, k)
 		}
 	}
 	for ctx.Err() == nil {
@@ -331,7 +331,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if isAdvancedTeamDisabled(usr.LatestDevice) {
 				usr.ActiveT2Referrals = 0
 			}
-			updatedUser, shouldGenerateHistory, IDT0Changed, slashingAmountForTMinus1, slashingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
+			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
@@ -378,11 +378,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if balanceDistributedForTMinus1 > 0 {
 					balanceT2EthereumIncr[tMinus1Ref.ID] += balanceDistributedForTMinus1
 				}
-				if tMinus1Ref != nil && tMinus1Ref.ID != 0 && slashingAmountForTMinus1 != 0 {
-					slashingsToApplyForTMinus1[tMinus1Ref.ID] += slashingAmountForTMinus1
+				if tMinus1Ref != nil && tMinus1Ref.ID != 0 && pendingAmountForTMinus1 != 0 {
+					pendingBalancesForTMinus1[tMinus1Ref.ID] += pendingAmountForTMinus1
 				}
-				if t0Ref != nil && t0Ref.ID != 0 && slashingAmountForT0 != 0 {
-					slashingsToApplyForT0[t0Ref.ID] += slashingAmountForT0
+				if t0Ref != nil && t0Ref.ID != 0 && pendingAmountForT0 != 0 {
+					pendingBalancesForT0[t0Ref.ID] += pendingAmountForT0
 				}
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
@@ -507,7 +507,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		var pipeliner redis.Pipeliner
 		var transactional bool
-		if len(slashingsToApplyForTMinus1)+len(slashingsToApplyForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
+		if len(pendingBalancesForTMinus1)+len(pendingBalancesForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
 			pipeliner = m.db.TxPipeline()
 			transactional = true
 		} else {
@@ -578,13 +578,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					return err
 				}
 			}
-			for idT0, amount := range slashingsToApplyForT0 {
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_pending", -amount).Err(); err != nil {
+			for idT0, amount := range pendingBalancesForTMinus1 {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_pending", amount).Err(); err != nil {
 					return err
 				}
 			}
-			for idTMinus1, amount := range slashingsToApplyForTMinus1 {
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_pending", -amount).Err(); err != nil {
+			for idTMinus1, amount := range pendingBalancesForT0 {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_pending", amount).Err(); err != nil {
 					return err
 				}
 			}

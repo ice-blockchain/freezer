@@ -7,13 +7,13 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory, IDT0Changed bool, slashingAmountForTMinus1, slashingAmountForT0 float64) {
+func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory, IDT0Changed bool, pendingAmountForTMinus1, pendingAmountForT0 float64) {
 	if usr == nil || usr.MiningSessionSoloStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil() {
 		return nil, false, false, 0, 0
 	}
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
-	resurrect(now, updatedUser, t0Ref, tMinus1Ref)
+	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
@@ -130,16 +130,18 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		if updatedUser.SlashingRateSolo < 0 {
 			updatedUser.SlashingRateSolo = 0
 		}
-		if updatedUser.SlashingRateT0 == 0 {
-			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 60. / miningSessionRatio
-		}
 	}
 
-	if t0Ref != nil && updatedUser.SlashingRateForT0 == 0 &&
+	if t0Ref != nil &&
 		((!t0Ref.MiningSessionSoloEndedAt.IsNil() &&
 			t0Ref.MiningSessionSoloEndedAt.Before(*now.Time)) ||
 			updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
-		updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 60. / miningSessionRatio
+		if updatedUser.SlashingRateForT0 == 0 {
+			updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 60. / miningSessionRatio
+		}
+		if updatedUser.SlashingRateT0 == 0 {
+			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 60. / miningSessionRatio
+		}
 	}
 	if tMinus1Ref != nil && updatedUser.SlashingRateForTMinus1 == 0 &&
 		((!tMinus1Ref.MiningSessionSoloEndedAt.IsNil() &&
@@ -148,31 +150,34 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
 	}
 
-	slashedAmount := (updatedUser.SlashingRateSolo + updatedUser.SlashingRateT0 + updatedUser.SlashingRateT1 + updatedUser.SlashingRateT2) * elapsedTimeFraction
+	slashedAmount := (updatedUser.SlashingRateSolo + updatedUser.SlashingRateT0) * elapsedTimeFraction
 	updatedUser.BalanceSolo -= updatedUser.SlashingRateSolo * elapsedTimeFraction
 
-	slashingAmountForTMinus1 = updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
-	slashingAmountForT0 = updatedUser.SlashingRateForT0 * elapsedTimeFraction
+	pendingAmountForTMinus1 -= updatedUser.SlashingRateForTMinus1 * elapsedTimeFraction
+	pendingAmountForT0 -= updatedUser.SlashingRateForT0 * elapsedTimeFraction
 
-	updatedUser.BalanceForTMinus1 -= slashingAmountForTMinus1
-	updatedUser.BalanceForT0 -= slashingAmountForT0
+	updatedUser.BalanceForTMinus1 += pendingAmountForTMinus1
+	updatedUser.BalanceForT0 += pendingAmountForT0
 	updatedUser.BalanceT0 -= updatedUser.SlashingRateT0 * elapsedTimeFraction
 	updatedUser.BalanceSolo += unAppliedSoloPending
 	updatedUser.BalanceT1 += unAppliedT1Pending
 	updatedUser.BalanceT2 += unAppliedT2Pending
 
+	pendingAmountForTMinus1 += pendingResurrectionForTMinus1
+	pendingAmountForT0 += pendingResurrectionForT0
+
 	if unAppliedSoloPending < 0 {
-		slashedAmount += unAppliedSoloPending
+		slashedAmount += -unAppliedSoloPending
 	} else {
 		mintedAmount += unAppliedSoloPending
 	}
 	if unAppliedT1Pending < 0 {
-		slashedAmount += unAppliedT1Pending
+		slashedAmount += -unAppliedT1Pending
 	} else {
 		mintedAmount += unAppliedT1Pending
 	}
 	if unAppliedT2Pending < 0 {
-		slashedAmount += unAppliedT2Pending
+		slashedAmount += -unAppliedT2Pending
 	} else {
 		mintedAmount += unAppliedT2Pending
 	}
@@ -207,7 +212,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
-	return updatedUser, shouldGenerateHistory, IDT0Changed, slashingAmountForTMinus1, slashingAmountForT0
+	return updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0
 }
 
 func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *referralUpdated) {
