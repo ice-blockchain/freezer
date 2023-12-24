@@ -94,9 +94,17 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceForT0 += rate
 			updatedUser.BalanceT0 += rate
 			mintedAmount += rate
+
+			if updatedUser.SlashingRateForT0 != 0 {
+				updatedUser.SlashingRateForT0 = 0
+			}
 		}
 		if tMinus1Ref != nil && !tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) {
 			updatedUser.BalanceForTMinus1 += 5 * baseMiningRate * elapsedTimeFraction / 100
+
+			if updatedUser.SlashingRateForTMinus1 != 0 {
+				updatedUser.SlashingRateForTMinus1 = 0
+			}
 		}
 		if updatedUser.ActiveT1Referrals < 0 {
 			updatedUser.ActiveT1Referrals = 0
@@ -110,16 +118,6 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2 += t2Rate
 		mintedAmount += t1Rate + t2Rate
 
-		if t0Ref != nil && updatedUser.SlashingRateForT0 != 0 &&
-			!t0Ref.MiningSessionSoloEndedAt.IsNil() &&
-			t0Ref.MiningSessionSoloEndedAt.After(*now.Time) {
-			updatedUser.SlashingRateForT0 = 0
-		}
-		if tMinus1Ref != nil && updatedUser.SlashingRateForTMinus1 != 0 &&
-			!tMinus1Ref.MiningSessionSoloEndedAt.IsNil() &&
-			tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) {
-			updatedUser.SlashingRateForTMinus1 = 0
-		}
 	} else {
 		if updatedUser.SlashingRateSolo == 0 {
 			updatedUser.SlashingRateSolo = updatedUser.BalanceSolo / 60. / miningSessionRatio
@@ -133,9 +131,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	}
 
 	if t0Ref != nil &&
-		((!t0Ref.MiningSessionSoloEndedAt.IsNil() &&
-			t0Ref.MiningSessionSoloEndedAt.Before(*now.Time)) ||
-			updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
+		((!t0Ref.MiningSessionSoloEndedAt.IsNil() && t0Ref.MiningSessionSoloEndedAt.Before(*now.Time)) || updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
 		if updatedUser.SlashingRateForT0 == 0 {
 			updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 60. / miningSessionRatio
 		}
@@ -143,11 +139,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 60. / miningSessionRatio
 		}
 	}
-	if tMinus1Ref != nil && updatedUser.SlashingRateForTMinus1 == 0 &&
-		((!tMinus1Ref.MiningSessionSoloEndedAt.IsNil() &&
-			tMinus1Ref.MiningSessionSoloEndedAt.Before(*now.Time)) ||
-			updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
-		updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
+	if tMinus1Ref != nil &&
+		((!tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.Before(*now.Time)) || updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
+		if updatedUser.SlashingRateForTMinus1 == 0 {
+			updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
+		}
 	}
 
 	slashedAmount := (updatedUser.SlashingRateSolo + updatedUser.SlashingRateT0) * elapsedTimeFraction

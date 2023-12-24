@@ -578,12 +578,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					return err
 				}
 			}
-			for idT0, amount := range pendingBalancesForTMinus1 {
+			for idT0, amount := range pendingBalancesForT0 {
 				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_pending", amount).Err(); err != nil {
 					return err
 				}
 			}
-			for idTMinus1, amount := range pendingBalancesForT0 {
+			for idTMinus1, amount := range pendingBalancesForTMinus1 {
 				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_pending", amount).Err(); err != nil {
 					return err
 				}
