@@ -61,7 +61,7 @@ func databaseGetValue[T bool | constraints.Integer](ctx context.Context, db stor
 		log.Panic(fmt.Sprintf("%s: unsupported type %T: %v", key, x, *value))
 	}
 
-	v, err := storage.Get[T](reqCtx, db, "SELECT value::"+hint+" FROM global WHERE key = $1", key)
+	v, err := storage.ExecOne[T](reqCtx, db, "SELECT value::"+hint+" FROM global WHERE key = $1", key)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get %v", key)
 	}
@@ -100,7 +100,7 @@ func (d *databaseConfig) HasPendingTransactions(ctx context.Context, status ethA
 	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
 
-	val, err := storage.Get[bool](reqCtx, d.DB, `SELECT true FROM pending_coin_distributions where eth_status = $1 limit 1`, status)
+	val, err := storage.ExecOne[bool](reqCtx, d.DB, `SELECT true FROM pending_coin_distributions where eth_status = $1 limit 1`, status)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			err = nil
