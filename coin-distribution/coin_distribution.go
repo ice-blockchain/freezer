@@ -4,10 +4,12 @@ package coindistribution
 
 import (
 	"context"
+	"fmt"
 	stdlibtime "time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/constraints"
 
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
@@ -24,33 +26,91 @@ func (d *databaseConfig) MustDisable(ctx context.Context, reason string) {
 		"failed to sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage")
 }
 
-func (d *databaseConfig) IsEnabled(ctx context.Context) bool {
+func databaseSetValue[T bool | constraints.Integer](ctx context.Context, db storage.Execer, key string, value T) error {
 	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
-	val, err := storage.ExecOne[struct {
-		Enabled bool
-	}](reqCtx, d.DB, `SELECT value::bool as enabled FROM global WHERE key = 'coin_distributer_enabled'`)
+
+	textValue := fmt.Sprintf("%v", value)
+	rows, err := storage.Exec(reqCtx, db, `UPDATE global SET value = $2 WHERE key = $1`, key, textValue)
+	if err == nil && rows == 0 {
+		err = storage.ErrNotFound
+	}
+
+	return errors.Wrapf(err, "failed to set %v to %q", key, textValue)
+}
+
+func databaseGetValue[T bool | constraints.Integer](ctx context.Context, db storage.Querier, key string, value *T) error {
+	var hint string
+
+	if value == nil {
+		log.Panic(key + ": value is nil")
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+	defer cancel()
+
+	var x any = value
+	switch x.(type) {
+	case *bool:
+		hint = "boolean"
+	case *int, *int8, *int16, *int32, *int64:
+		hint = "bigint"
+	case *uint, *uint8, *uint16, *uint32, *uint64:
+		hint = "bigint"
+	default:
+		log.Panic(fmt.Sprintf("%s: unsupported type %T: %v", key, x, *value))
+	}
+
+	v, err := storage.Get[T](reqCtx, db, "SELECT value::"+hint+" FROM global WHERE key = $1", key)
 	if err != nil {
-		log.Error(errors.Wrap(err, "failed to check if coinDistributer is enabled"))
+		return errors.Wrapf(err, "failed to get %v", key)
+	}
+	*value = *v
+
+	return nil
+}
+
+func (d *databaseConfig) GetGasLimit(ctx context.Context) (val uint64, err error) {
+	err = databaseGetValue(ctx, d.DB, configKeyoinDistributerGasLimit, &val)
+
+	return val, err
+}
+
+func (d *databaseConfig) IsEnabled(ctx context.Context) (val bool) {
+	databaseGetValue(ctx, d.DB, configKeyCoinDistributerEnabled, &val)
+
+	return val
+}
+
+func (d *databaseConfig) IsOnDemandMode(ctx context.Context) (val bool) {
+	databaseGetValue(ctx, d.DB, configKeyCoinDistributerOnDemand, &val)
+
+	return val
+}
+
+func (d *databaseConfig) DisableOnDemand(ctx context.Context) error {
+	return databaseSetValue(ctx, d.DB, configKeyCoinDistributerOnDemand, false)
+}
+
+func (d *databaseConfig) Disable(ctx context.Context) error {
+	return databaseSetValue(ctx, d.DB, configKeyCoinDistributerEnabled, false)
+}
+
+func (d *databaseConfig) HasPendingTransactions(ctx context.Context, status ethApiStatus) bool {
+	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+	defer cancel()
+
+	val, err := storage.Get[bool](reqCtx, d.DB, `SELECT true FROM pending_coin_distributions where eth_status = $1 limit 1`, status)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			err = nil
+		}
+		log.Error(errors.Wrap(err, "failed to check for pending transactions"))
 
 		return false
 	}
 
-	return val.Enabled
-}
-
-func (d *databaseConfig) Disable(ctx context.Context) error {
-	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
-	defer cancel()
-	rows, err := storage.Exec(reqCtx, d.DB, `UPDATE global SET value = 'false' WHERE key = 'coin_distributer_enabled'`)
-	if err != nil {
-		return errors.Wrap(err, "failed to disable coinDistributer")
-	}
-	if rows == 0 {
-		return errors.Wrap(storage.ErrNotFound, "failed to disable coinDistributer")
-	}
-
-	return nil
+	return *val
 }
 
 func init() {

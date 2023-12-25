@@ -100,15 +100,24 @@ const (
 
 	batchSize = 1320
 
-	gasLimit         = 300000
 	gasPriceCacheTTL = stdlibtime.Minute
 
+	workerActionRun      workerAction = 0
+	workerActionBlocked  workerAction = 1
+	workerActionDisabled workerAction = 2
+	workerActionOnDemand workerAction = 3
+
+	ethApiStatusNew      ethApiStatus = "NEW"
 	ethApiStatusPending  ethApiStatus = "PENDING"
 	ethApiStatusAccepted ethApiStatus = "ACCEPTED"
 	ethApiStatusRejected ethApiStatus = "REJECTED"
 
 	ethTxStatusSuccessful ethTxStatus = "SUCCESSFUL"
 	ethTxStatusFailed     ethTxStatus = "FAILED"
+
+	configKeyCoinDistributerEnabled  = "coin_distributer_enabled"
+	configKeyCoinDistributerOnDemand = "coin_distributer_forced_execution"
+	configKeyoinDistributerGasLimit  = "coin_distributer_gas_limit_units"
 )
 
 // .
@@ -116,17 +125,19 @@ var (
 	//nolint:gochecknoglobals // Singleton & global config mounted only during bootstrap.
 	cfg config
 	//go:embed DDL.sql
-	ddl              string
-	errNotEnoughData = errors.New("not enough data")
+	ddl                  string
+	errNotEnoughData     = errors.New("not enough data")
+	errClientUncoverable = errors.New("uncoverable error")
 )
 
 type (
 	ethTxStatus  string
 	ethApiStatus string
+	workerAction uint
 	ethClient    interface {
 		SuggestGasPrice(ctx context.Context) (*big.Int, error)
 		TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error)
-		Airdrop(ctx context.Context, gasPrice, chanID *big.Int, recipients []common.Address, amounts []*big.Int) (string, error)
+		Airdrop(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64, recipients []common.Address, amounts []*big.Int) (string, error)
 		io.Closer
 	}
 	airDropper interface {
@@ -156,11 +167,16 @@ type (
 		Workers      *pond.WorkerPool
 		CancelSignal chan struct{}
 	}
+	coinProcessorWorkerTask struct {
+		Context context.Context
+		Result  chan error
+	}
 	coinProcessor struct {
 		*databaseConfig
 		Client        ethClient
 		Conf          *config
 		WG            *sync.WaitGroup
+		ProcessSignal []chan coinProcessorWorkerTask
 		CancelSignal  chan struct{}
 		gasPriceCache struct {
 			price *big.Int

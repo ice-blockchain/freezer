@@ -41,6 +41,7 @@ INSERT INTO pending_coin_distributions
 	(created_at, day, internal_id, iceflakes, user_id, eth_address)
 VALUES (now(), CURRENT_DATE, 1, $1, $2, $3)`
 
+	t.Logf("adding %v new pending transaction(s)", count)
 	for i := 0; i < count; i++ {
 		_, err := storage.Exec(ctx, proc.DB, stmt, rand.Int63n(1_000_000)+1, RandStringBytes(10), RandStringBytes(16)) //nolint:gosec //.
 		require.NoError(t, err)
@@ -188,4 +189,46 @@ func TestIsInTimeWindow(t *testing.T) {
 	require.Panics(t, func() {
 		isInTimeWindow(0, 0, 24)
 	})
+}
+
+func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
+	maybeSkipTest(t)
+	ctx := context.TODO()
+	now := time.Now()
+	proc := newCoinProcessor(&mockedDummyEthClient{},
+		storage.MustConnect(ctx, ddl, applicationYamlKey),
+		&config{
+			Workers:    2,
+			StartHours: now.Hour() - 2,
+			EndHours:   now.Hour() - 1,
+		},
+	)
+	require.NotNil(t, proc)
+	defer proc.Close()
+
+	helperTruncatePendingTransactions(ctx, t, proc.DB)
+	helperAddNewPendingTransaction(ctx, t, proc, batchSize*4)
+
+	ch := make(chan *batch, 4)
+	proc.Start(ctx, ch)
+	require.True(t, proc.isBlocked())
+
+	select {
+	case <-ch:
+		t.Fatal("unexpected batch outside of time window")
+
+	case <-stdlibtime.After(stdlibtime.Second * 10):
+		t.Log("firing trigger")
+		require.NoError(t, databaseSetValue(ctx, proc.DB, configKeyCoinDistributerOnDemand, true))
+	}
+
+	for i := 0; i < 4; i++ {
+		data := <-ch
+		t.Logf("batch: %v: processed with %v record(s)", data.ID, len(data.Records))
+		for _, r := range data.Records {
+			require.Equal(t, ethApiStatusAccepted, r.EthStatus)
+		}
+	}
+
+	require.False(t, proc.IsOnDemandMode(ctx))
 }

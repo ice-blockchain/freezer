@@ -7,10 +7,12 @@ import (
 	"math/big"
 	"net/http"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -40,29 +42,77 @@ func mustNewEthClient(ctx context.Context, endpoint, privateKey, contract string
 	}
 }
 
-func maybeRetryRPCRequest[T any](ctx context.Context, fn func() (T, error)) (val T, err error) {
-	var httpErr *rpc.HTTPError
+func handleRPCError(ctx context.Context, target error) (retryAfter time.Duration) {
+	var sysErr *syscall.Errno
+	if errors.As(target, &sysErr) {
+		return time.Second * 5
+	}
 
+	var httpErr *rpc.HTTPError
+	if errors.As(target, &httpErr) {
+		if httpErr.StatusCode == http.StatusTooManyRequests {
+			return time.Hour
+		} else if httpErr.StatusCode >= http.StatusInternalServerError {
+			return time.Minute
+		}
+
+		return 0
+	}
+
+	if errors.Is(target, core.ErrIntrinsicGas) {
+		log.Error(errors.Wrap(sendEthereumGasLimitTooLowSlackMessage(ctx, target.Error()), "failed to send slack message"))
+
+		return time.Minute * 10
+	}
+
+	for _, ethErr := range []error{
+		core.ErrNonceTooLow,
+		core.ErrNonceMax,
+		core.ErrInsufficientFundsForTransfer,
+		core.ErrMaxInitCodeSizeExceeded,
+		core.ErrInsufficientFunds,
+		core.ErrTxTypeNotSupported,
+		core.ErrSenderNoEOA,
+		core.ErrBlobFeeCapTooLow,
+	} {
+		if errors.Is(target, ethErr) {
+			return 0
+		}
+	}
+
+	return time.Minute
+}
+
+func maybeRetryRPCRequest[T any](ctx context.Context, fn func() (T, error)) (val T, err error) {
+main:
 	for attempt := 1; ctx.Err() == nil; attempt++ {
 		val, err = fn()
 		if err == nil {
 			return val, nil
 		}
 
-		log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v)", attempt))
-		if errors.As(err, &httpErr) {
-			switch httpErr.StatusCode {
-			case http.StatusInternalServerError, http.StatusTooManyRequests:
-			default:
-				return val, err
-			}
+		retryAfter := handleRPCError(ctx, err)
+		if retryAfter > 0 {
+			log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v), retrying after %v", attempt, retryAfter.String()))
+		} else {
+			log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v), unrecoverable error", attempt))
+
+			return val, multierror.Append(errClientUncoverable, err)
 		}
 
-		// In case any other error occurred (network timeout, dns, etc), retry after a second.
-		time.Sleep(time.Second)
+		retryTimer := time.NewTimer(retryAfter)
+		select {
+		case <-ctx.Done():
+			retryTimer.Stop()
+
+			break main
+
+		case <-retryTimer.C:
+			retryTimer.Stop()
+		}
 	}
 
-	return val, err
+	return val, multierror.Append(err, ctx.Err())
 }
 
 func (ec *ethClientImpl) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
@@ -79,7 +129,7 @@ func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []
 	return ec.AirDropper.AirdropToWallets(opts, recipients, amounts) //nolint:wrapcheck //.
 }
 
-func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, chanID *big.Int) *bind.TransactOpts {
+func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64) *bind.TransactOpts {
 	opts, err := bind.NewKeyedTransactorWithChainID(ec.Key, chanID)
 	log.Panic(errors.Wrap(err, "failed to create transaction options")) //nolint:revive,nolintlint //.
 	opts.Context = ctx
@@ -90,9 +140,9 @@ func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, ch
 	return opts
 }
 
-func (ec *ethClientImpl) Airdrop(ctx context.Context, gasPrice, chanID *big.Int, recipients []common.Address, amounts []*big.Int) (string, error) {
+func (ec *ethClientImpl) Airdrop(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64, recipients []common.Address, amounts []*big.Int) (string, error) {
 	return maybeRetryRPCRequest(ctx, func() (string, error) {
-		tx, err := ec.AirDropper.AirdropToWallets(ec.CreateTransactionOpts(ctx, gasPrice, chanID), recipients, amounts)
+		tx, err := ec.AirdropToWallets(ec.CreateTransactionOpts(ctx, gasPrice, chanID, gasLimit), recipients, amounts)
 		if err != nil {
 			return "", err //nolint:wrapcheck //.
 		}
