@@ -110,6 +110,7 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 		}
 	}()
 
+	hadWork := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -123,29 +124,35 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 			return
 
 		case <-signals:
-			if err := ct.Do(ctx, notify); err != nil {
-				log.Error(errors.Wrap(err, "failed to check accepted transactions"))
-			} else if !ct.HasPendingTransactions(ctx, ethApiStatusAccepted) {
+			if hadWork && !ct.HasPendingTransactions(ctx, ethApiStatusAccepted) {
+				hadWork = false
 				log.Error(sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx),
 					"failed to sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage")
+			}
+
+			hasWork, err := ct.Do(ctx, notify)
+			if err != nil {
+				log.Error(errors.Wrap(err, "failed to check accepted transactions"))
+			} else {
+				hadWork = hadWork || hasWork
 			}
 		}
 	}
 }
 
-func (ct *coinTracker) Do(ctx context.Context, notify chan<- []*string) error {
+func (ct *coinTracker) Do(ctx context.Context, notify chan<- []*string) (submitted bool, err error) {
 	const limit = 100
 	var offset uint
 
 	for ctx.Err() == nil {
 		hashes, err := ct.FetchTransactions(ctx, limit, offset)
 		if err != nil {
-			return errors.Wrap(err, "failed to fetch transactions")
+			return false, errors.Wrap(err, "failed to fetch transactions")
 		}
 		if len(hashes) == 0 {
 			log.Debug("no transactions found to check")
 
-			return nil
+			return submitted, nil
 		}
 
 		ct.Workers.Submit(func() {
@@ -159,10 +166,11 @@ func (ct *coinTracker) Do(ctx context.Context, notify chan<- []*string) error {
 			sendNotify(notify, hashes)
 		})
 
+		submitted = true
 		offset += uint(len(hashes))
 	}
 
-	return nil
+	return submitted, nil
 }
 
 func (ct *coinTracker) FetchTransactions(ctx context.Context, limit, offset uint) ([]*string, error) {

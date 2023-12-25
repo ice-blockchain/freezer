@@ -5,6 +5,7 @@ package coindistribution
 import (
 	"context"
 	"math/big"
+	"net"
 	"net/http"
 	"sync"
 	"syscall"
@@ -45,6 +46,11 @@ func mustNewEthClient(ctx context.Context, endpoint, privateKey, contract string
 func handleRPCError(ctx context.Context, target error) (retryAfter time.Duration) {
 	var sysErr *syscall.Errno
 	if errors.As(target, &sysErr) {
+		return time.Second
+	}
+
+	var opErr *net.OpError
+	if errors.As(target, &opErr) {
 		return time.Second * 5
 	}
 
@@ -140,15 +146,23 @@ func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, ch
 	return opts
 }
 
-func (ec *ethClientImpl) Airdrop(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64, recipients []common.Address, amounts []*big.Int) (string, error) {
-	return maybeRetryRPCRequest(ctx, func() (string, error) {
-		tx, err := ec.AirdropToWallets(ec.CreateTransactionOpts(ctx, gasPrice, chanID, gasLimit), recipients, amounts)
+func (ec *ethClientImpl) Airdrop(ctx context.Context, chanID *big.Int, gas gasGetter, recipients []common.Address, amounts []*big.Int) (string, error) {
+	fn := func() (string, error) {
+		gasPrice, gasLimit, err := gas.GetGasOptions(ctx)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get gas options")
+		}
+
+		opts := ec.CreateTransactionOpts(ctx, gasPrice, chanID, gasLimit)
+		tx, err := ec.AirdropToWallets(opts, recipients, amounts)
 		if err != nil {
 			return "", err //nolint:wrapcheck //.
 		}
 
 		return tx.Hash().String(), nil
-	})
+	}
+
+	return maybeRetryRPCRequest(ctx, fn)
 }
 
 func (ec *ethClientImpl) TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error) { //nolint:funlen //.

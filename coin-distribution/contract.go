@@ -134,10 +134,13 @@ type (
 	ethTxStatus  string
 	ethApiStatus string
 	workerAction uint
-	ethClient    interface {
+	gasGetter    interface {
+		GetGasOptions(ctx context.Context) (price *big.Int, limit uint64, err error)
+	}
+	ethClient interface {
 		SuggestGasPrice(ctx context.Context) (*big.Int, error)
 		TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error)
-		Airdrop(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64, recipients []common.Address, amounts []*big.Int) (string, error)
+		Airdrop(ctx context.Context, chanID *big.Int, gas gasGetter, recipients []common.Address, amounts []*big.Int) (string, error)
 		io.Closer
 	}
 	airDropper interface {
