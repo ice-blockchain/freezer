@@ -80,7 +80,11 @@ func (ct *coinTracker) ProcessTransactionsHashes(ctx context.Context, hashes []*
 			err = multierror.Append(err, rejectErr)
 		}
 		log.Info("some transactions failed, disabling coinDistributer")
-		ct.MustDisable(ctx, fmt.Sprintf("some transactions failed: %v", err.Error()))
+		msg := "rejected"
+		if err != nil {
+			msg = err.Error()
+		}
+		ct.MustDisable(ctx, fmt.Sprintf("some transactions failed: %v", msg))
 		delete(statuses, ethTxStatusFailed)
 	}
 
