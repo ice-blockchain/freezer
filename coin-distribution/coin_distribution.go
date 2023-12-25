@@ -77,13 +77,13 @@ func (d *databaseConfig) GetGasLimit(ctx context.Context) (val uint64, err error
 }
 
 func (d *databaseConfig) IsEnabled(ctx context.Context) (val bool) {
-	databaseGetValue(ctx, d.DB, configKeyCoinDistributerEnabled, &val)
+	log.Error(errors.Wrap(databaseGetValue(ctx, d.DB, configKeyCoinDistributerEnabled, &val), "failed to databaseGetValue"))
 
 	return val
 }
 
 func (d *databaseConfig) IsOnDemandMode(ctx context.Context) (val bool) {
-	databaseGetValue(ctx, d.DB, configKeyCoinDistributerOnDemand, &val)
+	log.Error(databaseGetValue(ctx, d.DB, configKeyCoinDistributerOnDemand, &val), "failed to databaseGetValue")
 
 	return val
 }

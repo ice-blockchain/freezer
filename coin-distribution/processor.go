@@ -297,7 +297,8 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 			action := proc.GetAction(ctx)
 			if action == workerActionDisabled || action == workerActionBlocked {
 				if action == workerActionBlocked && prevAction == workerActionRun {
-					sendCoinDistributerIsNowOfflineSlackMessage(ctx)
+					log.Error(errors.Wrapf(sendCoinDistributerIsNowOfflineSlackMessage(ctx),
+						"failed to sendCoinDistributerIsNowOfflineSlackMessage"))
 				}
 				prevAction = action
 				log.Info(fmt.Sprintf("controller: disabled or blocked (%v)", action))
@@ -307,13 +308,14 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 
 			if prevAction == workerActionBlocked && action == workerActionRun {
 				log.Info("controller: unblocked")
-				sendCoinDistributerIsNowOnlineSlackMessage(ctx)
+				log.Error(errors.Wrapf(sendCoinDistributerIsNowOnlineSlackMessage(ctx),
+					"failed to sendCoinDistributerIsNowOnlineSlackMessage"))
 			}
 			prevAction = action
 
 			if action == workerActionOnDemand {
 				log.Info("controller: on demand mode trigger")
-				proc.DisableOnDemand(ctx)
+				log.Error(errors.Wrapf(proc.DisableOnDemand(ctx), "failed to DisableOnDemand"))
 			}
 
 			if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
@@ -328,7 +330,8 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 				log.Error(errors.Wrapf(err, "controller: worker(s) failed"))
 				proc.MustDisable(ctx, err.Error())
 			} else if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
-				sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx)
+				log.Error(errors.Wrapf(sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx),
+					"failed to sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage"))
 			}
 		}
 	}
