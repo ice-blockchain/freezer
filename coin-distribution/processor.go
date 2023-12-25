@@ -168,12 +168,21 @@ returning up.*
 	}, nil
 }
 
-func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batch) (string, error) {
-	gasLimit, err := proc.GetGasLimit(ctx)
+func (proc *coinProcessor) GetGasOptions(ctx context.Context) (price *big.Int, limit uint64, err error) {
+	price, err = proc.GetGasPrice(ctx)
 	if err != nil {
-		return "", err
+		return nil, 0, err
 	}
 
+	limit, err = proc.GetGasLimit(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return price, limit, nil
+}
+
+func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batch) (string, error) {
 	recipients, amounts := data.Prepare()
 	for recordNum := range data.Records {
 		log.Info(fmt.Sprintf("worker [%v]: batch %v: distributing %v iceflakes to address %v for user %q",
@@ -185,15 +194,7 @@ func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batc
 		))
 	}
 
-	price, err := proc.GetGasPrice(ctx)
-	if err != nil {
-		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to get gas price", num, data.ID))
-
-		return "", err
-	}
-	log.Info(fmt.Sprintf("worker [%v]: batch %v: gas price: %v, limit %v", num, data.ID, price.String(), gasLimit))
-
-	txHash, err := proc.Client.Airdrop(ctx, price, big.NewInt(proc.Conf.Ethereum.ChainID), gasLimit, recipients, amounts)
+	txHash, err := proc.Client.Airdrop(ctx, big.NewInt(proc.Conf.Ethereum.ChainID), proc, recipients, amounts)
 	if err != nil {
 		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to run contract", num, data.ID))
 
