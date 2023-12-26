@@ -3,14 +3,16 @@
 package miner
 
 import (
+	"testing"
+	stdlibtime "time"
+
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ice-blockchain/eskimo/users"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/time"
-	"github.com/stretchr/testify/require"
-	"testing"
-	stdlibtime "time"
 )
 
 type eligibleFlags uint8
