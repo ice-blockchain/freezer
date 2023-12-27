@@ -71,7 +71,13 @@ func databaseGetValue[T bool | constraints.Integer](ctx context.Context, db stor
 }
 
 func (d *databaseConfig) GetGasLimit(ctx context.Context) (val uint64, err error) {
-	err = databaseGetValue(ctx, d.DB, configKeyoinDistributerGasLimit, &val)
+	err = databaseGetValue(ctx, d.DB, configKeyCoinDistributerGasLimit, &val)
+
+	return val, err
+}
+
+func (d *databaseConfig) GetGasPriceOverride(ctx context.Context) (val uint64, err error) {
+	err = databaseGetValue(ctx, d.DB, configKeyCoinDistributerGasPrice, &val)
 
 	return val, err
 }

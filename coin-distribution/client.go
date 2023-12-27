@@ -4,9 +4,11 @@ package coindistribution
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -65,7 +67,12 @@ func handleRPCError(ctx context.Context, target error) (retryAfter time.Duration
 		return 0
 	}
 
-	if errors.Is(target, core.ErrIntrinsicGas) {
+	// We may have two types of errors here:
+	// 1. Errors from ethereum RPC.
+	// 2. Errors from ethereum module (pre validation).
+	// The first type of errors are wrapped (see core.ErrXXX), the second type of errors are not wrapped. Just strings. As is.
+	// So check the second case with HasPrefix() and the first case with errors.Is().
+	if errors.Is(target, core.ErrIntrinsicGas) || strings.HasPrefix(target.Error(), core.ErrIntrinsicGas.Error()) {
 		log.Error(errors.Wrap(sendEthereumGasLimitTooLowSlackMessage(ctx, target.Error()), "failed to send slack message"))
 
 		return time.Minute * 10
@@ -81,7 +88,7 @@ func handleRPCError(ctx context.Context, target error) (retryAfter time.Duration
 		core.ErrSenderNoEOA,
 		core.ErrBlobFeeCapTooLow,
 	} {
-		if errors.Is(target, ethErr) {
+		if errors.Is(target, ethErr) || strings.HasPrefix(target.Error(), ethErr.Error()) {
 			return 0
 		}
 	}
@@ -128,11 +135,35 @@ func (ec *ethClientImpl) SuggestGasPrice(ctx context.Context) (*big.Int, error) 
 }
 
 func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []common.Address, amounts []*big.Int) (*types.Transaction, error) {
-	// AirdropToWallets() uses PendingNonceAt() to get the next nonce internally which is not thread-safe.
+	// The slow zone, we **must** have `nonce` as a linear sequence, **without** gaps.
 	ec.Mutex.Lock()
 	defer ec.Mutex.Unlock()
 
-	return ec.AirDropper.AirdropToWallets(opts, recipients, amounts) //nolint:wrapcheck //.
+	if opts.Nonce == nil {
+		// It's already a part of maybeRetryRPCRequest() call, so use the client here as is.
+		nonce, err := ec.RPC.PendingNonceAt(opts.Context, opts.From)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get pending nonce")
+		}
+
+		log.Debug(fmt.Sprintf("airdropper: pending nonce: %v", nonce))
+		opts.Nonce = big.NewInt(int64(nonce))
+	}
+
+	tx, err := ec.AirDropper.AirdropToWallets(opts, recipients, amounts)
+	if err == nil && opts.Context.Err() == nil {
+		log.Info(fmt.Sprintf("airdropper: new transaction: %v | nonce %v | gas %v | limit %v | recipients %v",
+			tx.Hash().String(),
+			opts.Nonce.String(),
+			opts.GasPrice.String(),
+			opts.GasLimit,
+			len(recipients),
+		))
+		// Wait a little to avoid nonce collision with pending transactions.
+		time.Sleep(time.Second)
+	}
+
+	return tx, err //nolint:wrapcheck //.
 }
 
 func (ec *ethClientImpl) CreateTransactionOpts(ctx context.Context, gasPrice, chanID *big.Int, gasLimit uint64) *bind.TransactOpts {
