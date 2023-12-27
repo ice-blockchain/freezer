@@ -7,7 +7,7 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
+func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (pendingResurrectionForTMinus1, pendingResurrectionForT0 float64) {
 	if !usr.ResurrectSoloUsedAt.IsNil() && usr.ResurrectSoloUsedAt.After(*now.Time) {
 		var resurrectDelta float64
 		if timeSpent := usr.MiningSessionSoloStartedAt.Sub(*usr.MiningSessionSoloPreviouslyEndedAt.Time); cfg.Development {
@@ -18,13 +18,11 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 
 		usr.BalanceSolo += usr.SlashingRateSolo * resurrectDelta
 		usr.BalanceT0 += usr.SlashingRateT0 * resurrectDelta
-		usr.BalanceT1 += usr.SlashingRateT1 * resurrectDelta
-		usr.BalanceT2 += usr.SlashingRateT2 * resurrectDelta
-		mintedAmount := (usr.SlashingRateSolo + usr.SlashingRateT0 + usr.SlashingRateT1 + usr.SlashingRateT2) * resurrectDelta
+		mintedAmount := (usr.SlashingRateSolo + usr.SlashingRateT0) * resurrectDelta
 		mintedStandard, mintedPreStaking := tokenomics.ApplyPreStaking(mintedAmount, usr.PreStakingAllocation, usr.PreStakingBonus)
 		usr.BalanceTotalMinted += mintedStandard + mintedPreStaking
 
-		usr.SlashingRateSolo, usr.SlashingRateT0, usr.SlashingRateT1, usr.SlashingRateT2 = 0, 0, 0, 0
+		usr.SlashingRateSolo, usr.SlashingRateT0 = 0, 0
 		usr.ResurrectSoloUsedAt = now
 	} else {
 		usr.ResurrectSoloUsedAt = nil
@@ -38,7 +36,9 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 			resurrectDelta = timeSpent.Hours()
 		}
 
-		usr.BalanceForT0 += usr.SlashingRateForT0 * resurrectDelta
+		amount := usr.SlashingRateForT0 * resurrectDelta
+		usr.BalanceForT0 += amount
+		pendingResurrectionForT0 += amount
 
 		usr.SlashingRateForT0 = 0
 		usr.ResurrectT0UsedAt = now
@@ -54,7 +54,9 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 			resurrectDelta = timeSpent.Hours()
 		}
 
-		usr.BalanceForTMinus1 += usr.SlashingRateForTMinus1 * resurrectDelta
+		amount := usr.SlashingRateForTMinus1 * resurrectDelta
+		usr.BalanceForTMinus1 += amount
+		pendingResurrectionForTMinus1 += amount
 
 		usr.SlashingRateForTMinus1 = 0
 		usr.ResurrectTMinus1UsedAt = now
@@ -63,13 +65,15 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) {
 	}
 
 	if usr.MiningSessionSoloEndedAt.After(*now.Time) {
-		usr.SlashingRateSolo, usr.SlashingRateT0, usr.SlashingRateT1, usr.SlashingRateT2 = 0, 0, 0, 0
+		usr.SlashingRateSolo, usr.SlashingRateT0 = 0, 0
 	}
-	if usr.SlashingRateForT0 > 0 && (t0Ref == nil || t0Ref.MiningSessionSoloEndedAt.IsNil() || t0Ref.MiningSessionSoloEndedAt.After(*now.Time)) {
+	if usr.SlashingRateForT0 > 0 && (t0Ref == nil || t0Ref.MiningSessionSoloEndedAt.IsNil() || (t0Ref.MiningSessionSoloEndedAt.After(*now.Time) && usr.MiningSessionSoloEndedAt.After(*now.Time))) {
 		usr.SlashingRateForT0 = 0
 	}
 
-	if usr.SlashingRateForTMinus1 > 0 && (tMinus1Ref == nil || tMinus1Ref.MiningSessionSoloEndedAt.IsNil() || tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time)) { //nolint:lll // .
+	if usr.SlashingRateForTMinus1 > 0 && (tMinus1Ref == nil || tMinus1Ref.MiningSessionSoloEndedAt.IsNil() || (tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) && usr.MiningSessionSoloEndedAt.After(*now.Time))) { //nolint:lll // .
 		usr.SlashingRateForTMinus1 = 0
 	}
+
+	return pendingResurrectionForTMinus1, pendingResurrectionForT0
 }

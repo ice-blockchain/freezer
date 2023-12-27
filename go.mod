@@ -23,7 +23,7 @@ require (
 	github.com/swaggo/swag v1.16.2
 	github.com/testcontainers/testcontainers-go v0.27.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20231219180239-dc181d75b848
+	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 )
 
 require (
@@ -218,6 +218,7 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.1 // indirect
 	lukechampine.com/uint128 v1.3.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
