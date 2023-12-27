@@ -221,7 +221,8 @@ const (
 
 	floatToStringFormatter = "%.2f"
 
-	daysCountToInitCoinsCacheOnStartup = 90
+	daysCountToInitCoinsCacheOnStartup     = 90
+	routinesCountToInitCoinsCacheOnStartup = 10
 )
 
 type (
