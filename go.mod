@@ -2,6 +2,8 @@ module github.com/ice-blockchain/freezer
 
 go 1.21
 
+replace github.com/cockroachdb/pebble v1.0.0 => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
+
 require (
 	github.com/ClickHouse/ch-go v0.61.0
 	github.com/alitto/pond v1.8.3
@@ -55,6 +57,7 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/pebble v1.0.0 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
+	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
