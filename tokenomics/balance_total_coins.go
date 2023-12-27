@@ -18,10 +18,9 @@ import (
 
 func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcOffset stdlibtime.Duration) (*TotalCoinsSummary, error) {
 	var (
-		dates    []stdlibtime.Time
-		res      = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
-		now      = time.Now()
-		location = stdlibtime.FixedZone(utcOffset.String(), int(utcOffset.Seconds()))
+		dates []stdlibtime.Time
+		res   = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
+		now   = time.Now()
 	)
 
 	dates, res.TimeSeries = r.totalCoinsDates(now, days)
@@ -29,22 +28,18 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getCachedTotalCoins for createdAts:%#v", dates)
 	}
-	for i, child := range res.TimeSeries {
+	for _, child := range res.TimeSeries {
 		for _, stats := range totalCoins {
 			dayMatch := stats.CreatedAt.Equal(child.Date)
 			if dayMatch {
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
-				child.Total = child.Standard + child.PreStaking + child.Blockchain
+				child.Total = child.Standard + child.PreStaking
 				break
 			}
 		}
-		if i == 0 {
-			child.Date = child.Date.In(location).Add(-1 * stdlibtime.Nanosecond)
-		} else {
-			child.Date = stdlibtime.Date(child.Date.Year(), child.Date.Month(), child.Date.Day(), child.Date.Hour(), child.Date.Minute(), child.Date.Second(), child.Date.Nanosecond()-1, location)
-		}
+		child.Date = child.Date.Add(-1 * stdlibtime.Nanosecond)
 
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
@@ -60,15 +55,11 @@ func (r *repository) totalCoinsDates(now *time.Time, days uint64) ([]stdlibtime.
 		dayInterval        = r.cfg.GlobalAggregationInterval.Parent
 		start              = now.Add(-1 * truncationInterval).Truncate(truncationInterval)
 	)
-	midnightHour := 0
-	if r.cfg.GlobalAggregationInterval.Child < stdlibtime.Hour {
-		midnightHour = now.Hour()
-	}
-	timeSinceMidnight := now.UTC().Sub(stdlibtime.Date(now.Year(), now.Month(), now.Day(), midnightHour, 0, 0, 0, stdlibtime.UTC))
 	dates = append(dates, start)
 	timeSeries = append(timeSeries, &TotalCoinsTimeSeriesDataPoint{Date: start})
 	for day := uint64(0); day < days-1; day++ {
-		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Add(-timeSinceMidnight).Truncate(truncationInterval)
+		var date stdlibtime.Time
+		date = now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Truncate(dayInterval)
 		dates = append(dates, date)
 		timeSeries = append(timeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
@@ -80,7 +71,7 @@ func (r *repository) cacheTotalCoins(ctx context.Context, coins []*dwh.TotalCoin
 	for _, v := range coins {
 		val = append(val, v)
 	}
-	return errors.Wrapf(storage.Set(ctx, r.db, val...), "failed to set cache value for total coins: %+v", coins)
+	return errors.Wrapf(storage.Set(ctx, r.db, val...), "failed to set cache value for total coins: %#v", coins)
 }
 
 func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime.Time) ([]*dwh.TotalCoins, error) {
