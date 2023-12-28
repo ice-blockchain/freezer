@@ -173,6 +173,8 @@ type (
 	config struct {
 		disableAdvancedTeam                *atomic.Pointer[[]string]
 		coinDistributionCollectorStartedAt *atomic.Pointer[time.Time]
+		totalEthereumAmountCycle           *atomic.Uint64
+		totalEthereumCountCycle            *atomic.Uint64
 		coinDistributionCollectorSettings  *atomic.Pointer[coindistribution.CollectorSettings]
 		tokenomics.Config                  `mapstructure:",squash"` //nolint:tagliatelle // Nope.
 		EthereumDistributionFrequency      struct {

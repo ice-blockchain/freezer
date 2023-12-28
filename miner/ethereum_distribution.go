@@ -390,7 +390,7 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 			reqCtx, cancel = context.WithTimeout(context.Background(), requestDeadline)
 			m.notifyCoinDistributionCollectionCycleEnded(reqCtx)
 			cancel()
-			log.Info(fmt.Sprintf("finished collecting coin distributions in %v", after.Sub(*before.Time)))
+			log.Info(fmt.Sprintf("finished collecting coin distributions in %v, users:%v, amount:%v", after.Sub(*before.Time), cfg.totalEthereumCountCycle.Swap(0), float64(cfg.totalEthereumAmountCycle.Swap(0))/100.0))
 			cfg.coinDistributionCollectorStartedAt.Store(new(time.Time))
 			m.coinDistributionWorkerMX.Unlock()
 		case <-ctx.Done():

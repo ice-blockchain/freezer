@@ -89,7 +89,7 @@ func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime
 }
 
 func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
-	return fmt.Sprintf("totalCoinStats:%v", date.Truncate(r.cfg.GlobalAggregationInterval.Child).Format(stdlibtime.RFC3339))
+	return (&dwh.TotalCoins{CreatedAt: time.New(date.Truncate(r.cfg.GlobalAggregationInterval.Child))}).Key()
 }
 
 func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow *time.Time) {
