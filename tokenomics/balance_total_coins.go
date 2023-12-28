@@ -35,7 +35,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
-				child.Total = child.Standard + child.PreStaking
+				child.Total = stats.BalanceTotal
 				break
 			}
 		}
@@ -79,18 +79,9 @@ func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime
 	for _, d := range dates {
 		keys = append(keys, r.totalCoinsCacheKey(d))
 	}
-	cacheResult, err := storage.Get[dwh.TotalCoins](ctx, r.db, keys...)
+	cached, err := storage.Get[dwh.TotalCoins](ctx, r.db, keys...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get cached coinStats for dates %v", dates)
-	}
-	cached := make([]*dwh.TotalCoins, 0, len(cacheResult))
-	for _, c := range cacheResult {
-		cached = append(cached, &dwh.TotalCoins{
-			CreatedAt:              c.CreatedAt,
-			BalanceTotalStandard:   c.BalanceTotalStandard,
-			BalanceTotalPreStaking: c.BalanceTotalPreStaking,
-			BalanceTotalEthereum:   c.BalanceTotalEthereum,
-		})
 	}
 
 	return cached, nil
@@ -149,7 +140,7 @@ func (r *repository) mustInitTotalCoinsCache(ctx context.Context) {
 			err = errors.New("first try")
 			for err != nil {
 				log.Info(fmt.Sprintf("Building total coins cache for %v", fetchDate))
-				err = errors.Wrapf(r.buildTotalCoinCache(ctx, date), "failed to build/init total coins cache for %v", fetchDate)
+				err = errors.Wrapf(r.buildTotalCoinCache(ctx, fetchDate), "failed to build/init total coins cache for %v", fetchDate)
 				if err != nil {
 					log.Error(err)
 				}

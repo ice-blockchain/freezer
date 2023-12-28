@@ -551,12 +551,14 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 			proto.ResultColumn{Name: "balance_total_ethereum", Data: &balanceTotalEthereum}),
 		OnResult: func(_ context.Context, block proto.Block) error {
 			for ix := 0; ix < block.Rows; ix++ {
-				res = append(res, &TotalCoins{
+				resItem := &TotalCoins{
 					CreatedAt:              time.New((&createdAt).Row(ix)),
 					BalanceTotalStandard:   (&balanceTotalStandard).Row(ix),
 					BalanceTotalPreStaking: (&balanceTotalPreStaking).Row(ix),
 					BalanceTotalEthereum:   (&balanceTotalEthereum).Row(ix),
-				})
+				}
+				resItem.BalanceTotal = resItem.BalanceTotalStandard + resItem.BalanceTotalPreStaking
+				res = append(res, resItem)
 			}
 			(&createdAt).Reset()
 			(&balanceTotalStandard).Reset()

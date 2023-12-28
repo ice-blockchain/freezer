@@ -35,6 +35,7 @@ type (
 		BalanceTotalStandard   float64    `redis:"standard"`
 		BalanceTotalPreStaking float64    `redis:"pre_staking"`
 		BalanceTotalEthereum   float64    `redis:"blockchain"`
+		BalanceTotal           float64    `redis:"total"`
 	}
 	InsertMetadata = proto.Input
 	Columns        struct {
