@@ -100,6 +100,8 @@ func refEligibleForDistribution(now *time.Time, r *referral, distributionCfg *co
 func testCollectorConfig(minBalance float64, streak uint64) *coindistribution.CollectorSettings {
 	cfg.EthereumDistributionFrequency.Min = 24 * stdlibtime.Hour
 	cfg.EthereumDistributionFrequency.Max = 7 * 24 * stdlibtime.Hour
+	cfg.coinDistributionCollectorStartedAt.Store(testTime)
+
 	return &coindistribution.CollectorSettings{
 		DeniedCountries:          nil,
 		LatestDate:               time.New(testTime.Truncate(24 * stdlibtime.Hour).Add(364 * 24 * stdlibtime.Hour)),
