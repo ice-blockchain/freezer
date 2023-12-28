@@ -228,7 +228,7 @@ func (proc *coinProcessor) Do(ctx context.Context, num int64) (*batch, error) {
 		if err2 := proc.BatchMarkRejected(ctx, num, data); err2 != nil {
 			log.Error(errors.Wrapf(err2, "worker [%v]: failed to mark batch %v as rejected", num, data.ID))
 		}
-		proc.MustDisable(ctx, err.Error())
+		proc.MustDisable(err.Error())
 
 		return data, err
 	}
@@ -338,7 +338,7 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 			err := proc.RunWorkers(ctx)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "controller: worker(s) failed"))
-				proc.MustDisable(ctx, err.Error())
+				proc.MustDisable(err.Error())
 			} else if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
 				log.Error(errors.Wrapf(sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx),
 					"failed to sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage"))

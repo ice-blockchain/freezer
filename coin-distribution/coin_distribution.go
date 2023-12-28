@@ -16,13 +16,13 @@ import (
 	"github.com/ice-blockchain/wintr/log"
 )
 
-func (d *databaseConfig) MustDisable(ctx context.Context, reason string) {
-	for err := d.Disable(ctx); err != nil; err = d.Disable(ctx) {
+func (d *databaseConfig) MustDisable(reason string) {
+	for err := d.Disable(context.Background()); err != nil; err = d.Disable(context.Background()) {
 		log.Error(errors.Wrap(err, "failed to disable coinDistributer"))
-		stdlibtime.Sleep(stdlibtime.Millisecond)
+		stdlibtime.Sleep(stdlibtime.Second)
 	}
 
-	log.Error(sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage(ctx, reason),
+	log.Error(sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage(context.Background(), reason),
 		"failed to sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage")
 }
 
