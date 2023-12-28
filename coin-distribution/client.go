@@ -139,24 +139,14 @@ func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []
 	ec.Mutex.Lock()
 	defer ec.Mutex.Unlock()
 
-	if opts.Nonce == nil {
-		// It's already a part of maybeRetryRPCRequest() call, so use the client here as is.
-		nonce, err := ec.RPC.PendingNonceAt(opts.Context, opts.From)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get pending nonce")
-		}
-
-		log.Debug(fmt.Sprintf("airdropper: pending nonce: %v", nonce))
-		opts.Nonce = big.NewInt(int64(nonce))
-	}
-
 	tx, err := ec.AirDropper.AirdropToWallets(opts, recipients, amounts)
 	if err == nil && opts.Context.Err() == nil {
-		log.Info(fmt.Sprintf("airdropper: new transaction: %v | nonce %v | gas %v | limit %v | recipients %v",
+		log.Info(fmt.Sprintf("airdropper: new transaction: %v | nonce %v | gas %v | cost %v | limit %v | recipients %v",
 			tx.Hash().String(),
-			opts.Nonce.String(),
-			opts.GasPrice.String(),
-			opts.GasLimit,
+			tx.Nonce(),
+			tx.GasPrice().String(),
+			tx.Cost().String(),
+			tx.Gas(),
 			len(recipients),
 		))
 		// Wait a little to avoid nonce collision with pending transactions.
