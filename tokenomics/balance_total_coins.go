@@ -109,22 +109,25 @@ func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow 
 				historyGenerationDelta = stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child) * 0.75) //nolint:gomnd // .
 			)
 			if !lastDateCached.Equal(newDate) && now.Sub(newDate) >= historyGenerationDelta {
-				lock, err := redislock.Obtain(ctx, r.db, totalCoinStatsCacheKey, r.cfg.GlobalAggregationInterval.Child/2, &redislock.Options{RetryStrategy: redislock.NoRetry()})
+				dwhCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
+				lock, err := redislock.Obtain(dwhCtx, r.db, totalCoinStatsCacheLockKey, totalCoinStatsCacheLockDuration, &redislock.Options{RetryStrategy: redislock.NoRetry()})
 				if err != nil && errors.Is(err, redislock.ErrNotObtained) {
+					cancel()
 					continue
 				} else if err != nil {
 					log.Error(errors.Wrapf(err, "failed to init total coin stats cache (aquire lock totalCoinStatsCache)")) //nolint:revive // Nope.
+					cancel()
+					continue
 				}
-				dwhCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
 				if err = r.buildTotalCoinCache(dwhCtx, newDate); err != nil {
 					log.Error(errors.Wrapf(err, "failed to update total coin stats cache for date %v", *now.Time))
 				} else {
 					lastDateCached = time.New(newDate)
 				}
-				cancel()
 				if lock != nil {
-					log.Error(errors.Wrapf(lock.Release(ctx), "error releasing lock, key: totalCoinStatsCache"))
+					log.Error(errors.Wrapf(lock.Release(dwhCtx), "error releasing lock, key: totalCoinStatsCache"))
 				}
+				cancel()
 			}
 		case <-ctx.Done():
 			return
@@ -146,6 +149,7 @@ func (r *repository) buildTotalCoinCache(ctx context.Context, dates ...stdlibtim
 func (r *repository) mustInitTotalCoinsCache(ctx context.Context, now *time.Time) {
 	dates, _ := r.totalCoinsDates(now, daysCountToInitCoinsCacheOnStartup)
 	alreadyCached, err := r.getCachedTotalCoins(ctx, dates)
+	log.Panic(errors.Wrapf(err, "failed to init total coin stats cache")) //nolint:revive // Nope.
 	for _, cached := range alreadyCached {
 		for dateIdx, date := range dates {
 			if cached.CreatedAt.Equal(date) {
@@ -157,26 +161,27 @@ func (r *repository) mustInitTotalCoinsCache(ctx context.Context, now *time.Time
 	}
 	workerPool := pond.New(routinesCountToInitCoinsCacheOnStartup, 0, pond.MinWorkers(routinesCountToInitCoinsCacheOnStartup))
 	if len(dates) > 0 {
-		lock, err := redislock.Obtain(ctx, r.db, totalCoinStatsCacheKey, r.cfg.GlobalAggregationInterval.Child/2, &redislock.Options{RetryStrategy: redislock.NoRetry()})
+		lockCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
+		defer cancel()
+		lock, err := redislock.Obtain(lockCtx, r.db, totalCoinStatsCacheLockKey, totalCoinStatsCacheLockDuration, &redislock.Options{RetryStrategy: redislock.NoRetry()})
 		if err != nil && errors.Is(err, redislock.ErrNotObtained) {
 			return
 		} else if err != nil {
 			log.Panic(errors.Wrapf(err, "failed to init total coin stats cache (aquire lock totalCoinStatsCache)")) //nolint:revive // Nope.
 		}
 		defer func() {
-			log.Error(errors.Wrapf(lock.Release(ctx), "error releasing lock, key: totalCoinStatsCache"))
+			log.Error(errors.Wrapf(lock.Release(lockCtx), "error releasing lock, key: totalCoinStatsCache"))
 		}()
-
+		for _, date := range dates {
+			fetchDate := date
+			workerPool.Submit(func() {
+				for err = errors.New("first try"); err != nil; {
+					log.Info(fmt.Sprintf("Building total coins cache for `%v`", fetchDate))
+					err = errors.Wrapf(r.buildTotalCoinCache(ctx, fetchDate), "failed to build/init total coins cache for %v", fetchDate)
+					log.Error(err)
+				}
+			})
+		}
+		workerPool.StopAndWait()
 	}
-	for _, date := range dates {
-		fetchDate := date
-		workerPool.Submit(func() {
-			for err = errors.New("first try"); err != nil; {
-				log.Info(fmt.Sprintf("Building total coins cache for `%v`", fetchDate))
-				err = errors.Wrapf(r.buildTotalCoinCache(ctx, fetchDate), "failed to build/init total coins cache for %v", fetchDate)
-				log.Error(err)
-			}
-		})
-	}
-	workerPool.StopAndWait()
 }
