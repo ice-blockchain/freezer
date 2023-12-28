@@ -84,7 +84,7 @@ func (ct *coinTracker) ProcessTransactionsHashes(ctx context.Context, hashes []*
 		if err != nil {
 			msg = err.Error()
 		}
-		ct.MustDisable(ctx, fmt.Sprintf("some transactions failed: %v", msg))
+		ct.MustDisable(fmt.Sprintf("some transactions failed: %v", msg))
 		delete(statuses, ethTxStatusFailed)
 	}
 
