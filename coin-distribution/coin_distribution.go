@@ -22,7 +22,9 @@ func (d *databaseConfig) MustDisable(reason string) {
 		stdlibtime.Sleep(stdlibtime.Second)
 	}
 
-	log.Error(sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage(context.Background(), reason),
+	ctx, cancel := context.WithTimeout(context.Background(), requestDeadline)
+	defer cancel()
+	log.Error(sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage(ctx, reason),
 		"failed to sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage")
 }
 
