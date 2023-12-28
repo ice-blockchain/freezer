@@ -223,6 +223,7 @@ const (
 
 	daysCountToInitCoinsCacheOnStartup     = 90
 	routinesCountToInitCoinsCacheOnStartup = 10
+	totalCoinStatsCacheKey                 = "totalCoinStatsCache"
 )
 
 type (
