@@ -220,6 +220,9 @@ const (
 	requestDeadline                     = 25 * stdlibtime.Second
 
 	floatToStringFormatter = "%.2f"
+
+	daysCountToInitCoinsCacheOnStartup     = 90
+	routinesCountToInitCoinsCacheOnStartup = 10
 )
 
 type (

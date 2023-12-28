@@ -31,8 +31,11 @@ type (
 		BalanceTotalMinted, BalanceTotalSlashed float64
 	}
 	TotalCoins struct {
-		CreatedAt                                                          *time.Time
-		BalanceTotalStandard, BalanceTotalPreStaking, BalanceTotalEthereum float64
+		CreatedAt              *time.Time `redis:"created_at"`
+		BalanceTotalStandard   float64    `redis:"standard"`
+		BalanceTotalPreStaking float64    `redis:"pre_staking"`
+		BalanceTotalEthereum   float64    `redis:"blockchain"`
+		BalanceTotal           float64    `redis:"total"`
 	}
 	InsertMetadata = proto.Input
 	Columns        struct {
