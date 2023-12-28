@@ -171,10 +171,11 @@ type (
 		extraBonusIndicesDistribution               map[uint16]map[uint16]uint16
 	}
 	config struct {
-		disableAdvancedTeam               *atomic.Pointer[[]string]
-		coinDistributionCollectorSettings *atomic.Pointer[coindistribution.CollectorSettings]
-		tokenomics.Config                 `mapstructure:",squash"` //nolint:tagliatelle // Nope.
-		EthereumDistributionFrequency     struct {
+		disableAdvancedTeam                *atomic.Pointer[[]string]
+		coinDistributionCollectorStartedAt *atomic.Pointer[time.Time]
+		coinDistributionCollectorSettings  *atomic.Pointer[coindistribution.CollectorSettings]
+		tokenomics.Config                  `mapstructure:",squash"` //nolint:tagliatelle // Nope.
+		EthereumDistributionFrequency      struct {
 			Min stdlibtime.Duration `yaml:"min"`
 			Max stdlibtime.Duration `yaml:"max"`
 		} `yaml:"ethereumDistributionFrequency" mapstructure:"ethereumDistributionFrequency"`

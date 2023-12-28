@@ -49,6 +49,7 @@ func (ref *referral) isEligibleForSelfForEthereumDistribution(now *time.Time) bo
 			ref.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
+			currentCoinDistributionCollectingEndedAt(),
 			ref.MiningSessionSoloStartedAt,
 			ref.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -71,6 +72,7 @@ func (ref *referral) isEligibleForReferralForEthereumDistribution(now *time.Time
 			ref.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
+			currentCoinDistributionCollectingEndedAt(),
 			ref.MiningSessionSoloStartedAt,
 			ref.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -100,6 +102,7 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 			u.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
+			currentCoinDistributionCollectingEndedAt(),
 			u.MiningSessionSoloStartedAt,
 			u.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -145,6 +148,7 @@ func (u *user) isEligibleForReferralForEthereumDistribution(now *time.Time) bool
 		u.Country,
 		coinDistributionCollectorSettings.DeniedCountries,
 		now,
+		currentCoinDistributionCollectingEndedAt(),
 		u.MiningSessionSoloStartedAt,
 		u.MiningSessionSoloEndedAt,
 		coinDistributionCollectorSettings.EndDate,
@@ -330,6 +334,7 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 			m.coinDistributionWorkerMX.Lock()
 			log.Info("started collecting coin distributions")
 			before := time.Now()
+			cfg.coinDistributionCollectorStartedAt.Store(before)
 			reqCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
 			log.Error(errors.Wrap(coindistribution.SendNewCoinDistributionCollectionCycleStartedSlackMessage(reqCtx),
 				"failed to SendNewCoinDistributionCollectionCycleStartedSlackMessage"))
@@ -386,6 +391,7 @@ func (m *miner) startCoinDistributionCollectionWorkerManager(ctx context.Context
 			m.notifyCoinDistributionCollectionCycleEnded(reqCtx)
 			cancel()
 			log.Info(fmt.Sprintf("finished collecting coin distributions in %v", after.Sub(*before.Time)))
+			cfg.coinDistributionCollectorStartedAt.Store(new(time.Time))
 			m.coinDistributionWorkerMX.Unlock()
 		case <-ctx.Done():
 			return
@@ -450,4 +456,19 @@ func (m *miner) startSynchronizingCoinDistributionCollectorSettings(ctx context.
 			return
 		}
 	}
+}
+
+func currentCoinDistributionCollectingEndedAt() *time.Time {
+	coinDistributionCollectorStartedAt := cfg.coinDistributionCollectorStartedAt.Load()
+	if coinDistributionCollectorStartedAt.IsNil() {
+		coinDistributionCollectorStartedAt = time.New(time.Now().Add(-1 * stdlibtime.Millisecond))
+	}
+	var startingWindow stdlibtime.Duration
+	if cfg.Development {
+		startingWindow = 10 * stdlibtime.Second
+	} else {
+		startingWindow = 5 * stdlibtime.Minute
+	}
+
+	return time.New(coinDistributionCollectorStartedAt.Add(startingWindow))
 }

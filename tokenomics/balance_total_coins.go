@@ -5,6 +5,7 @@ package tokenomics
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	stdlibtime "time"
 
 	"github.com/alitto/pond"
@@ -16,10 +17,10 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcOffset stdlibtime.Duration) (*TotalCoinsSummary, error) {
+func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ stdlibtime.Duration) (*TotalCoinsSummary, error) {
 	var (
 		dates []stdlibtime.Time
-		res   = &TotalCoinsSummary{TimeSeries: make([]*TotalCoinsTimeSeriesDataPoint, 0, days)}
+		res   = new(TotalCoinsSummary)
 		now   = time.Now()
 	)
 
@@ -30,8 +31,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, utcO
 	}
 	for _, child := range res.TimeSeries {
 		for _, stats := range totalCoins {
-			dayMatch := stats.CreatedAt.Equal(child.Date)
-			if dayMatch {
+			if stats.CreatedAt.Equal(child.Date) {
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
@@ -58,11 +58,11 @@ func (r *repository) totalCoinsDates(now *time.Time, days uint64) ([]stdlibtime.
 	dates = append(dates, start)
 	timeSeries = append(timeSeries, &TotalCoinsTimeSeriesDataPoint{Date: start})
 	for day := uint64(0); day < days-1; day++ {
-		var date stdlibtime.Time
-		date = now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Truncate(dayInterval)
+		date := now.Add(dayInterval * -1 * stdlibtime.Duration(day)).Truncate(dayInterval)
 		dates = append(dates, date)
 		timeSeries = append(timeSeries, &TotalCoinsTimeSeriesDataPoint{Date: date})
 	}
+
 	return dates, timeSeries
 }
 
@@ -71,6 +71,7 @@ func (r *repository) cacheTotalCoins(ctx context.Context, coins []*dwh.TotalCoin
 	for _, v := range coins {
 		val = append(val, v)
 	}
+
 	return errors.Wrapf(storage.Set(ctx, r.db, val...), "failed to set cache value for total coins: %#v", coins)
 }
 
@@ -81,7 +82,7 @@ func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime
 	}
 	cached, err := storage.Get[dwh.TotalCoins](ctx, r.db, keys...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get cached coinStats for dates %v", dates)
+		return nil, errors.Wrapf(err, "failed to get cached coinStats for dates %#v", dates)
 	}
 
 	return cached, nil
@@ -91,17 +92,32 @@ func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
 	return fmt.Sprintf("totalCoinStats:%v", date.Truncate(r.cfg.GlobalAggregationInterval.Child).Format(stdlibtime.RFC3339))
 }
 
-func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context) {
-	for ctx.Err() == nil {
-		now := time.Now()
-		if now.Sub(now.Truncate(r.cfg.GlobalAggregationInterval.Child)) >= stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child)*0.75) {
-			dwhCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
-			if err := r.buildTotalCoinCache(dwhCtx, now.Truncate(r.cfg.GlobalAggregationInterval.Child)); err != nil {
-				log.Error(errors.Wrapf(err, "failed to update total coin stats cache for date %v", *now.Time))
+func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow *time.Time) {
+	ticker := stdlibtime.NewTicker(stdlibtime.Duration(1+rand.Intn(10)) * (r.cfg.GlobalAggregationInterval.Child / 60)) //nolint:gosec,gomnd // Not an  issue.
+	defer ticker.Stop()
+
+	dates, _ := r.totalCoinsDates(initialNow, 1)
+	lastDateCached := time.New(dates[0])
+
+	for {
+		select {
+		case <-ticker.C:
+			var (
+				now                    = time.Now()
+				newDate                = now.Truncate(r.cfg.GlobalAggregationInterval.Child)
+				historyGenerationDelta = stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child) * 0.75) //nolint:gomnd // .
+			)
+			if !lastDateCached.Equal(newDate) && now.Sub(newDate) >= historyGenerationDelta {
+				dwhCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
+				if err := r.buildTotalCoinCache(dwhCtx, newDate); err != nil {
+					log.Error(errors.Wrapf(err, "failed to update total coin stats cache for date %v", *now.Time))
+				} else {
+					lastDateCached = time.New(newDate)
+				}
+				cancel()
 			}
-			cancel()
-		} else {
-			stdlibtime.Sleep(stdlibtime.Second)
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -109,21 +125,18 @@ func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context) {
 func (r *repository) buildTotalCoinCache(ctx context.Context, dates ...stdlibtime.Time) error {
 	totalCoins, err := r.dwh.SelectTotalCoins(ctx, dates)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read total coin stats cacheable values for dates %v", dates)
+		return errors.Wrapf(err, "failed to read total coin stats cacheable values for dates %#v", dates)
 	}
 
 	return errors.Wrapf(
 		r.cacheTotalCoins(ctx, totalCoins),
-		"failed to save total coin stats cache for dates %v", dates)
+		"failed to save total coin stats cache for dates %#v", dates)
 }
 
-func (r *repository) mustInitTotalCoinsCache(ctx context.Context) {
-	now := time.Now()
+func (r *repository) mustInitTotalCoinsCache(ctx context.Context, now *time.Time) {
 	dates, _ := r.totalCoinsDates(now, daysCountToInitCoinsCacheOnStartup)
 	alreadyCached, err := r.getCachedTotalCoins(ctx, dates)
-	if err != nil {
-		log.Panic(errors.Wrapf(err, "failed to init total coin stats cache"))
-	}
+	log.Panic(errors.Wrapf(err, "failed to init total coin stats cache")) //nolint:revive // Nope.
 	for _, cached := range alreadyCached {
 		for dateIdx, date := range dates {
 			if cached.CreatedAt.Equal(date) {
@@ -137,13 +150,10 @@ func (r *repository) mustInitTotalCoinsCache(ctx context.Context) {
 	for _, date := range dates {
 		fetchDate := date
 		workerPool.Submit(func() {
-			err = errors.New("first try")
-			for err != nil {
-				log.Info(fmt.Sprintf("Building total coins cache for %v", fetchDate))
+			for err = errors.New("first try"); err != nil; {
+				log.Info(fmt.Sprintf("Building total coins cache for `%v`", fetchDate))
 				err = errors.Wrapf(r.buildTotalCoinCache(ctx, fetchDate), "failed to build/init total coins cache for %v", fetchDate)
-				if err != nil {
-					log.Error(err)
-				}
+				log.Error(err)
 			}
 		})
 	}

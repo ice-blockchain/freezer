@@ -557,7 +557,8 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 					BalanceTotalPreStaking: (&balanceTotalPreStaking).Row(ix),
 					BalanceTotalEthereum:   (&balanceTotalEthereum).Row(ix),
 				}
-				resItem.BalanceTotal = resItem.BalanceTotalStandard + resItem.BalanceTotalPreStaking
+				resItem.BalanceTotalStandard += resItem.BalanceTotalPreStaking - resItem.BalanceTotalEthereum
+				resItem.BalanceTotal = resItem.BalanceTotalStandard + resItem.BalanceTotalEthereum
 				res = append(res, resItem)
 			}
 			(&createdAt).Reset()

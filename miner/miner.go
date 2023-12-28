@@ -34,6 +34,7 @@ func init() {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	cfg.disableAdvancedTeam = new(atomic.Pointer[[]string])
 	cfg.coinDistributionCollectorSettings = new(atomic.Pointer[coindistribution.CollectorSettings])
+	cfg.coinDistributionCollectorStartedAt = new(atomic.Pointer[time.Time])
 }
 
 func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {

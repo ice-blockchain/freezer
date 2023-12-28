@@ -45,9 +45,10 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 	}
 	go repo.startDisableAdvancedTeamCfgSyncer(ctx)
 
-	repo.mustInitTotalCoinsCache(ctx)
+	now := time.Now()
+	repo.mustInitTotalCoinsCache(ctx, now)
 
-	go repo.keepTotalCoinsCacheUpdated(ctx)
+	go repo.keepTotalCoinsCacheUpdated(ctx, now)
 
 	return repo
 }

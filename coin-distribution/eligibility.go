@@ -45,7 +45,7 @@ func IsEligibleForEthereumDistribution(
 	standardBalance, minEthereumDistributionICEBalanceRequired float64,
 	ethAddress, country string,
 	distributionDeniedCountries map[string]struct{},
-	now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate *time.Time,
+	now, collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate *time.Time,
 	kycState model.KYCState,
 	miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	var countryAllowed bool
@@ -54,7 +54,7 @@ func IsEligibleForEthereumDistribution(
 	}
 
 	return countryAllowed &&
-		!miningSessionSoloEndedAt.IsNil() && miningSessionSoloEndedAt.After(now.Add(miningSessionSoloEndedAtNetworkDelayAdjustment)) &&
+		!miningSessionSoloEndedAt.IsNil() && miningSessionSoloEndedAt.After(*collectingEndedAt.Time) &&
 		isEthereumAddressValid(ethAddress) &&
 		CalculateEthereumDistributionICEBalance(standardBalance, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, ethereumDistributionEndDate) >= minEthereumDistributionICEBalanceRequired && //nolint:lll // .
 		model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, miningSessionDuration) >= minMiningStreaksRequired &&

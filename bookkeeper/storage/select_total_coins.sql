@@ -4,8 +4,8 @@ WITH valid_users AS (
                             created_at, id, id_t0, id_tminus1, pre_staking_allocation, pre_staking_bonus, balance_solo, balance_solo_ethereum, balance_t0, balance_t0_ethereum, balance_for_t0, balance_t1_ethereum, balance_for_tminus1, balance_t2_ethereum
                     FROM %[1]v
                     WHERE created_at IN ['%[2]v']
-                      AND kyc_step_passed >= 2 
-                      AND (kyc_step_blocked = 0 OR kyc_step_blocked >= 3)
+                      AND kyc_step_passed >= %[3]v
+                      AND (kyc_step_blocked = 0 OR kyc_step_blocked >= %[3]v + 1)
                     ),
   valid_t1_users AS (
                     SELECT created_at, id_t0, SUM(balance_for_t0) AS balance_t1
