@@ -117,7 +117,8 @@ const (
 
 	configKeyCoinDistributerEnabled  = "coin_distributer_enabled"
 	configKeyCoinDistributerOnDemand = "coin_distributer_forced_execution"
-	configKeyoinDistributerGasLimit  = "coin_distributer_gas_limit_units"
+	configKeyCoinDistributerGasLimit = "coin_distributer_gas_limit_units"
+	configKeyCoinDistributerGasPrice = "coin_distributer_gas_price_override"
 )
 
 // .

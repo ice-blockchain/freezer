@@ -169,9 +169,18 @@ returning up.*
 }
 
 func (proc *coinProcessor) GetGasOptions(ctx context.Context) (price *big.Int, limit uint64, err error) {
-	price, err = proc.GetGasPrice(ctx)
+	gasOverride, _ := proc.GetGasPriceOverride(ctx)
 	if err != nil {
 		return nil, 0, err
+	}
+
+	if gasOverride == 0 {
+		price, err = proc.GetGasPrice(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+	} else {
+		price = big.NewInt(0).SetUint64(gasOverride)
 	}
 
 	limit, err = proc.GetGasLimit(ctx)

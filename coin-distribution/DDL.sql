@@ -47,7 +47,8 @@ INSERT INTO global (key,value)
                    ('coin_collector_start_hour','0'),
                    ('coin_collector_min_balance_required','0'),
                    ('coin_collector_denied_countries',''),
-                   ('coin_distributer_gas_limit_units','300000')
+                   ('coin_distributer_gas_limit_units','30000000'),
+                   ('coin_distributer_gas_price_override','3000000000')
          ON CONFLICT(key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS coin_distributions_by_earner (
