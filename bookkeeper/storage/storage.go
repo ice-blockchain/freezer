@@ -574,17 +574,25 @@ func (db *db) SelectTotalCoins(ctx context.Context, createdAts []stdlibtime.Time
 		return nil, err
 	}
 	dedupedRes := make([]*TotalCoins, 0, len(createdAts))
-	for _, rowA := range res {
-		found := false
-		for _, rowB := range dedupedRes {
-			if rowA.CreatedAt.Equal(*rowB.CreatedAt.Time) {
-				found = true
 
+	for _, cAt := range createdAts {
+		var found *TotalCoins = nil
+		for _, rowA := range res {
+			if rowA.CreatedAt.Equal(cAt) {
+				found = rowA
 				break
 			}
 		}
-		if !found {
-			dedupedRes = append(dedupedRes, rowA)
+		if found != nil {
+			dedupedRes = append(dedupedRes, found)
+		} else {
+			dedupedRes = append(dedupedRes, &TotalCoins{
+				CreatedAt:              time.New(cAt),
+				BalanceTotalStandard:   0,
+				BalanceTotalPreStaking: 0,
+				BalanceTotalEthereum:   0,
+				BalanceTotal:           0,
+			})
 		}
 	}
 	res = dedupedRes

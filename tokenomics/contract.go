@@ -223,6 +223,8 @@ const (
 
 	daysCountToInitCoinsCacheOnStartup     = 90
 	routinesCountToInitCoinsCacheOnStartup = 10
+	totalCoinStatsCacheLockKey             = "totalCoinStatsCache"
+	totalCoinStatsCacheLockDuration        = 1 * stdlibtime.Minute
 )
 
 type (
