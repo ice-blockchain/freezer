@@ -41,10 +41,9 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 
 	conf := new(config)
 	conf.Ethereum.ContractAddress = contractAddr
-	conf.Ethereum.ChainID = 5
+	conf.Ethereum.ChainID = 97
 	conf.Ethereum.RPC = rpc
 	conf.Ethereum.PrivateKey = privateKey
-	conf.Workers = 2
 
 	t.Run("AddPendingEntry", func(t *testing.T) {
 		db := storage.MustConnect(context.TODO(), ddl, applicationYamlKey)
@@ -68,39 +67,16 @@ func TestFullCoinDistribution(t *testing.T) { //nolint:paralleltest,funlen //.
 	defer cd.Close()
 
 	chBatches := make(chan *batch, 1)
-	chTracker := make(chan []*string, 1)
-	cd.MustStart(context.TODO(), chBatches, chTracker)
+	cd.MustStart(context.TODO(), chBatches)
 
 	t.Logf("waiting for batch to be processed")
-	var processedBatch *batch
-	for {
-		select {
-		case b := <-chBatches:
-			t.Logf("batch: %+v processed", b)
-			for i := range b.Records {
-				t.Logf("record: %v processed: %v", pointerToString(b.Records[i].EthTX), b.Records[i].EthStatus)
-				require.Equal(t, ethApiStatusAccepted, b.Records[i].EthStatus)
-			}
-			processedBatch = b
-
-		case txs := <-chTracker:
-			require.NotNil(t, processedBatch)
-			found := false
-			for i := range txs {
-				t.Logf("transaction: %v processed", *txs[i])
-				for recordNum := range processedBatch.Records {
-					if processedBatch.Records[recordNum].EthTX != nil && *processedBatch.Records[recordNum].EthTX == *txs[i] {
-						t.Logf("transaction: %+v found in batch", *txs[i])
-						found = true
-					}
-				}
-			}
-
-			require.True(t, found)
-
-			return
-		}
+	processedBatch := <-chBatches
+	t.Logf("batch: %+v processed: status %v", processedBatch, processedBatch.Status)
+	for i := range processedBatch.Records {
+		t.Logf("record: %v processed: %v", pointerToString(processedBatch.Records[i].EthTX), processedBatch.Records[i].EthStatus)
+		require.Equal(t, ethApiStatusAccepted, processedBatch.Records[i].EthStatus)
 	}
+	require.Equal(t, ethTxStatusSuccessful, processedBatch.Status)
 }
 
 func TestDatabaseSetGetValues(t *testing.T) {

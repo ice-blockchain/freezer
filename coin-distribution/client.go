@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -105,14 +106,13 @@ main:
 		}
 
 		retryAfter := handleRPCError(ctx, err)
-		if retryAfter > 0 {
-			log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v), retrying after %v", attempt, retryAfter.String()))
-		} else {
+		if retryAfter == 0 {
 			log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v), unrecoverable error", attempt))
 
 			return val, multierror.Append(errClientUncoverable, err)
 		}
 
+		log.Error(errors.Wrapf(err, "failed to call ethereum RPC (attempt %v), retrying after %v", attempt, retryAfter.String()))
 		retryTimer := time.NewTimer(retryAfter)
 		select {
 		case <-ctx.Done():
@@ -149,8 +149,6 @@ func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []
 			tx.Gas(),
 			len(recipients),
 		))
-		// Wait a little to avoid nonce collision with pending transactions.
-		time.Sleep(time.Second)
 	}
 
 	return tx, err //nolint:wrapcheck //.
@@ -177,13 +175,32 @@ func (ec *ethClientImpl) Airdrop(ctx context.Context, chanID *big.Int, gas gasGe
 		opts := ec.CreateTransactionOpts(ctx, gasPrice, chanID, gasLimit)
 		tx, err := ec.AirdropToWallets(opts, recipients, amounts)
 		if err != nil {
-			return "", err //nolint:wrapcheck //.
+			return "", err
 		}
 
 		return tx.Hash().String(), nil
 	}
 
 	return maybeRetryRPCRequest(ctx, fn)
+}
+
+func (ec *ethClientImpl) TransactionStatus(ctx context.Context, hash string) (ethTxStatus, error) {
+	return maybeRetryRPCRequest(ctx, func() (ethTxStatus, error) {
+		receipt, err := ec.RPC.TransactionReceipt(ctx, common.HexToHash(hash))
+		if err != nil {
+			if errors.Is(err, ethereum.NotFound) {
+				return ethTxStatusPending, nil
+			}
+
+			return "", err //nolint:wrapcheck //.
+		}
+
+		if receipt.Status == types.ReceiptStatusSuccessful {
+			return ethTxStatusSuccessful, nil
+		}
+
+		return ethTxStatusFailed, nil
+	})
 }
 
 func (ec *ethClientImpl) TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error) { //nolint:funlen //.

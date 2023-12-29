@@ -17,6 +17,8 @@ import (
 )
 
 func maybeSkipTest(t *testing.T) {
+	t.Helper()
+
 	run := os.Getenv("TEST_RUN_WITH_DATABASE")
 	if run != "yes" {
 		t.Skip("TEST_RUN_WITH_DATABASE is not set to 'yes'")
@@ -70,12 +72,12 @@ func TestBatchPrepareFetch(t *testing.T) { //nolint:paralleltest //.
 	helperTruncatePendingTransactions(ctx, t, proc.DB)
 
 	t.Run("NotEnoughData", func(t *testing.T) { //nolint:paralleltest //.
-		_, err := proc.BatchPrepareFetch(ctx, 1)
+		_, err := proc.BatchPrepareFetch(ctx)
 		require.ErrorIs(t, err, errNotEnoughData)
 	})
 	t.Run("Fetch", func(t *testing.T) { //nolint:paralleltest //.
 		helperAddNewPendingTransaction(ctx, t, proc, 100)
-		b, err := proc.BatchPrepareFetch(ctx, 1)
+		b, err := proc.BatchPrepareFetch(ctx)
 		require.NoError(t, err)
 		require.Len(t, b.Records, 100)
 		for _, r := range b.Records {
@@ -119,7 +121,7 @@ func TestGetGasPrice(t *testing.T) { //nolint:tparallel //.
 func TestProcessorDistributeAccepted(t *testing.T) { //nolint:paralleltest //.
 	maybeSkipTest(t)
 	ctx := context.TODO()
-	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{Workers: 2})
+	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{})
 	require.NotNil(t, proc)
 	defer proc.Close()
 
@@ -142,7 +144,7 @@ func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
 	ctx := context.TODO()
 	proc := newCoinProcessor(&mockedDummyEthClient{dropErr: errors.New("drop error")}, //nolint:goerr113 //.
 		storage.MustConnect(ctx, ddl, applicationYamlKey),
-		&config{Workers: 2},
+		&config{},
 	)
 	require.NotNil(t, proc)
 	defer proc.Close()
@@ -198,7 +200,6 @@ func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
 	proc := newCoinProcessor(&mockedDummyEthClient{},
 		storage.MustConnect(ctx, ddl, applicationYamlKey),
 		&config{
-			Workers:    2,
 			StartHours: now.Hour() - 2,
 			EndHours:   now.Hour() - 1,
 		},

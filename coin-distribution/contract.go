@@ -12,7 +12,6 @@ import (
 	"sync"
 	stdlibtime "time"
 
-	"github.com/alitto/pond"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -98,7 +97,7 @@ const (
 	applicationYamlKey = "coin-distribution"
 	requestDeadline    = 25 * stdlibtime.Second
 
-	batchSize = 1320
+	batchSize = 700
 
 	gasPriceCacheTTL = stdlibtime.Minute
 
@@ -114,6 +113,7 @@ const (
 
 	ethTxStatusSuccessful ethTxStatus = "SUCCESSFUL"
 	ethTxStatusFailed     ethTxStatus = "FAILED"
+	ethTxStatusPending    ethTxStatus = "PENDING"
 
 	configKeyCoinDistributerEnabled  = "coin_distributer_enabled"
 	configKeyCoinDistributerOnDemand = "coin_distributer_forced_execution"
@@ -141,6 +141,7 @@ type (
 	ethClient interface {
 		SuggestGasPrice(ctx context.Context) (*big.Int, error)
 		TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error)
+		TransactionStatus(ctx context.Context, hash string) (status ethTxStatus, err error)
 		Airdrop(ctx context.Context, chanID *big.Int, gas gasGetter, recipients []common.Address, amounts []*big.Int) (string, error)
 		io.Closer
 	}
@@ -159,28 +160,18 @@ type (
 	}
 	batch struct {
 		ID      string
+		TX      string
+		Status  ethTxStatus
 		Records []*batchRecord
 	}
 	databaseConfig struct {
 		DB *storage.DB
-	}
-	coinTracker struct {
-		*databaseConfig
-		Client       ethClient
-		Conf         *config
-		Workers      *pond.WorkerPool
-		CancelSignal chan struct{}
-	}
-	coinProcessorWorkerTask struct {
-		Context context.Context
-		Result  chan error
 	}
 	coinProcessor struct {
 		*databaseConfig
 		Client        ethClient
 		Conf          *config
 		WG            *sync.WaitGroup
-		ProcessSignal []chan coinProcessorWorkerTask
 		CancelSignal  chan struct{}
 		gasPriceCache struct {
 			price *big.Int
@@ -198,7 +189,6 @@ type (
 		Client    ethClient
 		DB        *storage.DB
 		Processor *coinProcessor
-		Tracker   *coinTracker
 	}
 	repository struct {
 		cfg *config
@@ -214,9 +204,8 @@ type (
 			ContractAddress string `yaml:"contractAddress" mapstructure:"contract-address"`
 			ChainID         int64  `yaml:"chainId"         mapstructure:"chain-id"`
 		} `yaml:"ethereum" mapstructure:"ethereum"`
-		StartHours  int   `yaml:"startHours"  mapstructure:"start-hours"`
-		EndHours    int   `yaml:"endHours"    mapstructure:"end-hours"`
-		Workers     int64 `yaml:"workers"     mapstructure:"workers"`
-		Development bool  `yaml:"development" mapstructure:"development"`
+		StartHours  int  `yaml:"startHours"  mapstructure:"start-hours"`
+		EndHours    int  `yaml:"endHours"    mapstructure:"end-hours"`
+		Development bool `yaml:"development" mapstructure:"development"`
 	}
 )

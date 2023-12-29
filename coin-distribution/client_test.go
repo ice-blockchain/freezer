@@ -60,13 +60,17 @@ func (*mockedDummyEthClient) TransactionsStatus(context.Context, []*string) (map
 	return nil, nil //nolint:nilnil //.
 }
 
+func (*mockedDummyEthClient) TransactionStatus(context.Context, string) (ethTxStatus, error) {
+	return ethTxStatusSuccessful, nil
+}
+
 func (m *mockedAirDropper) AirdropToWallets(opts *bind.TransactOpts, _ []common.Address, _ []*big.Int) (*types.Transaction, error) {
 	if m.errBefore > 0 {
 		m.errBefore--
 
 		log.Info(fmt.Sprintf("airdropper: error(s) left: %v", m.errBefore))
 
-		return nil, &net.OpError{Err: syscall.ECONNRESET} //nolint:wrapcheck //.
+		return nil, &net.OpError{Err: syscall.ECONNRESET}
 	}
 
 	log.Info(fmt.Sprintf("airdropper: gas price %v, limit %v", opts.GasPrice.String(), opts.GasLimit))
@@ -79,7 +83,7 @@ func (m *mockedAirDropper) AirdropToWallets(opts *bind.TransactOpts, _ []common.
 			big.NewInt(0),
 			nil,
 		),
-		nil //nolint:nilnil //.
+		nil
 }
 
 func (m *mockedGasGetter) GetGasOptions(context.Context) (*big.Int, uint64, error) {

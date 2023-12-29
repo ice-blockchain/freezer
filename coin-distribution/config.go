@@ -10,9 +10,6 @@ import (
 )
 
 func (cfg *config) EnsureValid() {
-	if cfg.Workers == 0 {
-		log.Panic("workers must be > 0")
-	}
 	if cfg.Ethereum.ChainID == 0 {
 		log.Panic("ethereum.chainID must be > 0")
 	}
