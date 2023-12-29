@@ -98,7 +98,7 @@ const (
 	applicationYamlKey = "coin-distribution"
 	requestDeadline    = 25 * stdlibtime.Second
 
-	batchSize = 1320
+	batchSize = 700
 
 	gasPriceCacheTTL = stdlibtime.Minute
 
@@ -114,6 +114,7 @@ const (
 
 	ethTxStatusSuccessful ethTxStatus = "SUCCESSFUL"
 	ethTxStatusFailed     ethTxStatus = "FAILED"
+	ethTxStatusPending    ethTxStatus = "PENDING"
 
 	configKeyCoinDistributerEnabled  = "coin_distributer_enabled"
 	configKeyCoinDistributerOnDemand = "coin_distributer_forced_execution"
@@ -141,6 +142,7 @@ type (
 	ethClient interface {
 		SuggestGasPrice(ctx context.Context) (*big.Int, error)
 		TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error)
+		TransactionStatus(ctx context.Context, hash string) (status ethTxStatus, err error)
 		Airdrop(ctx context.Context, chanID *big.Int, gas gasGetter, recipients []common.Address, amounts []*big.Int) (string, error)
 		io.Closer
 	}
@@ -159,6 +161,7 @@ type (
 	}
 	batch struct {
 		ID      string
+		TX      string
 		Records []*batchRecord
 	}
 	databaseConfig struct {
@@ -171,16 +174,11 @@ type (
 		Workers      *pond.WorkerPool
 		CancelSignal chan struct{}
 	}
-	coinProcessorWorkerTask struct {
-		Context context.Context
-		Result  chan error
-	}
 	coinProcessor struct {
 		*databaseConfig
 		Client        ethClient
 		Conf          *config
 		WG            *sync.WaitGroup
-		ProcessSignal []chan coinProcessorWorkerTask
 		CancelSignal  chan struct{}
 		gasPriceCache struct {
 			price *big.Int

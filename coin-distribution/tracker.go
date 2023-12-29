@@ -114,7 +114,6 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 		}
 	}()
 
-	hadWork := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -128,17 +127,9 @@ func (ct *coinTracker) StartChecker(ctx context.Context, notify chan<- []*string
 			return
 
 		case <-signals:
-			if hadWork && !ct.HasPendingTransactions(ctx, ethApiStatusAccepted) {
-				hadWork = false
-				log.Error(sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx),
-					"failed to sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage")
-			}
-
-			hasWork, err := ct.Do(ctx, notify)
+			_, err := ct.Do(ctx, notify)
 			if err != nil {
 				log.Error(errors.Wrap(err, "failed to check accepted transactions"))
-			} else {
-				hadWork = hadWork || hasWork
 			}
 		}
 	}

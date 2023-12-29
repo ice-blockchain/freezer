@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	stdlibtime "time"
 
@@ -17,6 +18,8 @@ import (
 )
 
 func maybeSkipTest(t *testing.T) {
+	t.Helper()
+
 	run := os.Getenv("TEST_RUN_WITH_DATABASE")
 	if run != "yes" {
 		t.Skip("TEST_RUN_WITH_DATABASE is not set to 'yes'")
@@ -70,12 +73,12 @@ func TestBatchPrepareFetch(t *testing.T) { //nolint:paralleltest //.
 	helperTruncatePendingTransactions(ctx, t, proc.DB)
 
 	t.Run("NotEnoughData", func(t *testing.T) { //nolint:paralleltest //.
-		_, err := proc.BatchPrepareFetch(ctx, 1)
+		_, err := proc.BatchPrepareFetch(ctx)
 		require.ErrorIs(t, err, errNotEnoughData)
 	})
 	t.Run("Fetch", func(t *testing.T) { //nolint:paralleltest //.
 		helperAddNewPendingTransaction(ctx, t, proc, 100)
-		b, err := proc.BatchPrepareFetch(ctx, 1)
+		b, err := proc.BatchPrepareFetch(ctx)
 		require.NoError(t, err)
 		require.Len(t, b.Records, 100)
 		for _, r := range b.Records {
@@ -231,4 +234,17 @@ func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
 	}
 
 	require.False(t, proc.IsOnDemandMode(ctx))
+}
+
+func TestWaitForDuration(t *testing.T) {
+	t.Parallel()
+
+	proc := &coinProcessor{CancelSignal: make(chan struct{}, 1), WG: &sync.WaitGroup{}}
+	tick := 0
+	for range proc.WaitForDuration(context.TODO(), stdlibtime.Second, 3) {
+		t.Log("tick")
+		tick++
+	}
+	require.Equal(t, 3, tick)
+	proc.Close()
 }

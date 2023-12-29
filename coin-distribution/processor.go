@@ -23,37 +23,19 @@ func newCoinProcessor(client ethClient, db *storage.DB, conf *config) *coinProce
 		Conf:           conf,
 		WG:             new(sync.WaitGroup),
 		CancelSignal:   make(chan struct{}),
-		ProcessSignal:  make([]chan coinProcessorWorkerTask, conf.Workers),
 		databaseConfig: &databaseConfig{DB: db},
 	}
 	proc.gasPriceCache.mu = new(sync.RWMutex)
 	proc.gasPriceCache.time = time.New(stdlibtime.Time{})
 
-	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
-		proc.ProcessSignal[workerNumber] = make(chan coinProcessorWorkerTask, 1)
-	}
-
 	return proc
 }
 
 func (proc *coinProcessor) Start(ctx context.Context, notify chan<- *batch) {
-	proc.WG.Add(int(proc.Conf.Workers))
-
-	log.Info(fmt.Sprintf("starting [%d] worker(s) ...", proc.Conf.Workers))
-
-	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
-		log.Info(fmt.Sprintf("starting worker [%v]", workerNumber))
-		go func(wn int64) {
-			defer proc.WG.Done()
-			proc.Worker(ctx, notify, wn)
-		}(workerNumber)
-	}
-
-	log.Info("starting controller ...")
 	proc.WG.Add(1)
 	go func() {
 		defer proc.WG.Done()
-		proc.Controller(ctx)
+		proc.Controller(ctx, notify)
 	}()
 }
 
@@ -98,7 +80,7 @@ func (proc *coinProcessor) GetGasPrice(ctx context.Context) (value *big.Int, err
 	return value, nil
 }
 
-func (proc *coinProcessor) BatchMarkAccepted(ctx context.Context, _ int64, data *batch, txHash string) error {
+func (proc *coinProcessor) BatchMarkAccepted(ctx context.Context, data *batch, txHash string) error {
 	const stmt = `
 update pending_coin_distributions
 set
@@ -115,7 +97,7 @@ where
 	return errors.Wrapf(err, "failed to mark batch %v with TX %v as accepted", data.ID, txHash)
 }
 
-func (proc *coinProcessor) BatchMarkRejected(ctx context.Context, _ int64, data *batch) error {
+func (proc *coinProcessor) BatchMarkRejected(ctx context.Context, data *batch) error {
 	const stmt = `
 update pending_coin_distributions
 set
@@ -130,7 +112,7 @@ where
 	return errors.Wrapf(err, "failed to mark batch %v with as rejected", data.ID)
 }
 
-func (proc *coinProcessor) BatchPrepareFetch(ctx context.Context, workerNumber int64) (*batch, error) { //nolint:funlen //.
+func (proc *coinProcessor) BatchPrepareFetch(ctx context.Context) (*batch, error) { //nolint:funlen //.
 	const stmt = `
 with records as (
 	select
@@ -138,11 +120,10 @@ with records as (
 	from
 		pending_coin_distributions
 	where
-		eth_status = 'NEW' and
-		(internal_id % 10) = $1
+		eth_status = 'NEW'
 	order by
 		created_at ASC
-	limit $2
+	limit $1
 	for update skip locked
 )
 update pending_coin_distributions up
@@ -155,7 +136,7 @@ where
 returning up.*
 `
 
-	result, err := storage.ExecMany[batchRecord](ctx, proc.DB, stmt, workerNumber, batchSize)
+	result, err := storage.ExecMany[batchRecord](ctx, proc.DB, stmt, batchSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch pending coin distributions")
 	} else if len(result) == 0 {
@@ -169,7 +150,7 @@ returning up.*
 }
 
 func (proc *coinProcessor) GetGasOptions(ctx context.Context) (price *big.Int, limit uint64, err error) {
-	gasOverride, _ := proc.GetGasPriceOverride(ctx)
+	gasOverride, err := proc.GetGasPriceOverride(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -191,11 +172,10 @@ func (proc *coinProcessor) GetGasOptions(ctx context.Context) (price *big.Int, l
 	return price, limit, nil
 }
 
-func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batch) (string, error) {
+func (proc *coinProcessor) Distribute(ctx context.Context, data *batch) (string, error) {
 	recipients, amounts := data.Prepare()
 	for recordNum := range data.Records {
-		log.Info(fmt.Sprintf("worker [%v]: batch %v: distributing %v iceflakes to address %v for user %q",
-			num,
+		log.Info(fmt.Sprintf("batch %v: distributing %v iceflakes to address %v for user %q",
 			data.ID,
 			data.Records[recordNum].Iceflakes,
 			data.Records[recordNum].EthAddress,
@@ -205,36 +185,37 @@ func (proc *coinProcessor) Distribute(ctx context.Context, num int64, data *batc
 
 	txHash, err := proc.Client.Airdrop(ctx, big.NewInt(proc.Conf.Ethereum.ChainID), proc, recipients, amounts)
 	if err != nil {
-		log.Error(errors.Wrapf(err, "worker [%v]: batch %v: failed to run contract", num, data.ID))
+		log.Error(errors.Wrapf(err, "batch %v: failed to run contract", data.ID))
 
 		return "", errors.Wrapf(err, "failed to run contract on batch %v", data.ID)
 	}
 
-	log.Info(fmt.Sprintf("worker [%v]: batch %v: transaction hash: %v", num, data.ID, txHash))
+	log.Info(fmt.Sprintf("batch %v: transaction hash: %v", data.ID, txHash))
 
 	return txHash, nil
 }
 
-func (proc *coinProcessor) Do(ctx context.Context, num int64) (*batch, error) {
-	data, err := proc.BatchPrepareFetch(ctx, num)
+func (proc *coinProcessor) Do(ctx context.Context) (*batch, error) {
+	data, err := proc.BatchPrepareFetch(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	txHash, err := proc.Distribute(ctx, num, data)
+	txHash, err := proc.Distribute(ctx, data)
 	if err != nil {
-		err = errors.Wrapf(err, "worker [%v]: failed to distribute batch", num)
+		err = errors.Wrapf(err, "failed to distribute batch")
 		log.Error(err)
-		if err2 := proc.BatchMarkRejected(ctx, num, data); err2 != nil {
-			log.Error(errors.Wrapf(err2, "worker [%v]: failed to mark batch %v as rejected", num, data.ID))
+		if err2 := proc.BatchMarkRejected(ctx, data); err2 != nil {
+			log.Error(errors.Wrapf(err2, "failed to mark batch %v as rejected", data.ID))
 		}
 		proc.MustDisable(err.Error())
 
 		return data, err
 	}
 
-	if err = proc.BatchMarkAccepted(ctx, num, data, txHash); err != nil {
-		log.Error(errors.Wrapf(err, "worker [%v]: failed to mark batch %v as accepted", num, data.ID))
+	data.TX = txHash
+	if err = proc.BatchMarkAccepted(ctx, data, txHash); err != nil {
+		log.Error(errors.Wrapf(err, "failed to mark batch %v as accepted", data.ID))
 
 		return data, err
 	}
@@ -268,8 +249,8 @@ func (proc *coinProcessor) GetAction(ctx context.Context) workerAction {
 	return workerActionRun
 }
 
-func (proc *coinProcessor) Controller(ctx context.Context) {
-	const tickInternal = stdlibtime.Second * 30
+func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch) {
+	const tickInternal = stdlibtime.Minute
 
 	log.Info("controller started")
 	defer log.Info("controller stopped")
@@ -285,7 +266,6 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 			select {
 			case signals <- struct{}{}:
 			default:
-				log.Warn("controller: signal channel is full")
 			}
 		}
 	}()
@@ -335,7 +315,7 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 			}
 
 			log.Info(fmt.Sprintf("controller: running action %v", action))
-			err := proc.RunWorkers(ctx)
+			err := proc.RunDistribution(ctx, notify)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "controller: worker(s) failed"))
 				proc.MustDisable(err.Error())
@@ -343,111 +323,83 @@ func (proc *coinProcessor) Controller(ctx context.Context) {
 				log.Error(errors.Wrapf(sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx),
 					"failed to sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage"))
 			}
+			log.Info(fmt.Sprintf("controller: action %v finished", action))
 		}
 	}
 }
 
-func (proc *coinProcessor) RunWorkers(ctx context.Context) error {
-	taskContext, cancel := context.WithCancel(ctx)
-	defer cancel()
+func (proc *coinProcessor) WaitForDuration(ctx context.Context, tickInterval stdlibtime.Duration, ticks int) <-chan struct{} {
+	ch := make(chan struct{}, ticks)
 
-	reports := make(chan error, proc.Conf.Workers)
-	task := coinProcessorWorkerTask{Context: taskContext, Result: reports}
-
-	notified := 0
-	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
-		select {
-		case proc.ProcessSignal[workerNumber] <- task:
-			log.Info(fmt.Sprintf("controller: worker [%v]: notified", workerNumber))
-			notified++
-
-		default:
-			log.Info(fmt.Sprintf("controller: worker [%v]: channel is full", workerNumber))
-		}
-	}
-
-	log.Info(fmt.Sprintf("controller: waiting for %v worker(s) to finish ...", notified))
-	for i := 0; i < notified; i++ {
-		err := <-reports
-		switch {
-		case err == nil || errors.Is(err, errNotEnoughData):
-			// Expected, do nothing.
-
-		case errors.Is(err, errClientUncoverable):
-			log.Error(errors.Wrap(err, "controller: unrecoverable error detected, stopping workers"))
-			cancel()
-
-			return err
-
-		default:
-			log.Error(errors.Wrapf(err, "controller: failed to process batch"))
-		}
-	}
-
-	log.Info("controller: all workers finished")
-
-	return nil
-}
-
-func (proc *coinProcessor) Worker(ctx context.Context, notify chan<- *batch, num int64) { //nolint:funlen //.
-	log.Info(fmt.Sprintf("worker [%v]: started", num))
-	defer log.Info(fmt.Sprintf("worker [%v]: stopped", num))
-
-	signals := make(chan coinProcessorWorkerTask, 1)
 	go func() {
-		for val := range proc.ProcessSignal[num] {
+		defer close(ch)
+
+		waitTicker := stdlibtime.NewTicker(tickInterval)
+		defer waitTicker.Stop()
+
+		for i := 0; i < ticks; i++ {
 			select {
-			case signals <- val:
-			default:
-				log.Warn(fmt.Sprintf("worker [%v]: signal channel is full", num))
+			case <-ctx.Done():
+				return
+
+			case <-proc.CancelSignal:
+				return
+
+			case <-waitTicker.C:
+				ch <- struct{}{}
 			}
 		}
 	}()
 
-main:
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info(fmt.Sprintf("worker [%v]: %v", num, ctx.Err()))
+	return ch
+}
 
-			return
-
-		case <-proc.CancelSignal:
-			log.Info(fmt.Sprintf("worker [%v]: exit signal", num))
-
-			return
-
-		case task := <-signals:
-			data, err := proc.Do(task.Context, num)
-			if data != nil {
-				sendNotify(notify, data)
+func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *batch) error {
+	for it := 1; ctx.Err() == nil; it++ {
+		log.Info(fmt.Sprintf("distribution: iteration %v", it))
+		b, err := proc.Do(context.WithoutCancel(ctx))
+		if b != nil {
+			sendNotify(notify, b)
+		}
+		if err != nil {
+			if errors.Is(err, errNotEnoughData) {
+				err = nil
 			}
+
+			return err
+		}
+
+		done := false
+		for range proc.WaitForDuration(ctx, stdlibtime.Second*5, 3) {
+			if done {
+				// Transaction is already successful, just wait for the next tick.
+				continue
+			}
+
+			status, err := proc.Client.TransactionStatus(ctx, b.TX)
 			if err != nil {
-				if !errors.Is(err, errNotEnoughData) {
-					err = errors.Wrapf(err, "worker [%v]: failed to process batch %v", num, data.ID)
-					log.Error(err)
-				}
-
-				select {
-				case task.Result <- err:
-				case <-task.Context.Done():
-					log.Warn(fmt.Sprintf("worker [%v]: cannot send error report: %v: %v", num, err, task.Context.Err()))
-
-					continue main
-				}
+				log.Error(errors.Wrapf(err, "%v: failed to get transaction status %v", b.ID, b.TX))
 
 				continue
 			}
 
-			select {
-			case signals <- task:
-			case <-task.Context.Done():
-				log.Info(fmt.Sprintf("worker [%v]: action context: %v", num, task.Context.Err()))
+			if status == ethTxStatusSuccessful {
+				log.Info(fmt.Sprintf("%v: transaction %v is successful", b.ID, b.TX))
+				done = true
 
-				continue main
+				continue
+			}
+
+			if status == ethTxStatusFailed {
+				err = fmt.Errorf("%v: transaction %v is failed", b.ID, b.TX)
+				log.Error(err)
+
+				return err
 			}
 		}
 	}
+
+	return ctx.Err()
 }
 
 // isInTimeWindow checks if current hour is in time window [startHour, endHour].
@@ -471,9 +423,6 @@ func (proc *coinProcessor) isBlocked() bool {
 
 func (proc *coinProcessor) Close() error {
 	close(proc.CancelSignal)
-	for workerNumber := int64(0); workerNumber < proc.Conf.Workers; workerNumber++ {
-		close(proc.ProcessSignal[workerNumber])
-	}
 
 	log.Info("waiting for workers to stop ...")
 	proc.WG.Wait()
