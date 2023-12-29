@@ -12,7 +12,6 @@ import (
 	"sync"
 	stdlibtime "time"
 
-	"github.com/alitto/pond"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -162,17 +161,11 @@ type (
 	batch struct {
 		ID      string
 		TX      string
+		Status  ethTxStatus
 		Records []*batchRecord
 	}
 	databaseConfig struct {
 		DB *storage.DB
-	}
-	coinTracker struct {
-		*databaseConfig
-		Client       ethClient
-		Conf         *config
-		Workers      *pond.WorkerPool
-		CancelSignal chan struct{}
 	}
 	coinProcessor struct {
 		*databaseConfig
@@ -196,7 +189,6 @@ type (
 		Client    ethClient
 		DB        *storage.DB
 		Processor *coinProcessor
-		Tracker   *coinTracker
 	}
 	repository struct {
 		cfg *config
@@ -212,9 +204,8 @@ type (
 			ContractAddress string `yaml:"contractAddress" mapstructure:"contract-address"`
 			ChainID         int64  `yaml:"chainId"         mapstructure:"chain-id"`
 		} `yaml:"ethereum" mapstructure:"ethereum"`
-		StartHours  int   `yaml:"startHours"  mapstructure:"start-hours"`
-		EndHours    int   `yaml:"endHours"    mapstructure:"end-hours"`
-		Workers     int64 `yaml:"workers"     mapstructure:"workers"`
-		Development bool  `yaml:"development" mapstructure:"development"`
+		StartHours  int  `yaml:"startHours"  mapstructure:"start-hours"`
+		EndHours    int  `yaml:"endHours"    mapstructure:"end-hours"`
+		Development bool `yaml:"development" mapstructure:"development"`
 	}
 )

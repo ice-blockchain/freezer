@@ -149,6 +149,39 @@ returning up.*
 	}, nil
 }
 
+func (ct *coinProcessor) DeleteTransactions(ctx context.Context, hash string) error {
+	const stmt = `delete from pending_coin_distributions where eth_status = 'ACCEPTED' and eth_tx = $1`
+
+	r, err := storage.Exec(ctx, ct.DB, stmt, hash)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete transactions")
+	}
+
+	log.Info(fmt.Sprintf("transaction: %v: deleted: %v", hash, r))
+
+	return nil
+}
+
+func (ct *coinProcessor) RejectTransaction(ctx context.Context, hash string) error {
+	const stmt = `
+update pending_coin_distributions
+set
+	eth_status = 'REJECTED'
+where
+	eth_status = 'ACCEPTED' and
+	eth_tx = $1
+`
+
+	r, err := storage.Exec(ctx, ct.DB, stmt, hash)
+	if err != nil {
+		return errors.Wrap(err, "failed to update transactions")
+	}
+
+	log.Info(fmt.Sprintf("transaction: %v: rejected: %v", hash, r))
+
+	return nil
+}
+
 func (proc *coinProcessor) GetGasOptions(ctx context.Context) (price *big.Int, limit uint64, err error) {
 	gasOverride, err := proc.GetGasPriceOverride(ctx)
 	if err != nil {
@@ -208,7 +241,6 @@ func (proc *coinProcessor) Do(ctx context.Context) (*batch, error) {
 		if err2 := proc.BatchMarkRejected(ctx, data); err2 != nil {
 			log.Error(errors.Wrapf(err2, "failed to mark batch %v as rejected", data.ID))
 		}
-		proc.MustDisable(err.Error())
 
 		return data, err
 	}
@@ -328,39 +360,33 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 	}
 }
 
-func (proc *coinProcessor) WaitForDuration(ctx context.Context, tickInterval stdlibtime.Duration, ticks int) <-chan struct{} {
-	ch := make(chan struct{}, ticks)
+func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) (ethTxStatus, error) {
+	now := time.Now()
 
-	go func() {
-		defer close(ch)
-
-		waitTicker := stdlibtime.NewTicker(tickInterval)
-		defer waitTicker.Stop()
-
-		for i := 0; i < ticks; i++ {
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-proc.CancelSignal:
-				return
-
-			case <-waitTicker.C:
-				ch <- struct{}{}
-			}
+	for ctx.Err() == nil {
+		status, err := proc.Client.TransactionStatus(ctx, hash)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to get transaction status: %v", hash)
 		}
-	}()
 
-	return ch
+		if status == ethTxStatusPending {
+			stdlibtime.Sleep(stdlibtime.Second * 3)
+
+			continue
+		}
+
+		log.Info(fmt.Sprintf("transaction %v: status: %v, duration: %v", hash, status, stdlibtime.Since(*now.Time)))
+
+		return status, nil
+	}
+
+	return "", ctx.Err()
 }
 
 func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *batch) error {
 	for it := 1; ctx.Err() == nil; it++ {
 		log.Info(fmt.Sprintf("distribution: iteration %v", it))
 		b, err := proc.Do(context.WithoutCancel(ctx))
-		if b != nil {
-			sendNotify(notify, b)
-		}
 		if err != nil {
 			if errors.Is(err, errNotEnoughData) {
 				err = nil
@@ -369,33 +395,28 @@ func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *b
 			return err
 		}
 
-		done := false
-		for range proc.WaitForDuration(ctx, stdlibtime.Second*5, 3) {
-			if done {
-				// Transaction is already successful, just wait for the next tick.
-				continue
-			}
+		status, err := proc.WaitForTransaction(ctx, b.TX)
+		if err != nil {
+			return err
+		}
 
-			status, err := proc.Client.TransactionStatus(ctx, b.TX)
-			if err != nil {
-				log.Error(errors.Wrapf(err, "%v: failed to get transaction status %v", b.ID, b.TX))
+		b.Status = status
+		sendNotify(notify, b)
 
-				continue
-			}
+		switch status {
+		case ethTxStatusSuccessful:
+			err = proc.DeleteTransactions(ctx, b.TX)
 
-			if status == ethTxStatusSuccessful {
-				log.Info(fmt.Sprintf("%v: transaction %v is successful", b.ID, b.TX))
-				done = true
+		case ethTxStatusFailed:
+			err = proc.RejectTransaction(ctx, b.TX)
+			proc.MustDisable(fmt.Sprintf("transaction %v failed", b.TX))
 
-				continue
-			}
+		default:
+			log.Panic(fmt.Sprintf("unexpected transaction status: %v", status))
+		}
 
-			if status == ethTxStatusFailed {
-				err = fmt.Errorf("%v: transaction %v is failed", b.ID, b.TX)
-				log.Error(err)
-
-				return err
-			}
+		if err != nil {
+			return errors.Wrapf(err, "failed to update transaction status: %v", b.TX)
 		}
 	}
 

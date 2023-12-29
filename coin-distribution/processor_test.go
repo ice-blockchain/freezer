@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math/rand"
 	"os"
-	"sync"
 	"testing"
 	stdlibtime "time"
 
@@ -122,7 +121,7 @@ func TestGetGasPrice(t *testing.T) { //nolint:tparallel //.
 func TestProcessorDistributeAccepted(t *testing.T) { //nolint:paralleltest //.
 	maybeSkipTest(t)
 	ctx := context.TODO()
-	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{Workers: 2})
+	proc := newCoinProcessor(new(mockedDummyEthClient), storage.MustConnect(ctx, ddl, applicationYamlKey), &config{})
 	require.NotNil(t, proc)
 	defer proc.Close()
 
@@ -145,7 +144,7 @@ func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
 	ctx := context.TODO()
 	proc := newCoinProcessor(&mockedDummyEthClient{dropErr: errors.New("drop error")}, //nolint:goerr113 //.
 		storage.MustConnect(ctx, ddl, applicationYamlKey),
-		&config{Workers: 2},
+		&config{},
 	)
 	require.NotNil(t, proc)
 	defer proc.Close()
@@ -201,7 +200,6 @@ func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
 	proc := newCoinProcessor(&mockedDummyEthClient{},
 		storage.MustConnect(ctx, ddl, applicationYamlKey),
 		&config{
-			Workers:    2,
 			StartHours: now.Hour() - 2,
 			EndHours:   now.Hour() - 1,
 		},
@@ -234,17 +232,4 @@ func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
 	}
 
 	require.False(t, proc.IsOnDemandMode(ctx))
-}
-
-func TestWaitForDuration(t *testing.T) {
-	t.Parallel()
-
-	proc := &coinProcessor{CancelSignal: make(chan struct{}, 1), WG: &sync.WaitGroup{}}
-	tick := 0
-	for range proc.WaitForDuration(context.TODO(), stdlibtime.Second, 3) {
-		t.Log("tick")
-		tick++
-	}
-	require.Equal(t, 3, tick)
-	proc.Close()
 }

@@ -130,7 +130,7 @@ func MustStartCoinDistribution(ctx context.Context, _ context.CancelFunc) Client
 	eth := mustNewEthClient(ctx, cfg.Ethereum.RPC, cfg.Ethereum.PrivateKey, cfg.Ethereum.ContractAddress)
 
 	cd := mustCreateCoinDistributionFromConfig(ctx, &cfg, eth)
-	cd.MustStart(ctx, nil, nil)
+	cd.MustStart(ctx, nil)
 
 	go startPrepareCoinDistributionsForReviewMonitor(ctx, cd.DB)
 
@@ -142,22 +142,19 @@ func mustCreateCoinDistributionFromConfig(ctx context.Context, conf *config, eth
 	cd := &coinDistributer{
 		Client:    ethClient,
 		Processor: newCoinProcessor(ethClient, db, conf),
-		Tracker:   newCoinTracker(ethClient, db, conf),
 		DB:        db,
 	}
 
 	return cd
 }
 
-func (cd *coinDistributer) MustStart(ctx context.Context, notifyProcessed chan<- *batch, notifyTracked chan<- []*string) {
-	cd.Tracker.Start(ctx, notifyTracked)
+func (cd *coinDistributer) MustStart(ctx context.Context, notifyProcessed chan<- *batch) {
 	cd.Processor.Start(ctx, notifyProcessed)
 }
 
 func (cd *coinDistributer) Close() error {
 	return multierror.Append( //nolint:wrapcheck //.
 		errors.Wrap(cd.Processor.Close(), "failed to close processor"),
-		errors.Wrap(cd.Tracker.Close(), "failed to close tracker"),
 		errors.Wrap(cd.Client.Close(), "failed to close eth client"),
 		errors.Wrap(cd.DB.Close(), "failed to close db"),
 	).ErrorOrNil()

@@ -149,8 +149,6 @@ func (ec *ethClientImpl) AirdropToWallets(opts *bind.TransactOpts, recipients []
 			tx.Gas(),
 			len(recipients),
 		))
-		// Wait a little to avoid nonce collision with pending transactions.
-		time.Sleep(time.Second)
 	}
 
 	return tx, err //nolint:wrapcheck //.
@@ -186,22 +184,23 @@ func (ec *ethClientImpl) Airdrop(ctx context.Context, chanID *big.Int, gas gasGe
 	return maybeRetryRPCRequest(ctx, fn)
 }
 
-func (ec *ethClientImpl) TransactionStatus(ctx context.Context, hash string) (status ethTxStatus, err error) {
-	var receipt *types.Receipt
+func (ec *ethClientImpl) TransactionStatus(ctx context.Context, hash string) (ethTxStatus, error) {
+	return maybeRetryRPCRequest(ctx, func() (ethTxStatus, error) {
+		receipt, err := ec.RPC.TransactionReceipt(ctx, common.HexToHash(hash))
+		if err != nil {
+			if errors.Is(err, ethereum.NotFound) {
+				return ethTxStatusPending, nil
+			}
 
-	if receipt, err = ec.RPC.TransactionReceipt(ctx, common.HexToHash(hash)); err != nil {
-		if errors.Is(err, ethereum.NotFound) {
-			return ethTxStatusPending, nil
+			return "", err //nolint:wrapcheck //.
 		}
 
-		return "", err //nolint:wrapcheck //.
-	}
+		if receipt.Status == types.ReceiptStatusSuccessful {
+			return ethTxStatusSuccessful, nil
+		}
 
-	if receipt.Status == types.ReceiptStatusSuccessful {
-		return ethTxStatusSuccessful, nil
-	}
-
-	return ethTxStatusFailed, nil
+		return ethTxStatusFailed, nil
+	})
 }
 
 func (ec *ethClientImpl) TransactionsStatus(ctx context.Context, hashes []*string) (statuses map[ethTxStatus][]string, err error) { //nolint:funlen //.
