@@ -115,10 +115,13 @@ const (
 	ethTxStatusFailed     ethTxStatus = "FAILED"
 	ethTxStatusPending    ethTxStatus = "PENDING"
 
-	configKeyCoinDistributerEnabled  = "coin_distributer_enabled"
-	configKeyCoinDistributerOnDemand = "coin_distributer_forced_execution"
-	configKeyCoinDistributerGasLimit = "coin_distributer_gas_limit_units"
-	configKeyCoinDistributerGasPrice = "coin_distributer_gas_price_override"
+	configKeyCoinDistributerEnabled     = "coin_distributer_enabled"
+	configKeyCoinDistributerOnDemand    = "coin_distributer_forced_execution"
+	configKeyCoinDistributerGasLimit    = "coin_distributer_gas_limit_units"
+	configKeyCoinDistributerGasPrice    = "coin_distributer_gas_price_override"
+	configKeyCoinDistributerMsgOnline   = "coin_distributer_msg_sent_online_date"
+	configKeyCoinDistributerMsgOffline  = "coin_distributer_msg_sent_offline_date"
+	configKeyCoinDistributerMsgFinished = "coin_distributer_msg_sent_finished_date"
 )
 
 // .

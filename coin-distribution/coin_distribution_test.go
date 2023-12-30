@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	stdlibtime "time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func pointerToString[T any](v *T) string {
@@ -100,4 +102,13 @@ func TestDatabaseSetGetValues(t *testing.T) {
 	err = databaseGetValue(context.TODO(), db, configKeyCoinDistributerEnabled, &boolValue)
 	require.NoError(t, err)
 	require.True(t, boolValue)
+
+	testTime := time.New(stdlibtime.Date(2021, 1, 2, 3, 4, 5, 0, stdlibtime.UTC))
+	err = databaseSetValue(context.TODO(), db, configKeyCoinDistributerMsgOnline, testTime)
+	require.NoError(t, err)
+
+	var timeValue time.Time
+	err = databaseGetValue(context.TODO(), db, configKeyCoinDistributerMsgOnline, &timeValue)
+	require.NoError(t, err)
+	require.Equal(t, testTime, &timeValue)
 }
