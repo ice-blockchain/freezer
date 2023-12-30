@@ -377,6 +377,8 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 			}
 
 			log.Info(fmt.Sprintf("controller: running action %v", action))
+			log.Error(errors.Wrap(sendCoinDistributerStartedProcessingSlackMessage(ctx),
+				"failed to send DistributerStartedProcessingSlackMessage"))
 			err := proc.RunDistribution(ctx, notify)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "controller: action %v failed with error %v", action, err))
