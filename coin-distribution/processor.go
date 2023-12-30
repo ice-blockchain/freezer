@@ -149,10 +149,10 @@ returning up.*
 	}, nil
 }
 
-func (ct *coinProcessor) DeleteTransactions(ctx context.Context, hash string) error {
+func (proc *coinProcessor) DeleteTransactions(ctx context.Context, hash string) error {
 	const stmt = `delete from pending_coin_distributions where eth_status = 'ACCEPTED' and eth_tx = $1`
 
-	r, err := storage.Exec(ctx, ct.DB, stmt, hash)
+	r, err := storage.Exec(ctx, proc.DB, stmt, hash)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete transactions")
 	}
@@ -162,7 +162,7 @@ func (ct *coinProcessor) DeleteTransactions(ctx context.Context, hash string) er
 	return nil
 }
 
-func (ct *coinProcessor) RejectTransaction(ctx context.Context, hash string) error {
+func (proc *coinProcessor) RejectTransaction(ctx context.Context, hash string) error {
 	const stmt = `
 update pending_coin_distributions
 set
@@ -172,7 +172,7 @@ where
 	eth_tx = $1
 `
 
-	r, err := storage.Exec(ctx, ct.DB, stmt, hash)
+	r, err := storage.Exec(ctx, proc.DB, stmt, hash)
 	if err != nil {
 		return errors.Wrap(err, "failed to update transactions")
 	}
@@ -281,6 +281,38 @@ func (proc *coinProcessor) GetAction(ctx context.Context) workerAction {
 	return workerActionRun
 }
 
+func (proc *coinProcessor) maybeSendMessage(ctx context.Context, key string, f func(context.Context) error) {
+	var lastMessageSentAt time.Time
+
+	err := databaseGetValue(ctx, proc.DB, key, &lastMessageSentAt)
+	if err != nil {
+		log.Error(errors.Wrapf(err, "failed to get %v", key))
+
+		return
+	}
+
+	now := time.Now()
+	year, month, day := now.Date()
+	sentYear, sentMonth, sentDay := lastMessageSentAt.Date()
+	if (year == sentYear && month == sentMonth && day == sentDay) || lastMessageSentAt.After(*now.Time) {
+		log.Debug(fmt.Sprintf("%v: message was already sent: %v (now %v)", key, lastMessageSentAt, now))
+
+		return
+	}
+
+	err = f(ctx)
+	if err != nil {
+		log.Error(errors.Wrapf(err, "failed to send message"))
+
+		return
+	}
+
+	err = databaseSetValue(ctx, proc.DB, key, now)
+	if err != nil {
+		log.Error(errors.Wrapf(err, "failed to set %v", key))
+	}
+}
+
 func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch) {
 	const tickInternal = stdlibtime.Minute
 
@@ -302,7 +334,7 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 		}
 	}()
 
-	prevAction := workerActionDisabled
+	prevAction := workerActionBlocked
 	for {
 		select {
 		case <-ctx.Done():
@@ -318,20 +350,18 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 		case <-signals:
 			action := proc.GetAction(ctx)
 			if action == workerActionDisabled || action == workerActionBlocked {
-				if action == workerActionBlocked && prevAction == workerActionRun {
-					log.Error(errors.Wrapf(sendCoinDistributerIsNowOfflineSlackMessage(ctx),
-						"failed to sendCoinDistributerIsNowOfflineSlackMessage"))
+				log.Info(fmt.Sprintf("controller: disabled or blocked (%v)", action))
+				if prevAction == workerActionRun {
+					proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOffline, sendCoinDistributerIsNowOfflineSlackMessage)
 				}
 				prevAction = action
-				log.Info(fmt.Sprintf("controller: disabled or blocked (%v)", action))
 
 				continue
 			}
 
 			if prevAction == workerActionBlocked && action == workerActionRun {
 				log.Info("controller: unblocked")
-				log.Error(errors.Wrapf(sendCoinDistributerIsNowOnlineSlackMessage(ctx),
-					"failed to sendCoinDistributerIsNowOnlineSlackMessage"))
+				proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOnline, sendCoinDistributerIsNowOnlineSlackMessage)
 			}
 			prevAction = action
 
@@ -349,12 +379,19 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 			log.Info(fmt.Sprintf("controller: running action %v", action))
 			err := proc.RunDistribution(ctx, notify)
 			if err != nil {
-				log.Error(errors.Wrapf(err, "controller: worker(s) failed"))
+				log.Error(errors.Wrapf(err, "controller: action %v failed with error %v", action, err))
 				proc.MustDisable(err.Error())
-			} else if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
-				log.Error(errors.Wrapf(sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx),
-					"failed to sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage"))
+
+				continue
 			}
+
+			if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
+				proc.maybeSendMessage(
+					ctx,
+					configKeyCoinDistributerMsgFinished,
+					sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage)
+			}
+
 			log.Info(fmt.Sprintf("controller: action %v finished", action))
 		}
 	}
@@ -385,6 +422,12 @@ func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) 
 
 func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *batch) error {
 	for it := 1; ctx.Err() == nil; it++ {
+		if !proc.IsEnabled(ctx) {
+			log.Info(fmt.Sprintf("distribution: iteration %v: disabled", it))
+
+			return nil
+		}
+
 		log.Info(fmt.Sprintf("distribution: iteration %v", it))
 		b, err := proc.Do(context.WithoutCancel(ctx))
 		if err != nil {

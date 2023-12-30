@@ -11,6 +11,8 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/pkg/errors"
+
+	"github.com/ice-blockchain/wintr/log"
 )
 
 func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx context.Context) error {
@@ -61,12 +63,6 @@ func sendCoinDistributerIsNowOfflineSlackMessage(ctx context.Context) error {
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
-func sendCurrentCoinDistributionsFinishedBeingSentToEthereumSlackMessage(ctx context.Context) error {
-	text := fmt.Sprintf(":rocket:`%v` all pending coin distributions have been processed successfully :rocket:", cfg.Environment)
-
-	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
-}
-
 func sendAllCurrentCoinDistributionsWereCommittedInEthereumSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":tada:`%v` all coin distributions have been committed successfully in ethereum :tada:", cfg.Environment)
 
@@ -99,6 +95,8 @@ func sendSlackMessage(ctx context.Context, text, alertSlackWebhook string) error
 	if err != nil {
 		return errors.Wrap(err, "newRequestWithContext failed")
 	}
+
+	log.Debug(fmt.Sprintf("sending slack message: %v", text))
 
 	const retries = 10
 	var resp *http.Response

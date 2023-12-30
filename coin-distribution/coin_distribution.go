@@ -4,6 +4,7 @@ package coindistribution
 
 import (
 	"context"
+	"encoding"
 	"fmt"
 	stdlibtime "time"
 
@@ -14,6 +15,7 @@ import (
 	appCfg "github.com/ice-blockchain/wintr/config"
 	"github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (d *databaseConfig) MustDisable(reason string) {
@@ -28,11 +30,23 @@ func (d *databaseConfig) MustDisable(reason string) {
 		"failed to sendCoinDistributionsProcessingStoppedDueToUnrecoverableFailureSlackMessage")
 }
 
-func databaseSetValue[T bool | constraints.Integer](ctx context.Context, db storage.Execer, key string, value T) error {
+func databaseSetValue[T bool | constraints.Integer | *time.Time](ctx context.Context, db storage.Execer, key string, value T) error {
+	var textValue string
+
 	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
 
-	textValue := fmt.Sprintf("%v", value)
+	switch i := any(value).(type) {
+	case encoding.TextMarshaler:
+		v, err := i.MarshalText()
+		if err != nil {
+			return errors.Wrapf(err, "failed to marshal %v", value)
+		}
+		textValue = string(v)
+	default:
+		textValue = fmt.Sprintf("%v", value)
+	}
+
 	rows, err := storage.Exec(reqCtx, db, `UPDATE global SET value = $2 WHERE key = $1`, key, textValue)
 	if err == nil && rows == 0 {
 		err = storage.ErrNotFound
@@ -41,7 +55,7 @@ func databaseSetValue[T bool | constraints.Integer](ctx context.Context, db stor
 	return errors.Wrapf(err, "failed to set %v to %q", key, textValue)
 }
 
-func databaseGetValue[T bool | constraints.Integer](ctx context.Context, db storage.Querier, key string, value *T) error {
+func databaseGetValue[T bool | constraints.Integer | time.Time](ctx context.Context, db storage.Querier, key string, value *T) error {
 	var hint string
 
 	if value == nil {
@@ -51,14 +65,15 @@ func databaseGetValue[T bool | constraints.Integer](ctx context.Context, db stor
 	reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 	defer cancel()
 
-	var x any = value
-	switch x.(type) {
+	switch x := any(value).(type) {
 	case *bool:
 		hint = "boolean"
 	case *int, *int8, *int16, *int32, *int64:
 		hint = "bigint"
 	case *uint, *uint8, *uint16, *uint32, *uint64:
 		hint = "bigint"
+	case *time.Time:
+		hint = "timestamp with time zone"
 	default:
 		log.Panic(fmt.Sprintf("%s: unsupported type %T: %v", key, x, *value))
 	}
