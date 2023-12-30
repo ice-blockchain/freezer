@@ -359,7 +359,7 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 				continue
 			}
 
-			if prevAction == workerActionBlocked && action == workerActionRun {
+			if action == workerActionRun {
 				log.Info("controller: unblocked")
 				proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOnline, sendCoinDistributerIsNowOnlineSlackMessage)
 			}
