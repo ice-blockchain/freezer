@@ -319,6 +319,15 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 	log.Info("controller started")
 	defer log.Info("controller stopped")
 
+	if proc.HasPendingTransactions(ctx, ethApiStatusAccepted) {
+		log.Info("controller: waiting for all accepted transactions to finish")
+		err := proc.WaitForAllAcceptedTransactions(ctx, notify)
+		if err != nil {
+			log.Error(errors.Wrapf(err, "failed to WaitForAllAcceptedTransactions"))
+			proc.MustDisable(err.Error())
+		}
+	}
+
 	ticker := stdlibtime.NewTicker(tickInternal)
 	defer ticker.Stop()
 
@@ -399,6 +408,70 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 	}
 }
 
+func (proc *coinProcessor) GetNextPendingTransaction(ctx context.Context) (string, error) {
+	const stmt = `
+select
+	eth_tx
+from
+	pending_coin_distributions
+where
+	eth_status = 'ACCEPTED'
+order by
+	created_at ASC
+limit 1
+`
+
+	val, err := storage.Get[string](ctx, proc.DB, stmt)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			err = nil
+		}
+
+		return "", errors.Wrap(err, "failed to get next pending transaction")
+	}
+
+	return *val, nil
+}
+
+func (proc *coinProcessor) WaitForAllAcceptedTransactions(ctx context.Context, notify chan<- *batch) error {
+	for ctx.Err() == nil {
+		txHash, err := proc.GetNextPendingTransaction(ctx)
+		if err != nil {
+			return err
+		}
+
+		if txHash == "" {
+			return nil
+		}
+
+		status, err := proc.WaitForTransaction(ctx, txHash)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case ethTxStatusSuccessful:
+			err = proc.DeleteTransactions(ctx, txHash)
+
+		case ethTxStatusFailed:
+			proc.MustDisable(fmt.Sprintf("accepted transaction %v failed", txHash))
+			err = proc.RejectTransaction(ctx, txHash)
+		}
+
+		if err != nil {
+			return errors.Wrapf(err, "failed to update transaction status: %v", txHash)
+		}
+
+		sendNotify(notify, &batch{TX: txHash, Status: status, Records: []*batchRecord{
+			{
+				EthTX: &txHash,
+			},
+		}})
+	}
+
+	return ctx.Err()
+}
+
 func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) (ethTxStatus, error) {
 	now := time.Now()
 
@@ -453,11 +526,12 @@ func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *b
 			err = proc.DeleteTransactions(ctx, b.TX)
 
 		case ethTxStatusFailed:
-			err = proc.RejectTransaction(ctx, b.TX)
 			proc.MustDisable(fmt.Sprintf("transaction %v failed", b.TX))
 
+			return errors.Wrapf(proc.RejectTransaction(ctx, b.TX), "failed to reject transaction %v", b.TX)
+
 		default:
-			log.Panic(fmt.Sprintf("unexpected transaction status: %v", status))
+			log.Panic(fmt.Sprintf("unexpected transaction status: %v (%v)", status, b.TX))
 		}
 
 		if err != nil {

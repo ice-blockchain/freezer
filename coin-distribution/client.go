@@ -82,6 +82,8 @@ func handleRPCError(ctx context.Context, target error) (retryAfter time.Duration
 	for _, ethErr := range []error{
 		core.ErrNonceTooLow,
 		core.ErrNonceMax,
+		core.ErrGasLimitReached,
+		core.ErrGasUintOverflow,
 		core.ErrInsufficientFundsForTransfer,
 		core.ErrMaxInitCodeSizeExceeded,
 		core.ErrInsufficientFunds,

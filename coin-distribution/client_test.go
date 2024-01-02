@@ -25,6 +25,7 @@ type (
 	mockedDummyEthClient struct {
 		dropErr error
 		gas     int64
+		txErr   map[string]error
 	}
 	mockedAirDropper struct {
 		errBefore int
@@ -60,7 +61,11 @@ func (*mockedDummyEthClient) TransactionsStatus(context.Context, []*string) (map
 	return nil, nil //nolint:nilnil //.
 }
 
-func (*mockedDummyEthClient) TransactionStatus(context.Context, string) (ethTxStatus, error) {
+func (m *mockedDummyEthClient) TransactionStatus(_ context.Context, hash string) (ethTxStatus, error) {
+	if err, ok := m.txErr[hash]; ok {
+		return ethTxStatusFailed, err
+	}
+
 	return ethTxStatusSuccessful, nil
 }
 
