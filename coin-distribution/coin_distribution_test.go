@@ -112,3 +112,92 @@ func TestDatabaseSetGetValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testTime, &timeValue)
 }
+
+func TestCoinDistributionWaitOK(t *testing.T) { //nolint:paralleltest,funlen //.
+	const (
+		testUserName = "testUserOK"
+		testTxOK     = "0xAABBCCDDEE"
+	)
+
+	maybeSkipTest(t)
+
+	cl := &mockedDummyEthClient{}
+	conf := new(config)
+
+	t.Run("AddPendingEntry", func(t *testing.T) {
+		db := storage.MustConnect(context.TODO(), ddl, applicationYamlKey)
+		defer db.Close()
+
+		helperTruncatePendingTransactions(context.TODO(), t, db)
+
+		const stmt = `
+		INSERT INTO pending_coin_distributions
+			(created_at, day, internal_id, iceflakes, user_id, eth_address, eth_status, eth_tx)
+		VALUES (now(), CURRENT_DATE, 1, '10000000000000000000000000'::uint256, $1, $2, 'ACCEPTED', $3)
+		ON CONFLICT (user_id,day) DO NOTHING
+		`
+
+		_, err := storage.Exec(context.TODO(), db, stmt, testUserName, "0x1234", testTxOK)
+		require.NoError(t, err)
+	})
+
+	cd := mustCreateCoinDistributionFromConfig(context.TODO(), conf, cl)
+	require.NotNil(t, cd)
+	defer cd.Close()
+
+	chBatches := make(chan *batch, 1)
+	cd.MustStart(context.TODO(), chBatches)
+
+	t.Logf("waiting for check for pending transaction")
+	processedBatch := <-chBatches
+	t.Logf("batch: %+v processed: status %v", processedBatch, processedBatch.Status)
+	require.Equal(t, ethTxStatusSuccessful, processedBatch.Status)
+	require.Equal(t, testTxOK, processedBatch.TX)
+	require.Len(t, processedBatch.Records, 1)
+	require.Equal(t, testTxOK, *processedBatch.Records[0].EthTX)
+}
+
+func TestCoinDistributionWaitFailed(t *testing.T) { //nolint:paralleltest,funlen //.
+	const (
+		testUserName = "testUserOK"
+		testTxFailed = "0xAABBCCDDEE"
+	)
+
+	maybeSkipTest(t)
+
+	cl := &mockedDummyEthClient{txErr: map[string]error{testTxFailed: nil}}
+	conf := new(config)
+
+	t.Run("AddPendingEntry", func(t *testing.T) {
+		db := storage.MustConnect(context.TODO(), ddl, applicationYamlKey)
+		defer db.Close()
+
+		helperTruncatePendingTransactions(context.TODO(), t, db)
+
+		const stmt = `
+		INSERT INTO pending_coin_distributions
+			(created_at, day, internal_id, iceflakes, user_id, eth_address, eth_status, eth_tx)
+		VALUES (now(), CURRENT_DATE, 1, '10000000000000000000000000'::uint256, $1, $2, 'ACCEPTED', $3)
+		ON CONFLICT (user_id,day) DO NOTHING
+		`
+
+		_, err := storage.Exec(context.TODO(), db, stmt, testUserName, "0x1234", testTxFailed)
+		require.NoError(t, err)
+	})
+
+	cd := mustCreateCoinDistributionFromConfig(context.TODO(), conf, cl)
+	require.NotNil(t, cd)
+	defer cd.Close()
+
+	chBatches := make(chan *batch, 1)
+	cd.MustStart(context.TODO(), chBatches)
+
+	t.Logf("waiting for check for pending transaction")
+	processedBatch := <-chBatches
+	t.Logf("batch: %+v processed: status %v", processedBatch, processedBatch.Status)
+	require.Equal(t, ethTxStatusFailed, processedBatch.Status)
+	require.Equal(t, testTxFailed, processedBatch.TX)
+	require.Len(t, processedBatch.Records, 1)
+	require.Equal(t, testTxFailed, *processedBatch.Records[0].EthTX)
+	require.False(t, cd.Processor.IsEnabled(context.TODO()))
+}
