@@ -112,11 +112,11 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 			cfg.EthereumDistributionFrequency.Max)
 }
 
-func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time) bool {
+func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time, idT0 int64) bool {
 	return u != nil &&
 		u.ID != 0 &&
 		coindistribution.IsEligibleForEthereumDistributionNow(
-			u.IDT0,
+			idT0,
 			now,
 			u.ForT0LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
@@ -125,11 +125,11 @@ func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time) bool {
 		u.isEligibleForReferralForEthereumDistribution(now)
 }
 
-func (u *user) isEligibleForTMinus1ForEthereumDistribution(now *time.Time) bool {
+func (u *user) isEligibleForTMinus1ForEthereumDistribution(now *time.Time, idTMinus1 int64) bool {
 	return u != nil &&
 		u.ID != 0 &&
 		coindistribution.IsEligibleForEthereumDistributionNow(
-			u.IDTMinus1,
+			idTMinus1,
 			now,
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
@@ -252,7 +252,7 @@ func (u *user) processEthereumCoinDistribution(
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if t0 != nil && t0.UserID != u.UserID && t0.ID == u.IDT0 && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now, u.ForT0LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
+	if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now, t0.ID) && t0.isEligibleForSelfForEthereumDistribution(now, u.ForT0LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
 		// Amount I've earned for my T0.
 		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
 		forT0CD.Balance = balanceDistributedForT0
@@ -267,7 +267,7 @@ func (u *user) processEthereumCoinDistribution(
 		u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if tMinus1 != nil && tMinus1.UserID != u.UserID && tMinus1.ID == u.IDTMinus1 && t0 != nil && tMinus1.UserID != t0.UserID && t0.ID == u.IDT0 && u.isEligibleForTMinus1ForEthereumDistribution(now) && tMinus1.isEligibleForSelfForEthereumDistribution(now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
+	if tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID && u.isEligibleForTMinus1ForEthereumDistribution(now, tMinus1.ID) && tMinus1.isEligibleForSelfForEthereumDistribution(now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
 		// Amount I've earned for my T-1.
 		balanceDistributedForTMinus1 = u.processEthereumCoinDistributionForForTMinus1(tMinus1, now)
 		forTMinus1CD.Balance = balanceDistributedForTMinus1
