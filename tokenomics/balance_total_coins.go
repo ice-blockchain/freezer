@@ -11,6 +11,7 @@ import (
 	"github.com/alitto/pond"
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -96,10 +97,6 @@ func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
 func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow *time.Time) {
 	ticker := stdlibtime.NewTicker(stdlibtime.Duration(1+rand.Intn(10)) * (r.cfg.GlobalAggregationInterval.Child / 60)) //nolint:gosec,gomnd // Not an  issue.
 	defer ticker.Stop()
-
-	dates, _ := r.totalCoinsDates(initialNow, 1)
-	lastDateCached := time.New(dates[0])
-
 	for {
 		select {
 		case <-ticker.C:
@@ -108,7 +105,11 @@ func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow 
 				newDate                = now.Truncate(r.cfg.GlobalAggregationInterval.Child)
 				historyGenerationDelta = stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child) * 0.75) //nolint:gomnd // .
 			)
-			if !lastDateCached.Equal(newDate) && now.Sub(newDate) >= historyGenerationDelta {
+			lastDateCached, err := r.getLastDateCached(ctx)
+			if err != nil {
+				log.Error(errors.Wrapf(err, "failed to get last date cached"))
+			}
+			if lastDateCached.IsNil() || (!lastDateCached.Equal(newDate) && now.Sub(newDate) >= historyGenerationDelta) {
 				dwhCtx, cancel := context.WithTimeout(ctx, 1*stdlibtime.Minute)
 				lock, err := redislock.Obtain(dwhCtx, r.db, totalCoinStatsCacheLockKey, totalCoinStatsCacheLockDuration, &redislock.Options{RetryStrategy: redislock.NoRetry()})
 				if err != nil && errors.Is(err, redislock.ErrNotObtained) {
@@ -122,7 +123,9 @@ func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow 
 				if err = r.buildTotalCoinCache(dwhCtx, newDate); err != nil {
 					log.Error(errors.Wrapf(err, "failed to update total coin stats cache for date %v", *now.Time))
 				} else {
-					lastDateCached = time.New(newDate)
+					if err := r.setLastDateCached(ctx, time.New(newDate)); err != nil {
+						log.Error(errors.Wrapf(err, "can't set last date cached: %v", time.New(newDate)))
+					}
 				}
 				if lock != nil {
 					log.Error(errors.Wrapf(lock.Release(dwhCtx), "error releasing lock, key: totalCoinStatsCache"))
@@ -184,4 +187,28 @@ func (r *repository) mustInitTotalCoinsCache(ctx context.Context, now *time.Time
 		}
 		workerPool.StopAndWait()
 	}
+}
+
+func (r *repository) setLastDateCached(ctx context.Context, lastDateCached *time.Time) error {
+	_, err := r.db.Set(ctx, "total_coins_last_date_cached", lastDateCached, 0).Result()
+
+	return errors.Wrapf(err, "failed to set total_coins_last_date_cached for: %v", lastDateCached)
+}
+
+func (r *repository) getLastDateCached(ctx context.Context) (lastDateCached *time.Time, err error) {
+	lastDateCachedString, err := r.db.Get(ctx, "total_coins_last_date_cached").Result()
+	if err != nil && errors.Is(err, redis.Nil) {
+		return nil, nil
+	}
+	if lastDateCachedString != "" {
+		lastDateCached = new(time.Time)
+		if err := lastDateCached.UnmarshalText([]byte(lastDateCachedString)); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse total_coins_last_date_cached `%v`", lastDateCachedString)
+		}
+		lastDateCached = time.New(lastDateCached.UTC())
+
+		return
+	}
+
+	return nil, errors.Wrap(err, "failed to get last date cached value")
 }
