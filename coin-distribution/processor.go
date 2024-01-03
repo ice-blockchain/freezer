@@ -531,6 +531,10 @@ func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *b
 			log.Info(fmt.Sprintf("distribution: iteration %v: disabled", it))
 
 			return nil
+		} else if proc.isBlocked() {
+			log.Info(fmt.Sprintf("distribution: iteration %v: blocked", it))
+
+			return nil
 		}
 
 		log.Info(fmt.Sprintf("distribution: iteration %v", it))
