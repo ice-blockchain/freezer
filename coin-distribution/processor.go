@@ -9,6 +9,7 @@ import (
 	"sync"
 	stdlibtime "time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
 
@@ -361,14 +362,23 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 			if action == workerActionDisabled || action == workerActionBlocked {
 				log.Info(fmt.Sprintf("controller: disabled or blocked (%v)", action))
 				if prevAction == workerActionRun {
-					proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOffline, sendCoinDistributerIsNowOfflineSlackMessage)
+					proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOffline, func(ctx context.Context) (err error) {
+						if proc.HasPendingTransactions(ctx, ethApiStatusNew) {
+							err = errors.Wrap(sendCoinDistributerHasUnfinishedWork(ctx), "failed to sendCoinDistributerHasUnfinishedWork")
+						}
+
+						return multierror.Append(err,
+							errors.Wrap(sendCoinDistributerIsNowOfflineSlackMessage(ctx),
+								"failed to sendCoinDistributerIsNowOfflineSlackMessage"),
+						)
+					})
 				}
 				prevAction = action
 
 				continue
 			}
 
-			if action == workerActionRun {
+			if action == workerActionRun && prevAction != workerActionRun {
 				log.Info("controller: unblocked")
 				proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOnline, sendCoinDistributerIsNowOnlineSlackMessage)
 			}
@@ -472,8 +482,18 @@ func (proc *coinProcessor) WaitForAllAcceptedTransactions(ctx context.Context, n
 	return ctx.Err()
 }
 
+func sleepWithContext(ctx context.Context, d stdlibtime.Duration) {
+	tm := stdlibtime.NewTimer(d)
+	defer tm.Stop()
+
+	select {
+	case <-ctx.Done():
+	case <-tm.C:
+	}
+}
+
 func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) (ethTxStatus, error) {
-	now := time.Now()
+	start := time.Now()
 
 	for ctx.Err() == nil {
 		status, err := proc.Client.TransactionStatus(ctx, hash)
@@ -482,12 +502,22 @@ func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) 
 		}
 
 		if status == ethTxStatusPending {
-			stdlibtime.Sleep(stdlibtime.Second * 3)
+			sleepDuration := stdlibtime.Second * 3
+
+			if d := stdlibtime.Since(*start.Time); d > stdlibtime.Hour {
+				sleepDuration = stdlibtime.Hour
+				log.Warn(fmt.Sprintf("transaction %v is in PENDING state since %v (%v)", hash, start, d))
+				if d > stdlibtime.Hour*24 {
+					sendCoinDistributerTransactionStuck(ctx, hash, start)
+				}
+			}
+
+			sleepWithContext(ctx, sleepDuration)
 
 			continue
 		}
 
-		log.Info(fmt.Sprintf("transaction %v: status: %v, duration: %v", hash, status, stdlibtime.Since(*now.Time)))
+		log.Info(fmt.Sprintf("transaction %v: status: %v, duration: %v", hash, status, stdlibtime.Since(*start.Time)))
 
 		return status, nil
 	}

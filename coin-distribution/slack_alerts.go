@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/wintr/log"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx context.Context) error {
@@ -59,6 +60,22 @@ func sendCoinDistributerIsNowOnlineSlackMessage(ctx context.Context) error {
 
 func sendCoinDistributerIsNowOfflineSlackMessage(ctx context.Context) error {
 	text := fmt.Sprintf(":sleeping:`%v` coin distributer is now offline :sleeping:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func sendCoinDistributerHasUnfinishedWork(ctx context.Context) error {
+	text := fmt.Sprintf(":octagonal_sign:`%v` coin distributer has unfinished work :octagonal_sign:", cfg.Environment)
+
+	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
+}
+
+func sendCoinDistributerTransactionStuck(ctx context.Context, hash string, start *time.Time) error {
+	text := fmt.Sprintf(":octagonal_sign:`%v` transaction `%v` stuck in PENDING state since `%v` :octagonal_sign:",
+		cfg.Environment,
+		hash,
+		start.Format(stdlibtime.RFC3339),
+	)
 
 	return errors.Wrap(sendSlackMessage(ctx, text, cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
