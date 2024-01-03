@@ -13,10 +13,6 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-const (
-	miningSessionSoloEndedAtNetworkDelayAdjustment = 20 * stdlibtime.Second
-)
-
 func IsCoinDistributionCollectorEnabled(now *time.Time, ethereumDistributionFrequencyMin stdlibtime.Duration, cs *CollectorSettings) bool {
 	return cs.Enabled &&
 		(cs.ForcedExecution ||
@@ -52,11 +48,12 @@ func IsEligibleForEthereumDistribution(
 	if _, countryDenied := distributionDeniedCountries[strings.ToLower(country)]; country != "" && !countryDenied {
 		countryAllowed = true
 	}
+	distributedBalance := CalculateEthereumDistributionICEBalance(standardBalance, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, ethereumDistributionEndDate) //nolint:lll // .
 
 	return countryAllowed &&
 		!miningSessionSoloEndedAt.IsNil() && miningSessionSoloEndedAt.After(*collectingEndedAt.Time) &&
 		isEthereumAddressValid(ethAddress) &&
-		CalculateEthereumDistributionICEBalance(standardBalance, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, ethereumDistributionEndDate) >= minEthereumDistributionICEBalanceRequired && //nolint:lll // .
+		((minEthereumDistributionICEBalanceRequired > 0 && distributedBalance >= minEthereumDistributionICEBalanceRequired) || (distributedBalance > 0)) &&
 		model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, miningSessionDuration) >= minMiningStreaksRequired &&
 		kycState.KYCStepPassedCorrectly(users.QuizKYCStep)
 }
