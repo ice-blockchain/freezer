@@ -29,7 +29,7 @@ func (ref *referral) username() string {
 	return "icenetwork/bogus"
 }
 
-func (ref *referral) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
+func (ref *referral) isEligibleForSelfForEthereumDistribution(now, lastEthereumCoinDistributionProcessedAt *time.Time) bool {
 	coinDistributionCollectorSettings := cfg.coinDistributionCollectorSettings.Load()
 
 	return ref != nil &&
@@ -37,7 +37,7 @@ func (ref *referral) isEligibleForSelfForEthereumDistribution(now *time.Time) bo
 		coindistribution.IsEligibleForEthereumDistributionNow(
 			ref.ID,
 			now,
-			ref.SoloLastEthereumCoinDistributionProcessedAt,
+			lastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max) &&
@@ -116,7 +116,7 @@ func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time) bool {
 	return u != nil &&
 		u.ID != 0 &&
 		coindistribution.IsEligibleForEthereumDistributionNow(
-			u.ID,
+			u.IDT0,
 			now,
 			u.ForT0LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
@@ -129,7 +129,7 @@ func (u *user) isEligibleForTMinus1ForEthereumDistribution(now *time.Time) bool 
 	return u != nil &&
 		u.ID != 0 &&
 		coindistribution.IsEligibleForEthereumDistributionNow(
-			u.ID,
+			u.IDTMinus1,
 			now,
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
@@ -235,41 +235,47 @@ func (u *user) processEthereumCoinDistribution(
 	if u.isEligibleForSelfForEthereumDistribution(now) {
 		// Amount I've earned for myself.
 		soloCD.Balance = u.processEthereumCoinDistributionForSolo(now)
+		totalForSelf := soloCD.Balance
 
 		if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && t0.isEligibleForReferralForEthereumDistribution(now) { //nolint:lll // .
 			// Amount my T0 earned for me.
 			t0CD.Balance = u.processEthereumCoinDistributionForT0(now)
+			totalForSelf += t0CD.Balance
 		}
 
-		if !ethereumDistributionDryRunModeEnabled {
+		if !ethereumDistributionDryRunModeEnabled && totalForSelf > 0 {
 			u.SoloLastEthereumCoinDistributionProcessedAt = now
+		} else {
+			u.SoloLastEthereumCoinDistributionProcessedAt = nil
 		}
 	} else {
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now) { //nolint:lll // .
+	if t0 != nil && t0.UserID != u.UserID && t0.ID == u.IDT0 && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now) && t0.isEligibleForSelfForEthereumDistribution(now, u.ForT0LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
 		// Amount I've earned for my T0.
 		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
 		forT0CD.Balance = balanceDistributedForT0
 
-		if !ethereumDistributionDryRunModeEnabled {
+		if !ethereumDistributionDryRunModeEnabled && forT0CD.Balance > 0 {
 			u.ForT0LastEthereumCoinDistributionProcessedAt = now
 		} else {
+			u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 			balanceDistributedForT0 = 0
 		}
 	} else {
 		u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 	}
 
-	if tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID && u.isEligibleForTMinus1ForEthereumDistribution(now) && tMinus1.isEligibleForSelfForEthereumDistribution(now) { //nolint:lll // .
+	if tMinus1 != nil && tMinus1.UserID != u.UserID && tMinus1.ID == u.IDTMinus1 && t0 != nil && tMinus1.UserID != t0.UserID && t0.ID == u.IDT0 && u.isEligibleForTMinus1ForEthereumDistribution(now) && tMinus1.isEligibleForSelfForEthereumDistribution(now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
 		// Amount I've earned for my T-1.
 		balanceDistributedForTMinus1 = u.processEthereumCoinDistributionForForTMinus1(tMinus1, now)
 		forTMinus1CD.Balance = balanceDistributedForTMinus1
 
-		if !ethereumDistributionDryRunModeEnabled {
+		if !ethereumDistributionDryRunModeEnabled && forTMinus1CD.Balance > 0 {
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt = now
 		} else {
+			u.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
 			balanceDistributedForTMinus1 = 0
 		}
 	} else {
@@ -282,6 +288,9 @@ func (u *user) processEthereumCoinDistribution(
 func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) float64 {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceSolo, u.PreStakingAllocation, u.PreStakingBonus)
 	ethIce := coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceSoloEthereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	if ethIce <= 0 {
+		return 0
+	}
 	if !ethereumDistributionDryRunModeEnabled {
 		u.BalanceSoloEthereum += ethIce
 	}
@@ -292,6 +301,9 @@ func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) float64 {
 func (u *user) processEthereumCoinDistributionForT0(now *time.Time) float64 {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceT0, u.PreStakingAllocation, u.PreStakingBonus)
 	ethIce := coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceT0Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	if ethIce <= 0 {
+		return 0
+	}
 	if !ethereumDistributionDryRunModeEnabled {
 		u.BalanceT0Ethereum += ethIce
 	}
@@ -303,6 +315,9 @@ func (u *user) processEthereumCoinDistributionForT0(now *time.Time) float64 {
 func (u *user) processEthereumCoinDistributionForForT0(t0 *referral, now *time.Time) float64 {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceForT0, t0.PreStakingAllocation, t0.PreStakingBonus)
 	ethIce := coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForT0Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	if ethIce <= 0 {
+		return 0
+	}
 	if !ethereumDistributionDryRunModeEnabled {
 		u.BalanceForT0Ethereum += ethIce
 	}
@@ -314,6 +329,9 @@ func (u *user) processEthereumCoinDistributionForForT0(t0 *referral, now *time.T
 func (u *user) processEthereumCoinDistributionForForTMinus1(tMinus1 *referral, now *time.Time) float64 {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceForTMinus1, tMinus1.PreStakingAllocation, tMinus1.PreStakingBonus)
 	ethIce := coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForTMinus1Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	if ethIce <= 0 {
+		return 0
+	}
 	if !ethereumDistributionDryRunModeEnabled {
 		u.BalanceForTMinus1Ethereum += ethIce
 	}

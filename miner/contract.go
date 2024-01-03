@@ -128,7 +128,6 @@ type (
 		model.MiningSessionSoloEndedAtField
 		model.MiningSessionSoloPreviouslyEndedAtField
 		model.ResurrectSoloUsedAtField
-		model.SoloLastEthereumCoinDistributionProcessedAtField
 		model.UserIDField
 		model.CountryField
 		model.UsernameField
