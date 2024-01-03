@@ -66,7 +66,7 @@ func (ref *referral) isEligibleForReferralForEthereumDistribution(now *time.Time
 		ref.ID != 0 &&
 		coindistribution.IsEligibleForEthereumDistribution(
 			0,
-			0,
+			0.1,
 			0,
 			"skip",
 			ref.Country,
@@ -142,7 +142,7 @@ func (u *user) isEligibleForReferralForEthereumDistribution(now *time.Time) bool
 	coinDistributionCollectorSettings := cfg.coinDistributionCollectorSettings.Load()
 	return coindistribution.IsEligibleForEthereumDistribution(
 		0,
-		0,
+		0.1,
 		0,
 		"skip",
 		u.Country,
