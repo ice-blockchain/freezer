@@ -398,7 +398,7 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 			log.Info(fmt.Sprintf("controller: running action %v", action))
 			log.Error(errors.Wrap(sendCoinDistributerStartedProcessingSlackMessage(ctx),
 				"failed to send DistributerStartedProcessingSlackMessage"))
-			err := proc.RunDistribution(ctx, notify)
+			err := proc.RunDistribution(ctx, action == workerActionOnDemand, notify)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "controller: action %v failed with error %v", action, err))
 				proc.MustDisable(err.Error())
@@ -525,13 +525,13 @@ func (proc *coinProcessor) WaitForTransaction(ctx context.Context, hash string) 
 	return "", ctx.Err()
 }
 
-func (proc *coinProcessor) RunDistribution(ctx context.Context, notify chan<- *batch) error {
+func (proc *coinProcessor) RunDistribution(ctx context.Context, ondemand bool, notify chan<- *batch) error {
 	for it := 1; ctx.Err() == nil; it++ {
 		if !proc.IsEnabled(ctx) {
 			log.Info(fmt.Sprintf("distribution: iteration %v: disabled", it))
 
 			return nil
-		} else if proc.isBlocked() {
+		} else if proc.isBlocked() && !ondemand {
 			log.Info(fmt.Sprintf("distribution: iteration %v: blocked", it))
 
 			return nil

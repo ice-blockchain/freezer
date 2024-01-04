@@ -58,7 +58,10 @@ func helperTruncatePendingTransactions(ctx context.Context, t *testing.T, db *st
 	_, err := storage.Exec(ctx, db, stmt)
 	require.NoError(t, err)
 
-	_, err = storage.Exec(ctx, db, `UPDATE global SET value = 'true' WHERE key = 'coin_distributer_enabled'`)
+	_, err = storage.Exec(ctx, db, `UPDATE global SET value = 'true' WHERE key = $1`, configKeyCoinDistributerEnabled)
+	require.NoError(t, err)
+
+	_, err = storage.Exec(ctx, db, `UPDATE global SET value = 'false' WHERE key = $1`, configKeyCoinDistributerOnDemand)
 	require.NoError(t, err)
 }
 
@@ -224,10 +227,14 @@ func TestProcessorTriggerOnDemand(t *testing.T) { //nolint:paralleltest //.
 	}
 
 	for i := 0; i < 4; i++ {
-		data := <-ch
-		t.Logf("batch: %v: processed with %v record(s)", data.ID, len(data.Records))
-		for _, r := range data.Records {
-			require.Equal(t, ethApiStatusAccepted, r.EthStatus)
+		select {
+		case data := <-ch:
+			t.Logf("batch: %v: processed with %v record(s)", data.ID, len(data.Records))
+			for _, r := range data.Records {
+				require.Equal(t, ethApiStatusAccepted, r.EthStatus)
+			}
+		case <-stdlibtime.After(stdlibtime.Minute * 2):
+			t.Fatalf("cannot receive batch #%v", i)
 		}
 	}
 
