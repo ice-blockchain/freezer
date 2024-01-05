@@ -12,7 +12,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.235.0
+	github.com/ice-blockchain/eskimo v1.237.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
 	github.com/ice-blockchain/wintr v1.128.0
 	github.com/imroc/req/v3 v3.42.3
