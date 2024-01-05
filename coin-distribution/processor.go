@@ -378,16 +378,14 @@ func (proc *coinProcessor) Controller(ctx context.Context, notify chan<- *batch)
 				continue
 			}
 
-			if action == workerActionRun && prevAction != workerActionRun {
+			if action == workerActionRun {
 				log.Info("controller: unblocked")
 				proc.maybeSendMessage(ctx, configKeyCoinDistributerMsgOnline, sendCoinDistributerIsNowOnlineSlackMessage)
-			}
-			prevAction = action
-
-			if action == workerActionOnDemand {
+			} else if action == workerActionOnDemand {
 				log.Info("controller: on demand mode trigger")
 				log.Error(errors.Wrapf(proc.DisableOnDemand(ctx), "failed to DisableOnDemand"))
 			}
+			prevAction = action
 
 			if !proc.HasPendingTransactions(ctx, ethApiStatusNew) {
 				log.Info("controller: no pending transactions")
