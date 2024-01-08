@@ -5,14 +5,14 @@ go 1.21
 replace github.com/cockroachdb/pebble v1.0.0 => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 
 require (
-	github.com/ClickHouse/ch-go v0.61.0
+	github.com/ClickHouse/ch-go v0.61.1
 	github.com/alitto/pond v1.8.3
 	github.com/bsm/redislock v0.9.4
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.239.0
+	github.com/ice-blockchain/eskimo v1.241.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
 	github.com/ice-blockchain/wintr v1.128.0
 	github.com/imroc/req/v3 v3.42.3
@@ -74,14 +74,14 @@ require (
 	github.com/dmarkham/enumer v1.5.9 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v24.0.7+incompatible // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231130133252-5a8a683fa581 // indirect
-	github.com/georgysavva/scany/v2 v2.0.0 // indirect
+	github.com/georgysavva/scany/v2 v2.1.0 // indirect
 	github.com/getsentry/sentry-go v0.25.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.9.1 // indirect

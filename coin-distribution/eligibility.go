@@ -54,7 +54,7 @@ func IsEligibleForEthereumDistribution(
 	return countryAllowed &&
 		!miningSessionSoloEndedAt.IsNil() && miningSessionSoloEndedAt.After(*collectingEndedAt.Time) &&
 		isEthereumAddressValid(ethAddress) &&
-		((minEthereumDistributionICEBalanceRequired > 0 && distributedBalance >= minEthereumDistributionICEBalanceRequired) || (distributedBalance > 0)) &&
+		((minEthereumDistributionICEBalanceRequired > 0 && distributedBalance >= minEthereumDistributionICEBalanceRequired) || (minEthereumDistributionICEBalanceRequired == 0 && distributedBalance > 0)) && //nolint:lll // .
 		model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, miningSessionDuration) >= minMiningStreaksRequired &&
 		kycState.KYCStepPassedCorrectly(users.QuizKYCStep)
 }
