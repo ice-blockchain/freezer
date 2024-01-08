@@ -584,7 +584,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if amount == 0 {
 					continue
 				}
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_ethereum_pending", amount).Err(); err != nil {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_tmp1_ethereum_pending", amount).Err(); err != nil {
 					return err
 				}
 			}
@@ -592,7 +592,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if amount == 0 {
 					continue
 				}
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_ethereum_pending", amount).Err(); err != nil {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_tmp1_ethereum_pending", amount).Err(); err != nil {
 					return err
 				}
 			}

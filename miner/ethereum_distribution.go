@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ethereumDistributionDryRunModeEnabled = true
+	ethereumDistributionDryRunModeEnabled = false
 )
 
 func (ref *referral) username() string {
