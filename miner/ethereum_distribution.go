@@ -168,9 +168,9 @@ func (ref *referral) couldHaveBeenEligibleForEthereumDistributionRecently(now *t
 
 //nolint:funlen // .
 func (u *user) processEthereumCoinDistribution(
-	now *time.Time, t0, tMinus1 *referral,
+	enabled bool, now *time.Time, t0, tMinus1 *referral,
 ) (records []*coindistribution.ByEarnerForReview, balanceDistributedForT0, balanceDistributedForTMinus1 float64) {
-	if !isCoinDistributionCollectorEnabled(now) {
+	if !enabled {
 		if u.BalanceSoloEthereumPending != nil {
 			u.BalanceSoloEthereum += float64(*u.BalanceSoloEthereumPending)
 			u.BalanceSoloEthereumPending = new(model.FlexibleFloat64)

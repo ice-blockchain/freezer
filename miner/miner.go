@@ -373,7 +373,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						tMinus1Ref = tMinus1Referrals[updatedUser.IDTMinus1]
 					}
 				}
-				userCoinDistributions, balanceDistributedForT0, balanceDistributedForTMinus1 := updatedUser.processEthereumCoinDistribution(now, t0Ref, tMinus1Ref)
+				userCoinDistributions, balanceDistributedForT0, balanceDistributedForTMinus1 := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
 				coinDistributions = append(coinDistributions, userCoinDistributions...)
 				if balanceDistributedForT0 > 0 {
 					balanceT1EthereumIncr[t0Ref.ID] += balanceDistributedForT0
