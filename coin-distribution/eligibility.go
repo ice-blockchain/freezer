@@ -63,7 +63,8 @@ func IsEligibleForEthereumDistributionNow(id int64,
 	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate *time.Time,
 	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	return (lastEthereumCoinDistributionProcessedAt.IsNil() && now.Truncate(ethereumDistributionFrequencyMin).Equal(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin))) || //nolint:lll // .
-		(id%int64(ethereumDistributionFrequencyMax/ethereumDistributionFrequencyMin)) == int64((now.Truncate(ethereumDistributionFrequencyMin).Sub(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin).Add(ethereumDistributionFrequencyMin))%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin) //nolint:lll // .
+		((lastEthereumCoinDistributionProcessedAt.IsNil() || !lastEthereumCoinDistributionProcessedAt.Truncate(ethereumDistributionFrequencyMin).Equal(now.Truncate(ethereumDistributionFrequencyMin))) && //nolint:lll // .
+			((id % int64(ethereumDistributionFrequencyMax/ethereumDistributionFrequencyMin)) == int64((now.Truncate(ethereumDistributionFrequencyMin).Sub(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin).Add(ethereumDistributionFrequencyMin))%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin))) //nolint:lll // .
 }
 
 func isEthereumAddressValid(ethAddress string) bool {

@@ -84,6 +84,8 @@ type (
 		model.SoloLastEthereumCoinDistributionProcessedAtField
 		model.ForT0LastEthereumCoinDistributionProcessedAtField
 		model.ForTMinus1LastEthereumCoinDistributionProcessedAtField
+		model.BalanceSoloEthereumPendingField
+		model.BalanceT0EthereumPendingField
 		model.BalanceT1EthereumPendingField
 		model.BalanceT2EthereumPendingField
 		model.DeserializedUsersKey

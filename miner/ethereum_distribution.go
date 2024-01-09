@@ -171,20 +171,30 @@ func (u *user) processEthereumCoinDistribution(
 	now *time.Time, t0, tMinus1 *referral,
 ) (records []*coindistribution.ByEarnerForReview, balanceDistributedForT0, balanceDistributedForTMinus1 float64) {
 	if !isCoinDistributionCollectorEnabled(now) {
+		if u.BalanceSoloEthereumPending != nil {
+			u.BalanceSoloEthereum += float64(*u.BalanceSoloEthereumPending)
+			u.BalanceSoloEthereumPending = new(model.FlexibleFloat64)
+		}
+		if u.BalanceT0EthereumPending != nil {
+			u.BalanceT0Ethereum += float64(*u.BalanceT0EthereumPending)
+			u.BalanceT0EthereumPending = new(model.FlexibleFloat64)
+		}
 		if u.BalanceT1EthereumPending != nil {
 			u.BalanceT1Ethereum += float64(*u.BalanceT1EthereumPending)
+			u.BalanceT1EthereumPending = new(model.FlexibleFloat64)
 		}
 		if u.BalanceT2EthereumPending != nil {
 			u.BalanceT2Ethereum += float64(*u.BalanceT2EthereumPending)
+			u.BalanceT2EthereumPending = new(model.FlexibleFloat64)
 		}
-		u.BalanceT1EthereumPending = new(model.FlexibleFloat64)
-		u.BalanceT2EthereumPending = new(model.FlexibleFloat64)
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
 		u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 		u.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
 
 		return nil, 0, 0
 	}
+	u.BalanceSoloEthereumPending = nil
+	u.BalanceT0EthereumPending = nil
 	u.BalanceT1EthereumPending = nil
 	u.BalanceT2EthereumPending = nil
 	records = make([]*coindistribution.ByEarnerForReview, 0, 1+1+1+1)
@@ -292,7 +302,8 @@ func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) float64 {
 		return 0
 	}
 	if !ethereumDistributionDryRunModeEnabled {
-		u.BalanceSoloEthereum += ethIce
+		val := model.FlexibleFloat64(ethIce)
+		u.BalanceSoloEthereumPending = &val
 	}
 
 	return ethIce
@@ -305,7 +316,8 @@ func (u *user) processEthereumCoinDistributionForT0(now *time.Time) float64 {
 		return 0
 	}
 	if !ethereumDistributionDryRunModeEnabled {
-		u.BalanceT0Ethereum += ethIce
+		val := model.FlexibleFloat64(ethIce)
+		u.BalanceT0EthereumPending = &val
 	}
 
 	return ethIce
