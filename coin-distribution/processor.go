@@ -575,22 +575,24 @@ func (proc *coinProcessor) RunDistribution(ctx context.Context, ondemand bool, n
 }
 
 // isInTimeWindow checks if current hour is in time window [startHour, endHour].
-func isInTimeWindow(currentHour, startHour, endHour int) bool {
-	for _, v := range []int{currentHour, startHour, endHour} {
+func isInTimeWindow(now *time.Time, startHour, endHour int) bool {
+	for _, v := range []int{startHour, endHour} {
 		if v < 0 || v > 23 {
 			log.Panic(fmt.Sprintf("invalid hour: %v", v))
 		}
 	}
 
+	currentHour := now.Hour()
+	currentMinute := now.Minute()
 	if startHour < endHour {
-		return currentHour >= startHour && currentHour <= endHour
+		return (currentHour >= startHour && currentHour < endHour) || (currentHour == endHour && currentMinute == 0)
 	}
 
-	return currentHour >= startHour || currentHour <= endHour
+	return currentHour >= startHour || (currentHour < endHour || (currentHour == endHour && currentMinute == 0))
 }
 
 func (proc *coinProcessor) isBlocked() bool {
-	return !isInTimeWindow(time.Now().Hour(), proc.Conf.StartHours, proc.Conf.EndHours)
+	return !isInTimeWindow(time.Now(), proc.Conf.StartHours, proc.Conf.EndHours)
 }
 
 func (proc *coinProcessor) Close() error {

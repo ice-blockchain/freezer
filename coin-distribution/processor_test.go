@@ -174,25 +174,32 @@ func TestProcessorDistributeRejected(t *testing.T) { //nolint:paralleltest //.
 func TestIsInTimeWindow(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, isInTimeWindow(10, 10, 22))
-	require.True(t, isInTimeWindow(23, 22, 6))
-	require.True(t, isInTimeWindow(6, 22, 6))
-	require.True(t, isInTimeWindow(0, 22, 6))
-	require.False(t, isInTimeWindow(17, 22, 6))
-	require.False(t, isInTimeWindow(23, 10, 22))
-	require.False(t, isInTimeWindow(9, 10, 22))
-	require.True(t, isInTimeWindow(2, 0, 23))
-	require.True(t, isInTimeWindow(0, 0, 0))
-	require.True(t, isInTimeWindow(1, 0, 0))
+	clock := func(h, m int) *time.Time {
+		return time.New(stdlibtime.Date(2038, 1, 1, h, m, 0, 0, stdlibtime.UTC))
+	}
+
+	require.True(t, isInTimeWindow(clock(10, 0), 10, 22))
+	require.True(t, isInTimeWindow(clock(23, 0), 22, 6))
+	require.True(t, isInTimeWindow(clock(6, 0), 22, 6))
+	require.True(t, isInTimeWindow(clock(0, 0), 22, 6))
+	require.False(t, isInTimeWindow(clock(17, 0), 22, 6))
+	require.False(t, isInTimeWindow(clock(23, 0), 10, 22))
+	require.False(t, isInTimeWindow(clock(9, 0), 10, 22))
+	require.True(t, isInTimeWindow(clock(2, 0), 0, 23))
+	require.True(t, isInTimeWindow(clock(0, 0), 0, 0))
+	require.True(t, isInTimeWindow(clock(1, 0), 0, 0))
+
+	require.True(t, isInTimeWindow(clock(16, 0), 16, 18))
+	require.True(t, isInTimeWindow(clock(16, 1), 16, 18))
+	require.True(t, isInTimeWindow(clock(17, 22), 16, 18))
+	require.True(t, isInTimeWindow(clock(18, 0), 16, 18))
+	require.False(t, isInTimeWindow(clock(18, 1), 16, 18))
 
 	require.Panics(t, func() {
-		isInTimeWindow(24, 0, 0)
+		isInTimeWindow(nil, -1, 0)
 	})
 	require.Panics(t, func() {
-		isInTimeWindow(0, -1, 0)
-	})
-	require.Panics(t, func() {
-		isInTimeWindow(0, 0, 24)
+		isInTimeWindow(nil, 0, 24)
 	})
 }
 
