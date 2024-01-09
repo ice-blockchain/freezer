@@ -471,19 +471,10 @@ func (m *miner) mustInitCoinDistributionCollector(ctx context.Context) {
 func (m *miner) startSynchronizingCoinDistributionCollectorSettings(ctx context.Context) {
 	ticker := stdlibtime.NewTicker(30 * stdlibtime.Second) //nolint:gomnd // .
 	defer ticker.Stop()
-	x := isCoinDistributionCollectorEnabled(time.Now())
 
 	for {
 		select {
 		case <-ticker.C:
-			if x && !isCoinDistributionCollectorEnabled(time.Now()) {
-				x = false
-				if users, amount := cfg.totalEthereumCountCycle.Swap(0), float64(cfg.totalEthereumAmountCycle.Swap(0))/100.0; users > 0 {
-					log.Info(fmt.Sprintf("current eth coins collected: users:%v, amount:%v", users, amount))
-				}
-			} else {
-				x = isCoinDistributionCollectorEnabled(time.Now())
-			}
 			if time.Now().Minute() == 15 {
 				if users, amount := cfg.totalEthereumCountCycle.Swap(0), float64(cfg.totalEthereumAmountCycle.Swap(0))/100.0; users > 0 {
 					log.Info(fmt.Sprintf("current eth coins collected: users:%v, amount:%v", users, amount))
