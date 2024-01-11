@@ -179,11 +179,15 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 
 				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
 			}
-			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,false,true)", reviewerUserID); err != nil {
+			totals, err := storage.ExecOne[struct {
+				Rows uint64
+				Ice  uint64
+			}](ctx, conn, "SELECT rows, ice FROM approve_coin_distributions($1,false,true) AS (rows bigint, ice numeric);", reviewerUserID)
+			if err != nil {
 				return errors.Wrap(err, "failed to call approve_coin_distributions")
 			}
 
-			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx),
+			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx, totals.Rows, float64(totals.Ice)/100),
 				"failed to sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage")
 		})
 	case "approve-and-process-immediately":
@@ -195,11 +199,15 @@ func (r *repository) ReviewCoinDistributions(ctx context.Context, reviewerUserID
 
 				return errors.Wrap(err, "failed to check if any rows in coin_distributions_pending_review exist")
 			}
-			if _, err := storage.Exec(ctx, conn, "call approve_coin_distributions($1,true,true)", reviewerUserID); err != nil {
+			totals, err := storage.ExecOne[struct {
+				Rows uint64
+				Ice  uint64
+			}](ctx, conn, "SELECT rows, ice FROM approve_coin_distributions($1,true,true) AS (rows bigint, ice numeric);", reviewerUserID)
+			if err != nil {
 				return errors.Wrap(err, "failed to call approve_coin_distributions")
 			}
 
-			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx),
+			return errors.Wrap(r.sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx, totals.Rows, float64(totals.Ice)/100),
 				"failed to sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage")
 		})
 	case "deny":

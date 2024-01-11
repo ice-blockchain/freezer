@@ -107,11 +107,14 @@ CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     decision                  text      NOT NULL,
                     PRIMARY KEY(user_id, day, review_day));
 
-create or replace procedure approve_coin_distributions(reviewer_user_id text, process_immediately boolean, nested boolean)
+DROP PROCEDURE IF EXISTS approve_coin_distributions;
+create or replace function approve_coin_distributions(reviewer_user_id text, process_immediately boolean, nested boolean)
+    returns RECORD
 language plpgsql
     as $$
 declare
          now timestamp := current_timestamp;
+         ret RECORD;
 BEGIN
     insert into pending_coin_distributions(created_at, internal_id, day, iceflakes, user_id, eth_address)
     select created_at, internal_id, day, iceflakes, user_id, eth_address
@@ -129,11 +132,15 @@ BEGIN
                     SET value = EXCLUDED.value;
      END IF;
 
-    delete from coin_distributions_pending_review where 1=1;
+    with del as (
+        delete from coin_distributions_pending_review where 1 = 1 returning ice
+    )
+    select count(1) as rows, coalesce(sum(ice), 0) as ice into ret from del;
 
     IF nested is false THEN
         commit;
     END IF;
+    return ret;
 end; $$;
 
 create or replace procedure deny_coin_distributions(reviewer_user_id text, nested boolean)

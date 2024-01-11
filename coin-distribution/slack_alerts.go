@@ -16,14 +16,14 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx context.Context) error {
-	text := fmt.Sprintf(":white_check_mark:`%v` current pending coin distributions are approved and are going to be processed as soon as the coin-distributer comes online :white_check_mark:", r.cfg.Environment) //nolint:lll // .
+func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedSlackMessage(ctx context.Context, recipients uint64, iceCoins float64) error {
+	text := fmt.Sprintf(":white_check_mark:`%v` current pending coin distributions are approved (`%v` recipients, `%.2f` ice coins) and are going to be processed as soon as the coin-distributer comes online :white_check_mark:", r.cfg.Environment, recipients, iceCoins) //nolint:lll // .
 
 	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
 
-func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx context.Context) error {
-	text := fmt.Sprintf(":white_check_mark::zap:`%v` current pending coin distributions are approved and are going to be processed immediately :zap::white_check_mark:", r.cfg.Environment) //nolint:lll // .
+func (r *repository) sendCurrentCoinDistributionsAvailableForReviewAreApprovedToBeProcessedImmediatelySlackMessage(ctx context.Context, recipients uint64, iceCoins float64) error {
+	text := fmt.Sprintf(":white_check_mark::zap:`%v` current pending coin distributions are approved (`%v` recipients, `%.2f` ice coins) and are going to be processed immediately :zap::white_check_mark:", r.cfg.Environment, recipients, iceCoins) //nolint:lll // .
 
 	return errors.Wrap(sendSlackMessage(ctx, text, r.cfg.AlertSlackWebhook), "failed to sendSlackMessage")
 }
