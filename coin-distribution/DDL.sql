@@ -107,7 +107,6 @@ CREATE TABLE IF NOT EXISTS reviewed_coin_distributions  (
                     decision                  text      NOT NULL,
                     PRIMARY KEY(user_id, day, review_day));
 
-DROP PROCEDURE IF EXISTS approve_coin_distributions;
 create or replace function approve_coin_distributions(reviewer_user_id text, process_immediately boolean, nested boolean)
     returns RECORD
 language plpgsql
