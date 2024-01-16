@@ -201,6 +201,10 @@ definitions:
     - 4
     - 5
     - 6
+    - 7
+    - 8
+    - 9
+    - 10
     type: integer
     x-enum-varnames:
     - NoneKYCStep
@@ -210,6 +214,10 @@ definitions:
     - QuizKYCStep
     - Social2KYCStep
     - Social3KYCStep
+    - Social4KYCStep
+    - Social5KYCStep
+    - Social6KYCStep
+    - Social7KYCStep
 info:
   contact:
     name: ice.io
