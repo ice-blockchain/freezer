@@ -12,9 +12,9 @@ require (
 	github.com/ethereum/go-ethereum v1.13.10
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.243.0
+	github.com/ice-blockchain/eskimo v1.258.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
-	github.com/ice-blockchain/wintr v1.128.0
+	github.com/ice-blockchain/wintr v1.129.0
 	github.com/imroc/req/v3 v3.42.3
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
@@ -24,7 +24,7 @@ require (
 	github.com/swaggo/swag v1.16.2
 	github.com/testcontainers/testcontainers-go v0.27.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20240110193028-0dcbfd608b1e
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 )
 
 require (
@@ -62,7 +62,7 @@ require (
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
-	github.com/containerd/containerd v1.7.11 // indirect
+	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/containerd/continuity v0.4.3 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20231205143816-408dbffb2041 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
@@ -96,7 +96,7 @@ require (
 	github.com/go-openapi/swag v0.22.7 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.16.0 // indirect
+	github.com/go-playground/validator/v10 v10.17.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/goccy/go-reflect v1.2.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
@@ -121,7 +121,7 @@ require (
 	github.com/ip2location/ip2location-go/v9 v9.7.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
-	github.com/jackc/pgx/v5 v5.5.1 // indirect
+	github.com/jackc/pgx/v5 v5.5.2 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -136,7 +136,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/moby/sys/mount v0.3.3 // indirect
@@ -156,7 +155,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
-	github.com/prometheus/common v0.45.0 // indirect
+	github.com/prometheus/common v0.46.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
