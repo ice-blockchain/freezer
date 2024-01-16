@@ -156,7 +156,7 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 			})
 		}
 	default:
-		if err := r.verifyLivenessKYC(ctx, state); err != nil {
+		if err := r.verifyLivenessKYC(ctx, state); err != nil || r.isLastKYCStep(state.KYCStepPassed) {
 			return err
 		}
 		nextKYCStep := state.KYCStepPassed + 1
@@ -172,6 +172,19 @@ func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSes
 	}
 
 	return nil
+}
+
+func (r *repository) isLastKYCStep(kycStep users.KYCStep) bool {
+	lastKYCStep := users.Social2KYCStep
+	if kycConfig := r.cfg.kycConfigJSON.Load(); kycConfig != nil {
+		for _, val := range kycConfig.DynamicDistributionSocialKYC {
+			if val != nil && val.KYCStep > lastKYCStep {
+				lastKYCStep = val.KYCStep
+			}
+		}
+	}
+
+	return kycStep == lastKYCStep
 }
 
 func (r *repository) verifyLivenessKYC(ctx context.Context, state *getCurrentMiningSession) error {
