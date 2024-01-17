@@ -35,8 +35,6 @@ func init() {
 	cfg.disableAdvancedTeam = new(atomic.Pointer[[]string])
 	cfg.coinDistributionCollectorSettings = new(atomic.Pointer[coindistribution.CollectorSettings])
 	cfg.coinDistributionCollectorStartedAt = new(atomic.Pointer[time.Time])
-	cfg.totalEthereumAmountCycle = new(atomic.Uint64)
-	cfg.totalEthereumCountCycle = new(atomic.Uint64)
 }
 
 func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
@@ -465,21 +463,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
-		for _, history := range histories {
-			if totalEthereum := history.BalanceSoloEthereum + history.BalanceT0Ethereum + history.BalanceT1Ethereum + history.BalanceT2Ethereum; totalEthereum > 0 {
-				cfg.totalEthereumAmountCycle.Add(uint64(totalEthereum * 100))
-				cfg.totalEthereumCountCycle.Add(1)
-			}
-			history.SoloLastEthereumCoinDistributionProcessedAt = nil
-			history.ForT0LastEthereumCoinDistributionProcessedAt = nil
-			history.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
-			history.BalanceSoloEthereum = 0
-			history.BalanceT0Ethereum = 0
-			history.BalanceT1Ethereum = 0
-			history.BalanceT2Ethereum = 0
-			history.BalanceForT0Ethereum = 0
-			history.BalanceForTMinus1Ethereum = 0
-		}
 		if err := dwhClient.Insert(reqCtx, historyColumns, historyInsertMetadata, histories); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to insert histories for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
@@ -584,7 +567,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if amount == 0 {
 					continue
 				}
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_tmp4_ethereum_pending", amount).Err(); err != nil {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_ethereum_pending", amount).Err(); err != nil {
 					return err
 				}
 			}
@@ -592,7 +575,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if amount == 0 {
 					continue
 				}
-				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_tmp4_ethereum_pending", amount).Err(); err != nil {
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_ethereum_pending", amount).Err(); err != nil {
 					return err
 				}
 			}

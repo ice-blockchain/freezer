@@ -467,11 +467,6 @@ func (m *miner) startSynchronizingCoinDistributionCollectorSettings(ctx context.
 	for {
 		select {
 		case <-ticker.C:
-			if time.Now().Minute() == 15 {
-				if users, amount := cfg.totalEthereumCountCycle.Swap(0), float64(cfg.totalEthereumAmountCycle.Swap(0))/100.0; users > 0 {
-					log.Info(fmt.Sprintf("current eth coins collected: users:%v, amount:%v", users, amount))
-				}
-			}
 			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
 			if settings, err := m.coinDistributionRepository.GetCollectorSettings(reqCtx); err != nil {
 				log.Error(errors.Wrap(err, "failed to GetCollectorSettings"))
