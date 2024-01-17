@@ -17,10 +17,6 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-const (
-	ethereumDistributionDryRunModeEnabled = false
-)
-
 func (ref *referral) username() string {
 	if ref != nil && ref.Username != "" {
 		return ref.Username
@@ -253,7 +249,7 @@ func (u *user) processEthereumCoinDistribution(
 			totalForSelf += t0CD.Balance
 		}
 
-		if !ethereumDistributionDryRunModeEnabled && totalForSelf > 0 {
+		if totalForSelf > 0 {
 			u.SoloLastEthereumCoinDistributionProcessedAt = now
 		} else {
 			u.SoloLastEthereumCoinDistributionProcessedAt = nil
@@ -267,7 +263,7 @@ func (u *user) processEthereumCoinDistribution(
 		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
 		forT0CD.Balance = balanceDistributedForT0
 
-		if !ethereumDistributionDryRunModeEnabled && forT0CD.Balance > 0 {
+		if forT0CD.Balance > 0 {
 			u.ForT0LastEthereumCoinDistributionProcessedAt = now
 		} else {
 			u.ForT0LastEthereumCoinDistributionProcessedAt = nil
@@ -282,7 +278,7 @@ func (u *user) processEthereumCoinDistribution(
 		balanceDistributedForTMinus1 = u.processEthereumCoinDistributionForForTMinus1(tMinus1, now)
 		forTMinus1CD.Balance = balanceDistributedForTMinus1
 
-		if !ethereumDistributionDryRunModeEnabled && forTMinus1CD.Balance > 0 {
+		if forTMinus1CD.Balance > 0 {
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt = now
 		} else {
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
@@ -301,10 +297,9 @@ func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) float64 {
 	if ethIce <= 0 {
 		return 0
 	}
-	if !ethereumDistributionDryRunModeEnabled {
-		val := model.FlexibleFloat64(ethIce)
-		u.BalanceSoloEthereumPending = &val
-	}
+
+	val := model.FlexibleFloat64(ethIce)
+	u.BalanceSoloEthereumPending = &val
 
 	return ethIce
 }
@@ -315,10 +310,9 @@ func (u *user) processEthereumCoinDistributionForT0(now *time.Time) float64 {
 	if ethIce <= 0 {
 		return 0
 	}
-	if !ethereumDistributionDryRunModeEnabled {
-		val := model.FlexibleFloat64(ethIce)
-		u.BalanceT0EthereumPending = &val
-	}
+
+	val := model.FlexibleFloat64(ethIce)
+	u.BalanceT0EthereumPending = &val
 
 	return ethIce
 }
@@ -330,9 +324,8 @@ func (u *user) processEthereumCoinDistributionForForT0(t0 *referral, now *time.T
 	if ethIce <= 0 {
 		return 0
 	}
-	if !ethereumDistributionDryRunModeEnabled {
-		u.BalanceForT0Ethereum += ethIce
-	}
+
+	u.BalanceForT0Ethereum += ethIce
 
 	return ethIce
 }
@@ -344,9 +337,8 @@ func (u *user) processEthereumCoinDistributionForForTMinus1(tMinus1 *referral, n
 	if ethIce <= 0 {
 		return 0
 	}
-	if !ethereumDistributionDryRunModeEnabled {
-		u.BalanceForTMinus1Ethereum += ethIce
-	}
+
+	u.BalanceForTMinus1Ethereum += ethIce
 
 	return ethIce
 }

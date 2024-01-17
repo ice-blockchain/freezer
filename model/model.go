@@ -87,13 +87,13 @@ type (
 		KYCStepBlockedField
 	}
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
-		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_tmp3_ethereum_coin_distribution_processed_at,omitempty"`
+		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_tmp4_ethereum_coin_distribution_processed_at,omitempty"`
 	}
 	ForT0LastEthereumCoinDistributionProcessedAtField struct {
-		ForT0LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_tmp3_ethereum_coin_distribution_processed_at,omitempty"`
+		ForT0LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_tmp4_ethereum_coin_distribution_processed_at,omitempty"`
 	}
 	ForTMinus1LastEthereumCoinDistributionProcessedAtField struct {
-		ForTMinus1LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_tmp3_ethereum_coin_distribution_processed_at,omitempty"`
+		ForTMinus1LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_tmp4_ethereum_coin_distribution_processed_at,omitempty"`
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
@@ -186,49 +186,49 @@ type (
 		BalanceSolo float64 `redis:"balance_solo"`
 	}
 	BalanceSoloEthereumField struct {
-		BalanceSoloEthereum float64 `redis:"balance_solo_tmp3_ethereum"`
+		BalanceSoloEthereum float64 `redis:"balance_solo_tmp4_ethereum"`
 	}
 	BalanceSoloEthereumPendingField struct {
-		BalanceSoloEthereumPending *FlexibleFloat64 `redis:"balance_solo_tmp3_ethereum_pending,omitempty"`
+		BalanceSoloEthereumPending *FlexibleFloat64 `redis:"balance_solo_tmp4_ethereum_pending,omitempty"`
 	}
 	BalanceT0Field struct {
 		BalanceT0 float64 `redis:"balance_t0"`
 	}
 	BalanceT0EthereumField struct {
-		BalanceT0Ethereum float64 `redis:"balance_t0_tmp3_ethereum"`
+		BalanceT0Ethereum float64 `redis:"balance_t0_tmp4_ethereum"`
 	}
 	BalanceT0EthereumPendingField struct {
-		BalanceT0EthereumPending *FlexibleFloat64 `redis:"balance_t0_tmp3_ethereum_pending,omitempty"`
+		BalanceT0EthereumPending *FlexibleFloat64 `redis:"balance_t0_tmp4_ethereum_pending,omitempty"`
 	}
 	BalanceT1Field struct {
 		BalanceT1 float64 `redis:"balance_t1"`
 	}
 	BalanceT1EthereumField struct {
-		BalanceT1Ethereum float64 `redis:"balance_t1_tmp3_ethereum"`
+		BalanceT1Ethereum float64 `redis:"balance_t1_tmp4_ethereum"`
 	}
 	BalanceT1EthereumPendingField struct {
-		BalanceT1EthereumPending *FlexibleFloat64 `redis:"balance_t1_tmp3_ethereum_pending,omitempty"`
+		BalanceT1EthereumPending *FlexibleFloat64 `redis:"balance_t1_tmp4_ethereum_pending,omitempty"`
 	}
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
 	}
 	BalanceT2EthereumField struct {
-		BalanceT2Ethereum float64 `redis:"balance_t2_tmp3_ethereum"`
+		BalanceT2Ethereum float64 `redis:"balance_t2_tmp4_ethereum"`
 	}
 	BalanceT2EthereumPendingField struct {
-		BalanceT2EthereumPending *FlexibleFloat64 `redis:"balance_t2_tmp3_ethereum_pending,omitempty"`
+		BalanceT2EthereumPending *FlexibleFloat64 `redis:"balance_t2_tmp4_ethereum_pending,omitempty"`
 	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
 	}
 	BalanceForT0EthereumField struct {
-		BalanceForT0Ethereum float64 `redis:"balance_for_t0_tmp3_ethereum"`
+		BalanceForT0Ethereum float64 `redis:"balance_for_t0_tmp4_ethereum"`
 	}
 	BalanceForTMinus1Field struct {
 		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
 	}
 	BalanceForTMinus1EthereumField struct {
-		BalanceForTMinus1Ethereum float64 `redis:"balance_for_tminus1_tmp3_ethereum"`
+		BalanceForTMinus1Ethereum float64 `redis:"balance_for_tminus1_tmp4_ethereum"`
 	}
 	SlashingRateSoloField struct {
 		SlashingRateSolo float64 `redis:"slashing_rate_solo"`
