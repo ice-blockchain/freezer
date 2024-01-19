@@ -4,7 +4,6 @@ package tokenomics
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -28,7 +27,6 @@ import (
 func init() { //nolint:gochecknoinits // It's the only way to tweak the client.
 	req.DefaultClient().SetJsonMarshal(json.Marshal)
 	req.DefaultClient().SetJsonUnmarshal(json.Unmarshal)
-	req.DefaultClient().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	req.DefaultClient().GetClient().Timeout = requestDeadline
 }
 
