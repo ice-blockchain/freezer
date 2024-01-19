@@ -219,10 +219,20 @@ func (r *repository) getLastDateCached(ctx context.Context) (lastDateCached *tim
 }
 
 func (r *repository) enhanceWithBlockchainCoinStats(res *TotalCoinsSummary) *TotalCoinsSummary {
-	for _, coinsAddedHistoryEntry := range r.cfg.blockchainCoinStatsJSON.Load().CoinsAddedHistory {
-		//TODO implement this
-		// We need to add the coinsAddedHistoryEntry.CoinsAdded to the correct Blockchain amount of the correct entry, based on the date interval
-		log.Info(fmt.Sprintf("coinsAddedHistoryEntry:%v,%v", coinsAddedHistoryEntry.CoinsAdded, coinsAddedHistoryEntry.Date))
+	c := r.cfg.blockchainCoinStatsJSON.Load()
+	if len(c.CoinsAddedHistory) == 0 {
+		return res
+	}
+	for _, coinsAddedHistoryEntry := range c.CoinsAddedHistory {
+		addedAfterFirst := coinsAddedHistoryEntry.Date.After(res.TimeSeries[0].Date)
+		if addedAfterFirst {
+			res.Blockchain += coinsAddedHistoryEntry.CoinsAdded
+		}
+		for i := range res.TimeSeries {
+			if coinsAddedHistoryEntry.Date.After(res.TimeSeries[i].Date) {
+				res.TimeSeries[i].Blockchain += coinsAddedHistoryEntry.CoinsAdded
+			}
+		}
 	}
 
 	return res
@@ -275,7 +285,7 @@ func (r *repository) syncBlockchainCoinStatsJSON(ctx context.Context) error {
 		if err = json.UnmarshalContext(ctx, data, &val); err != nil {
 			return errors.Wrapf(err, "failed to unmarshal into %#v, data: %v", val, string(data))
 		}
-		if body := string(data); !strings.Contains(body, "XXXX") {
+		if body := string(data); !strings.Contains(body, "coinsAddedHistory") {
 			return errors.Errorf("there's something wrong with the blockchainCoinStatsJSON body: %v", body)
 		}
 		r.cfg.blockchainCoinStatsJSON.Swap(&val)
