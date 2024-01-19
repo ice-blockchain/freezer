@@ -17,7 +17,7 @@ func IsCoinDistributionCollectorEnabled(now *time.Time, ethereumDistributionFreq
 	return cs.Enabled &&
 		(cs.ForcedExecution ||
 			(now.Hour() >= cs.StartHour &&
-				now.Minute() >= 50 && //nolint:gomnd // .
+				now.Minute() >= 40 && //nolint:gomnd // .
 				now.After(*cs.StartDate.Time) &&
 				now.Before(*cs.EndDate.Time) &&
 				(cs.LatestDate.IsNil() ||
