@@ -6,10 +6,15 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"strings"
+	"sync/atomic"
 	stdlibtime "time"
 
 	"github.com/alitto/pond"
 	"github.com/bsm/redislock"
+	"github.com/goccy/go-json"
+	"github.com/imroc/req/v3"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
@@ -46,7 +51,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
 
-	return res, nil
+	return r.enhanceWithBlockchainCoinStats(res), nil
 }
 
 func (r *repository) totalCoinsDates(now *time.Time, days uint64) ([]stdlibtime.Time, []*TotalCoinsTimeSeriesDataPoint) {
@@ -211,4 +216,70 @@ func (r *repository) getLastDateCached(ctx context.Context) (lastDateCached *tim
 	}
 
 	return nil, errors.Wrap(err, "failed to get last date cached value")
+}
+
+func (r *repository) enhanceWithBlockchainCoinStats(res *TotalCoinsSummary) *TotalCoinsSummary {
+	for _, coinsAddedHistoryEntry := range r.cfg.blockchainCoinStatsJSON.Load().CoinsAddedHistory {
+		//TODO implement this
+		// We need to add the coinsAddedHistoryEntry.CoinsAdded to the correct Blockchain amount of the correct entry, based on the date interval
+		log.Info(fmt.Sprintf("coinsAddedHistoryEntry:%v,%v", coinsAddedHistoryEntry.CoinsAdded, coinsAddedHistoryEntry.Date))
+	}
+
+	return res
+}
+
+func (r *repository) startBlockchainCoinStatsJSONSyncer(ctx context.Context) {
+	ticker := stdlibtime.NewTicker(10 * stdlibtime.Minute) //nolint:gomnd // .
+	defer ticker.Stop()
+	r.cfg.blockchainCoinStatsJSON = new(atomic.Pointer[blockchainCoinStatsJSON])
+	log.Panic(errors.Wrap(r.syncBlockchainCoinStatsJSON(ctx), "failed to syncBlockchainCoinStatsJSON"))
+
+	for {
+		select {
+		case <-ticker.C:
+			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			log.Error(errors.Wrap(r.syncBlockchainCoinStatsJSON(reqCtx), "failed to syncBlockchainCoinStatsJSON"))
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+//nolint:funlen,gomnd // .
+func (r *repository) syncBlockchainCoinStatsJSON(ctx context.Context) error {
+	if resp, err := req.
+		SetContext(ctx).
+		SetRetryCount(25).
+		SetRetryBackoffInterval(10*stdlibtime.Millisecond, 1*stdlibtime.Second).
+		SetRetryHook(func(resp *req.Response, err error) {
+			if err != nil {
+				log.Error(errors.Wrap(err, "failed to fetch BlockchainCoinStatsJSON, retrying..."))
+			} else {
+				log.Error(errors.Errorf("failed to fetch BlockchainCoinStatsJSON with status code:%v, retrying...", resp.GetStatusCode()))
+			}
+		}).
+		SetRetryCondition(func(resp *req.Response, err error) bool {
+			return err != nil || resp.GetStatusCode() != http.StatusOK
+		}).
+		SetHeader("Accept", "application/json").
+		SetHeader("Cache-Control", "no-cache, no-store, must-revalidate").
+		SetHeader("Pragma", "no-cache").
+		SetHeader("Expires", "0").
+		Get(r.cfg.BlockchainCoinStatsJSONURL); err != nil {
+		return errors.Wrapf(err, "failed to get fetch `%v`", r.cfg.BlockchainCoinStatsJSONURL)
+	} else if data, err2 := resp.ToBytes(); err2 != nil {
+		return errors.Wrapf(err2, "failed to read body of `%v`", r.cfg.BlockchainCoinStatsJSONURL)
+	} else {
+		var val blockchainCoinStatsJSON
+		if err = json.UnmarshalContext(ctx, data, &val); err != nil {
+			return errors.Wrapf(err, "failed to unmarshal into %#v, data: %v", val, string(data))
+		}
+		if body := string(data); !strings.Contains(body, "XXXX") {
+			return errors.Errorf("there's something wrong with the blockchainCoinStatsJSON body: %v", body)
+		}
+		r.cfg.blockchainCoinStatsJSON.Swap(&val)
+
+		return nil
+	}
 }

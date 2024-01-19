@@ -44,6 +44,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 		pictureClient: picture.New(applicationYamlKey),
 	}
 	go repo.startDisableAdvancedTeamCfgSyncer(ctx)
+	go repo.startBlockchainCoinStatsJSONSyncer(ctx)
 
 	now := time.Now()
 	repo.mustInitTotalCoinsCache(ctx, now)

@@ -31,6 +31,7 @@ cmd/freezer-refrigerant:
   wintr/auth/ice:
     jwtSecret: bogus
 tokenomics: &tokenomics
+  blockchain-coin-stats-json-url: https://ice-staging.b-cdn.net/assets/auth-config.json
   kyc:
     try-reset-kyc-steps-url: https://something.example.com
     config-json-url: https://ice-staging.b-cdn.net/something/somebogus.json

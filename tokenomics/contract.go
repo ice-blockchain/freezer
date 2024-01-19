@@ -306,10 +306,19 @@ type (
 		} `json:"web-social2-kyc"`
 	}
 
+	blockchainCoinStatsJSON struct {
+		CoinsAddedHistory []*struct {
+			CoinsAdded float64    `json:"coinsAdded"`
+			Date       *time.Time `json:"date"`
+		} `json:"coinsAddedHistory"`
+	}
+
 	Config struct {
-		disableAdvancedTeam *atomic.Pointer[[]string]
-		kycConfigJSON       *atomic.Pointer[kycConfigJSON]
-		KYC                 struct {
+		disableAdvancedTeam        *atomic.Pointer[[]string]
+		kycConfigJSON              *atomic.Pointer[kycConfigJSON]
+		blockchainCoinStatsJSON    *atomic.Pointer[blockchainCoinStatsJSON]
+		BlockchainCoinStatsJSONURL string `yaml:"blockchain-coin-stats-json-url" mapstructure:"blockchain-coin-stats-json-url"`
+		KYC                        struct {
 			RequireQuizOnlyOnSpecificDayOfWeek *int                `yaml:"require-quiz-only-on-specific-day-of-week" mapstructure:"require-quiz-only-on-specific-day-of-week"` //nolint:lll // .
 			TryResetKYCStepsURL                string              `yaml:"try-reset-kyc-steps-url" mapstructure:"try-reset-kyc-steps-url"`
 			ConfigJSONURL                      string              `yaml:"config-json-url" mapstructure:"config-json-url"`
