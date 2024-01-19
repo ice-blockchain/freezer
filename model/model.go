@@ -132,7 +132,7 @@ type (
 		ReferralsCountChangeGuardUpdatedAt *time.Time `redis:"referrals_count_change_guard_updated_at,omitempty"`
 	}
 	UserIDField struct {
-		UserID string `redis:"user_id,omitempty"`
+		UserID string `redis:"user_id,omitempty" json:"id"`
 	}
 	ProfilePictureNameField struct {
 		ProfilePictureName string `redis:"profile_picture_name,omitempty"`

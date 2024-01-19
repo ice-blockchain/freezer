@@ -81,7 +81,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 	if err != nil {
 		return err
 	}
-	if err = r.validateKYC(ctx, old[0], skipKYCSteps); shouldRollback == nil && err != nil {
+	if err = r.validateKYC(ctx, userID, old[0], skipKYCSteps); shouldRollback == nil && err != nil {
 		return err
 	}
 	if err = r.updateTMinus1(ctx, id, old[0].IDT0, old[0].IDTMinus1); err != nil {

@@ -4,6 +4,7 @@ package tokenomics
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 func init() { //nolint:gochecknoinits // It's the only way to tweak the client.
 	req.DefaultClient().SetJsonMarshal(json.Marshal)
 	req.DefaultClient().SetJsonUnmarshal(json.Unmarshal)
+	req.DefaultClient().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	req.DefaultClient().GetClient().Timeout = requestDeadline
 }
 
@@ -88,7 +90,7 @@ func (r *repository) syncKYCConfigJSON(ctx context.Context) error {
 	}
 }
 
-func (r *repository) validateKYC(ctx context.Context, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep) error { //nolint:funlen // .
+func (r *repository) validateKYC(ctx context.Context, userID string, state *getCurrentMiningSession, skipKYCSteps []users.KYCStep) error { //nolint:funlen // .
 	for _, skipKYCStep := range skipKYCSteps {
 		if skipKYCStep == users.FacialRecognitionKYCStep || skipKYCStep == users.LivenessDetectionKYCStep || skipKYCStep == users.NoneKYCStep {
 			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
@@ -488,6 +490,7 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 		return errors.Wrapf(err2, "failed to read body of eskimo user state request for userID:%v, skipKYCSteps:%#v", userID, skipKYCSteps)
 	} else {
 		var usr struct {
+			model.UserIDField
 			model.CountryField
 			model.MiningBlockchainAccountAddressField
 			model.KYCState
