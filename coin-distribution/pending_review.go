@@ -237,10 +237,20 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 	if len(records) == 0 {
 		return nil
 	}
+	deduplicated := make(map[string]*ByEarnerForReview, len(records))
+	for _, record := range records {
+		key := fmt.Sprintf("%v~%v", record.UserID, record.EarnerUserID)
+		if otherRecord, found := deduplicated[key]; !found {
+			deduplicated[key] = record
+		} else {
+			log.Warn(fmt.Sprintf("(%#v) is a duplicate of (%#v)", record, otherRecord))
+		}
+	}
 	const columns = 9
 	values := make([]string, 0, len(records))
 	args := make([]any, 0, len(records)*columns)
-	for ix, record := range records {
+	ix := 0
+	for _, record := range deduplicated {
 		values = append(values, generateValuesSQLParams(ix, columns))
 		args = append(args,
 			record.CreatedAt.Time,
@@ -252,6 +262,7 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 			record.UserID,
 			record.EarnerUserID,
 			record.EthAddress)
+		ix++
 	}
 	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
 																 VALUES %v
