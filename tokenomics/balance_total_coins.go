@@ -223,19 +223,20 @@ func (r *repository) enhanceWithBlockchainCoinStats(res *TotalCoinsSummary) *Tot
 	if len(c.CoinsAddedHistory) == 0 {
 		return res
 	}
+	cpy := *res
 	for _, coinsAddedHistoryEntry := range c.CoinsAddedHistory {
-		addedAfterFirst := coinsAddedHistoryEntry.Date.After(res.TimeSeries[0].Date)
-		if addedAfterFirst {
-			res.Blockchain += coinsAddedHistoryEntry.CoinsAdded
+		addedBeforeFirst := coinsAddedHistoryEntry.Date.Before(res.TimeSeries[0].Date)
+		if addedBeforeFirst {
+			cpy.Blockchain += coinsAddedHistoryEntry.CoinsAdded
 		}
 		for i := range res.TimeSeries {
-			if coinsAddedHistoryEntry.Date.After(res.TimeSeries[i].Date) {
-				res.TimeSeries[i].Blockchain += coinsAddedHistoryEntry.CoinsAdded
+			if coinsAddedHistoryEntry.Date.Before(res.TimeSeries[i].Date) {
+				cpy.TimeSeries[i].Blockchain += coinsAddedHistoryEntry.CoinsAdded
 			}
 		}
 	}
 
-	return res
+	return &cpy
 }
 
 func (r *repository) startBlockchainCoinStatsJSONSyncer(ctx context.Context) {
