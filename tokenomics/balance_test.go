@@ -1971,7 +1971,7 @@ func TestEnhanceWithBlockchainCoinStats(t *testing.T) {
 		})
 		resultStats := r.enhanceWithBlockchainCoinStats(sourceStats)
 		expectedStats := expectedEnhancedBlockchainStats(sourceStats, totalBlockchainLastDay+10510+10430+10590+10740+mostRecentAdditionalCoins, []float64{
-			totalBlockchainLastDay + 10510 + 10430 + 10590 + 10740,
+			totalBlockchainLastDay + 10510 + 10430 + 10590 + 10740 + mostRecentAdditionalCoins,
 			355530 + 10510 + 10430 + 10590,
 			344940 + 10510 + 10430,
 			334510 + 10510,
