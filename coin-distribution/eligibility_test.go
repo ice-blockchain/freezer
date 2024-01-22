@@ -3,10 +3,12 @@
 package coindistribution
 
 import (
-	"github.com/ice-blockchain/wintr/time"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	stdlibtime "time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ice-blockchain/wintr/time"
 )
 
 func TestIsEligibleForEthereumDistributionNow(t *testing.T) {
