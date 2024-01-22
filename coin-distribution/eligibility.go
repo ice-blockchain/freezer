@@ -60,11 +60,30 @@ func IsEligibleForEthereumDistribution(
 }
 
 func IsEligibleForEthereumDistributionNow(id int64,
-	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate *time.Time,
+	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate *time.Time,
 	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	return (lastEthereumCoinDistributionProcessedAt.IsNil() && now.Truncate(ethereumDistributionFrequencyMin).Equal(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin))) || //nolint:lll // .
 		((lastEthereumCoinDistributionProcessedAt.IsNil() || !lastEthereumCoinDistributionProcessedAt.Truncate(ethereumDistributionFrequencyMin).Equal(now.Truncate(ethereumDistributionFrequencyMin))) && //nolint:lll // .
-			((id % int64(ethereumDistributionFrequencyMax/ethereumDistributionFrequencyMin)) == int64((now.Truncate(ethereumDistributionFrequencyMin).Sub(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin).Add(ethereumDistributionFrequencyMin))%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin))) //nolint:lll // .
+			isEligibleForEthereumDistributionNow(id, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, coinDistributionStartDate, latestCoinDistributionCollectingDate)) //nolint:lll // .
+}
+
+func isEligibleForEthereumDistributionNow(id int64,
+	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration,
+	now, coinDistributionStartDate, latestCoinDistributionCollectingDate *time.Time,
+) bool {
+	if latestCoinDistributionCollectingDate.IsNil() {
+		return now.Truncate(ethereumDistributionFrequencyMin).Equal(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin))
+	}
+
+	latestCoinDistributionCollectingDay := latestCoinDistributionCollectingDate.Truncate(ethereumDistributionFrequencyMin)
+	for now.Truncate(ethereumDistributionFrequencyMin).After(latestCoinDistributionCollectingDay) {
+		latestCoinDistributionCollectingDay = latestCoinDistributionCollectingDay.Add(ethereumDistributionFrequencyMin)
+		if (id % int64(ethereumDistributionFrequencyMax/ethereumDistributionFrequencyMin)) == int64((latestCoinDistributionCollectingDay.Sub(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin).Add(ethereumDistributionFrequencyMin))%ethereumDistributionFrequencyMax)/ethereumDistributionFrequencyMin) { //nolint:lll // .
+			return true
+		}
+	}
+
+	return false
 }
 
 func isEthereumAddressValid(ethAddress string) bool {

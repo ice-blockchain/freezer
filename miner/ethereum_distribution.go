@@ -35,6 +35,7 @@ func (ref *referral) isEligibleForSelfForEthereumDistribution(now, lastEthereumC
 			now,
 			lastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
+			cfg.coinDistributionCollectorSettings.Load().LatestDate,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max) &&
 		coindistribution.IsEligibleForEthereumDistribution(
@@ -88,6 +89,7 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 			now,
 			u.SoloLastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
+			cfg.coinDistributionCollectorSettings.Load().LatestDate,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max) &&
 		coindistribution.IsEligibleForEthereumDistribution(
@@ -116,6 +118,7 @@ func (u *user) isEligibleForT0ForEthereumDistribution(now *time.Time, idT0 int64
 			now,
 			u.ForT0LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
+			cfg.coinDistributionCollectorSettings.Load().LatestDate,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max) &&
 		u.isEligibleForReferralForEthereumDistribution(now)
@@ -129,6 +132,7 @@ func (u *user) isEligibleForTMinus1ForEthereumDistribution(now *time.Time, idTMi
 			now,
 			u.ForTMinus1LastEthereumCoinDistributionProcessedAt,
 			cfg.coinDistributionCollectorSettings.Load().StartDate,
+			cfg.coinDistributionCollectorSettings.Load().LatestDate,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max) &&
 		u.isEligibleForReferralForEthereumDistribution(now)
