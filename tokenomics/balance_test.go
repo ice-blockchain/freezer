@@ -3,10 +3,12 @@
 package tokenomics
 
 import (
+	"sync/atomic"
 	"testing"
 	stdlibtime "time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	"github.com/ice-blockchain/wintr/time"
@@ -1845,4 +1847,146 @@ func TestProcessBalanceHistory_ChildIsHour_TimeGrow(t *testing.T) {
 		},
 	}
 	assert.EqualValues(t, expected, entries)
+}
+
+//nolint:lll // .
+func TestEnhanceWithBlockchainCoinStats(t *testing.T) {
+	cfg := Config{GlobalAggregationInterval: struct {
+		Parent stdlibtime.Duration `yaml:"parent"`
+		Child  stdlibtime.Duration `yaml:"child"`
+	}(struct {
+		Parent stdlibtime.Duration
+		Child  stdlibtime.Duration
+	}{Parent: 24 * stdlibtime.Hour, Child: 1 * stdlibtime.Hour})}
+
+	r := &repository{cfg: &cfg}
+	r.cfg.blockchainCoinStatsJSON = new(atomic.Pointer[blockchainCoinStatsJSON])
+	_, dates := r.totalCoinsDates(time.Now(), 5)
+	totalBlockchainLastDay := float64(366270)
+	sourceStats := &TotalCoinsSummary{
+		TimeSeries: []*TotalCoinsTimeSeriesDataPoint{
+			{
+				Date: dates[0].Date,
+				TotalCoins: TotalCoins{
+					Total:      29830000,
+					Blockchain: totalBlockchainLastDay,
+					Standard:   29830000,
+					PreStaking: 21820000,
+				},
+			},
+			{
+				Date: dates[1].Date,
+				TotalCoins: TotalCoins{
+					Total:      29770000,
+					Blockchain: 355530,
+					Standard:   29770000,
+					PreStaking: 21770000,
+				},
+			},
+			{
+				Date: dates[2].Date,
+				TotalCoins: TotalCoins{
+					Total:      29600000,
+					Blockchain: 344940,
+					Standard:   29600000,
+					PreStaking: 21610000,
+				},
+			},
+			{
+				Date: dates[3].Date,
+				TotalCoins: TotalCoins{
+					Total:      29410000,
+					Blockchain: 334510,
+					Standard:   29410000,
+					PreStaking: 21100000,
+				},
+			},
+			{
+				Date: dates[4].Date,
+				TotalCoins: TotalCoins{
+					Total:      29110000,
+					Blockchain: 324000,
+					Standard:   29110000,
+					PreStaking: 20890000,
+				},
+			},
+		},
+		TotalCoins: TotalCoins{
+			Total:      29830000,
+			Blockchain: totalBlockchainLastDay,
+			Standard:   29830000,
+			PreStaking: 21820000,
+		},
+	}
+	t.Run("applied for only one day (first)", func(t *testing.T) {
+		r.cfg.blockchainCoinStatsJSON.Store(&blockchainCoinStatsJSON{
+			CoinsAddedHistory: []*struct {
+				CoinsAdded float64    `json:"coinsAdded"`
+				Date       *time.Time `json:"date"`
+			}{
+				{100, time.New(dates[0].Date.Add(-1 * stdlibtime.Second))},
+			},
+		})
+		resultStats := r.enhanceWithBlockchainCoinStats(sourceStats)
+		expectedStats := expectedEnhancedBlockchainStats(sourceStats, totalBlockchainLastDay+(100), []float64{
+			totalBlockchainLastDay + 100, 355730, 345340, 334410, 329100,
+		})
+		require.EqualValues(t, expectedStats, resultStats)
+	})
+	t.Run("applied for all days, nothing before most recent", func(t *testing.T) {
+		r.cfg.blockchainCoinStatsJSON.Store(&blockchainCoinStatsJSON{
+			CoinsAddedHistory: []*struct {
+				CoinsAdded float64    `json:"coinsAdded"`
+				Date       *time.Time `json:"date"`
+			}{
+				{10740, time.New(dates[0].Date.Add(-1 * stdlibtime.Second))},
+				{10590, time.New(dates[1].Date.Add(-1 * stdlibtime.Second))},
+				{10430, time.New(dates[2].Date.Add(-1 * stdlibtime.Second))},
+				{10510, time.New(dates[3].Date.Add(-1 * stdlibtime.Second))},
+			},
+		})
+		resultStats := r.enhanceWithBlockchainCoinStats(sourceStats)
+		expectedStats := expectedEnhancedBlockchainStats(sourceStats, totalBlockchainLastDay+10510+10430+10590+10740, []float64{
+			totalBlockchainLastDay + 10510 + 10430 + 10590 + 10740,
+			355530 + 10510 + 10430 + 10590,
+			344940 + 10510 + 10430,
+			334510 + 10510,
+			324000,
+		})
+		require.EqualValues(t, expectedStats, resultStats)
+	})
+	t.Run("applied for all days, and before most recent entry => affects total", func(t *testing.T) {
+		mostRecentAdditionalCoins := float64(100)
+		r.cfg.blockchainCoinStatsJSON.Store(&blockchainCoinStatsJSON{
+			CoinsAddedHistory: []*struct {
+				CoinsAdded float64    `json:"coinsAdded"`
+				Date       *time.Time `json:"date"`
+			}{
+				{mostRecentAdditionalCoins, time.New(dates[0].Date.Add(-10 * stdlibtime.Second))},
+				{10740, time.New(dates[0].Date.Add(-1 * stdlibtime.Second))},
+				{10590, time.New(dates[1].Date.Add(-1 * stdlibtime.Second))},
+				{10430, time.New(dates[2].Date.Add(-1 * stdlibtime.Second))},
+				{10510, time.New(dates[3].Date.Add(-1 * stdlibtime.Second))},
+			},
+		})
+		resultStats := r.enhanceWithBlockchainCoinStats(sourceStats)
+		expectedStats := expectedEnhancedBlockchainStats(sourceStats, totalBlockchainLastDay+10510+10430+10590+10740+mostRecentAdditionalCoins, []float64{
+			totalBlockchainLastDay + 10510 + 10430 + 10590 + 10740 + mostRecentAdditionalCoins,
+			355530 + 10510 + 10430 + 10590,
+			344940 + 10510 + 10430,
+			334510 + 10510,
+			324000,
+		})
+		require.EqualValues(t, expectedStats, resultStats)
+	})
+}
+
+func expectedEnhancedBlockchainStats(sourceStats *TotalCoinsSummary, totals float64, blockchainCoins []float64) *TotalCoinsSummary {
+	expected := *sourceStats
+	for i, c := range blockchainCoins {
+		expected.TimeSeries[i].Blockchain = c
+	}
+	expected.Blockchain = totals
+
+	return &expected
 }
