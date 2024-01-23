@@ -148,14 +148,14 @@ func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	req *server.Request[StartOrUpdatePreStakingRequestBody, tokenomics.PreStakingSummary],
 ) (*server.Response[tokenomics.PreStakingSummary], *server.Response[server.ErrorResponse]) {
 	const maxAllocation = 100
-	if req.Data.Years > tokenomics.MaxPreStakingYears {
-		req.Data.Years = tokenomics.MaxPreStakingYears
+	if *req.Data.Years > tokenomics.MaxPreStakingYears {
+		*req.Data.Years = tokenomics.MaxPreStakingYears
 	}
-	if req.Data.Allocation > maxAllocation {
-		req.Data.Allocation = maxAllocation
+	if *req.Data.Allocation > maxAllocation {
+		*req.Data.Allocation = maxAllocation
 	}
-	years := uint64(req.Data.Years)
-	allocation := float64(req.Data.Allocation)
+	years := uint64(*req.Data.Years)
+	allocation := float64(*req.Data.Allocation)
 	st := &tokenomics.PreStakingSummary{
 		PreStaking: &tokenomics.PreStaking{
 			UserID:     req.Data.UserID,
