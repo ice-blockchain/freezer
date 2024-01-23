@@ -94,7 +94,7 @@ func (r *repository) validateKYC(ctx context.Context, userID string, state *getC
 			return errors.Errorf("you can't skip kycStep:%v", skipKYCStep)
 		}
 	}
-	if err := r.overrideKYCStateWithEskimoKYCState(ctx, state.UserID, state, skipKYCSteps); err != nil {
+	if err := r.overrideKYCStateWithEskimoKYCState(ctx, userID, state, skipKYCSteps); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
 	if state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
