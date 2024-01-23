@@ -43,6 +43,7 @@ var (
 	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
 	ErrDecreasingPreStakingAllocationOrYearsNotAllowed = errors.New("decreasing pre-staking allocation or years not allowed")
 	PreStakingBonusesPerYear                           = map[uint8]float64{
+		0: 0,
 		1: 35,
 		2: 70,
 		3: 115,
@@ -50,6 +51,7 @@ var (
 		5: 250,
 	}
 	PreStakingYearsByPreStakingBonuses = map[float64]uint8{
+		0:   0,
 		35:  1,
 		70:  2,
 		115: 3,
@@ -124,12 +126,12 @@ type (
 	}
 	PreStakingSummary struct {
 		*PreStaking
-		Bonus float64 `json:"bonus,omitempty" example:"100.00"`
+		Bonus *float64 `json:"bonus,omitempty" example:"100.00"`
 	}
 	PreStaking struct {
-		UserID     string  `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Years      uint64  `json:"years,omitempty" example:"1"`
-		Allocation float64 `json:"allocation,omitempty" example:"100.00"`
+		UserID     string   `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Years      *uint64  `json:"years,omitempty" example:"1"`
+		Allocation *float64 `json:"allocation,omitempty" example:"100.00"`
 	}
 	MiningRateBonuses struct {
 		T1         float64 `json:"t1,omitempty" example:"100.00"`

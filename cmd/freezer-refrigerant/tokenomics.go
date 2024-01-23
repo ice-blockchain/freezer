@@ -154,19 +154,18 @@ func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	if req.Data.Allocation > maxAllocation {
 		req.Data.Allocation = maxAllocation
 	}
+	years := uint64(req.Data.Years)
+	allocation := float64(req.Data.Allocation)
 	st := &tokenomics.PreStakingSummary{
 		PreStaking: &tokenomics.PreStaking{
 			UserID:     req.Data.UserID,
-			Years:      uint64(req.Data.Years),
-			Allocation: float64(req.Data.Allocation),
+			Years:      &years,
+			Allocation: &allocation,
 		},
 	}
 	if err := s.tokenomicsProcessor.StartOrUpdatePreStaking(contextWithHashCode(ctx, req), st); err != nil {
 		err = errors.Wrapf(err, "failed to StartOrUpdatePreStaking for %#v", req.Data)
-		switch {
-		case errors.Is(err, tokenomics.ErrDecreasingPreStakingAllocationOrYearsNotAllowed):
-			return nil, server.ForbiddenWithCode(err, decreasingPreStakingAllocationOrYearsNotAllowedErrorCode)
-		case errors.Is(err, tokenomics.ErrRelationNotFound):
+		if errors.Is(err, tokenomics.ErrRelationNotFound) {
 			return nil, server.NotFound(err, userNotFoundErrorCode)
 		}
 
