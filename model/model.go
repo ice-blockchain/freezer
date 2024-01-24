@@ -85,6 +85,7 @@ type (
 		KYCStepsLastUpdatedAtField
 		KYCStepPassedField
 		KYCStepBlockedField
+		KYCQuizResetAtField
 	}
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
 		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
@@ -310,6 +311,10 @@ type (
 	}
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
+	}
+
+	KYCQuizResetAtField struct {
+		KYCQuizResetAt *TimeSlice `json:"kycQuizResetAt" redis:"kyc_quiz_reset_at"`
 	}
 )
 

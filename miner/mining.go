@@ -78,7 +78,20 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2Pending = 0
 		updatedUser.BalanceT2PendingApplied = 0
 	}
+	needSlashDueToQuizReset := false
+	if usr.KYCQuizResetAt != nil {
+		for _, quizResettedDate := range *usr.KYCQuizResetAt {
+			if updatedUser.BalanceLastUpdatedAt.After(*quizResettedDate.Time) {
+				needSlashDueToQuizReset = true
 
+				break
+			}
+		}
+	}
+
+	if needSlashDueToQuizReset {
+		updatedUser.applyInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
+	}
 	if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) {
 		if !updatedUser.ExtraBonusStartedAt.IsNil() && now.Before(updatedUser.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration)) {
 			rate := (100 + float64(updatedUser.ExtraBonus)) * baseMiningRate * elapsedTimeFraction / 100.
@@ -208,6 +221,9 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
+	if needSlashDueToQuizReset {
+		updatedUser.restoreInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
+	}
 	return updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0
 }
 
@@ -224,6 +240,33 @@ func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *re
 	}
 
 	return nil
+}
+
+func (updatedUser *user) applyInstantSlashing(usr *user, t0Ref, tMinus1Ref *referral, unAppliedSoloPending, elapsedTimeFraction float64) {
+	updatedUser.SlashingRateSolo = (usr.BalanceSolo / elapsedTimeFraction)
+	if unAppliedSoloPending != 0 {
+		updatedUser.SlashingRateSolo += unAppliedSoloPending / elapsedTimeFraction
+	}
+	if t0Ref != nil {
+		updatedUser.SlashingRateT0 = usr.BalanceT0 / elapsedTimeFraction
+		updatedUser.SlashingRateForT0 = usr.BalanceForT0 / elapsedTimeFraction
+	}
+	if tMinus1Ref != nil {
+		updatedUser.SlashingRateForTMinus1 = usr.BalanceForTMinus1 / elapsedTimeFraction
+	}
+}
+func (updatedUser *user) restoreInstantSlashing(usr *user, t0Ref, tMinus1Ref *referral, unAppliedSoloPending, elapsedTimeFraction float64) {
+	updatedUser.SlashingRateSolo -= (usr.BalanceSolo / elapsedTimeFraction)
+	if unAppliedSoloPending != 0 {
+		updatedUser.SlashingRateSolo -= unAppliedSoloPending / elapsedTimeFraction
+	}
+	if t0Ref != nil {
+		updatedUser.SlashingRateT0 -= usr.BalanceT0 / elapsedTimeFraction
+		updatedUser.SlashingRateForT0 -= usr.BalanceForT0 / elapsedTimeFraction
+	}
+	if tMinus1Ref != nil {
+		updatedUser.SlashingRateForTMinus1 -= usr.BalanceForTMinus1 / elapsedTimeFraction
+	}
 }
 
 func (u *user) isAbsoluteZero() bool {
