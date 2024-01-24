@@ -24,11 +24,10 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to getPreStaking for userID:%v", userID)
 	}
-	years := uint64(PreStakingYearsByPreStakingBonuses[ps.PreStakingBonus])
 
 	return &PreStakingSummary{
 		PreStaking: &PreStaking{
-			Years:      years,
+			Years:      uint64(PreStakingYearsByPreStakingBonuses[ps.PreStakingBonus]),
 			Allocation: ps.PreStakingAllocation,
 		},
 		Bonus: ps.PreStakingBonus,
