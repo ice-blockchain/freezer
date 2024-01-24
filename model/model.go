@@ -254,6 +254,12 @@ type (
 	PreStakingAllocationField struct {
 		PreStakingAllocation float64 `redis:"pre_staking_allocation,omitempty"`
 	}
+	PreStakingAllocationResettableField struct {
+		PreStakingAllocation float64 `redis:"pre_staking_allocation"`
+	}
+	PreStakingBonusResettableField struct {
+		PreStakingBonus float64 `redis:"pre_staking_bonus"`
+	}
 	ExtraBonusField struct {
 		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
 	}

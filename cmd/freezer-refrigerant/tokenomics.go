@@ -148,25 +148,23 @@ func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	req *server.Request[StartOrUpdatePreStakingRequestBody, tokenomics.PreStakingSummary],
 ) (*server.Response[tokenomics.PreStakingSummary], *server.Response[server.ErrorResponse]) {
 	const maxAllocation = 100
-	if req.Data.Years > tokenomics.MaxPreStakingYears {
-		req.Data.Years = tokenomics.MaxPreStakingYears
+	if *req.Data.Years > tokenomics.MaxPreStakingYears {
+		*req.Data.Years = tokenomics.MaxPreStakingYears
 	}
-	if req.Data.Allocation > maxAllocation {
-		req.Data.Allocation = maxAllocation
+	if *req.Data.Allocation > maxAllocation {
+		*req.Data.Allocation = maxAllocation
 	}
+	allocation := float64(*req.Data.Allocation)
 	st := &tokenomics.PreStakingSummary{
 		PreStaking: &tokenomics.PreStaking{
 			UserID:     req.Data.UserID,
-			Years:      uint64(req.Data.Years),
-			Allocation: float64(req.Data.Allocation),
+			Years:      uint64(*req.Data.Years),
+			Allocation: allocation,
 		},
 	}
 	if err := s.tokenomicsProcessor.StartOrUpdatePreStaking(contextWithHashCode(ctx, req), st); err != nil {
 		err = errors.Wrapf(err, "failed to StartOrUpdatePreStaking for %#v", req.Data)
-		switch {
-		case errors.Is(err, tokenomics.ErrDecreasingPreStakingAllocationOrYearsNotAllowed):
-			return nil, server.ForbiddenWithCode(err, decreasingPreStakingAllocationOrYearsNotAllowedErrorCode)
-		case errors.Is(err, tokenomics.ErrRelationNotFound):
+		if errors.Is(err, tokenomics.ErrRelationNotFound) {
 			return nil, server.NotFound(err, userNotFoundErrorCode)
 		}
 

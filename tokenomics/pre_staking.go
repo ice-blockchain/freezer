@@ -14,8 +14,8 @@ import (
 type (
 	preStaking struct {
 		model.DeserializedUsersKey
-		model.PreStakingBonusField
-		model.PreStakingAllocationField
+		model.PreStakingBonusResettableField
+		model.PreStakingAllocationResettableField
 	}
 )
 
@@ -58,23 +58,26 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	if existing != nil {
 		existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
-		if (existing.PreStakingAllocation == 100 || existing.PreStakingAllocation == st.Allocation) &&
-			(existingYears == MaxPreStakingYears || existingYears == st.Years) {
+		if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {
 			st.Allocation = existing.PreStakingAllocation
 			st.Years = existingYears
 			st.Bonus = existing.PreStakingBonus
 
 			return nil
 		}
-		if existing.PreStakingAllocation > st.Allocation || existingYears > st.Years {
-			return ErrDecreasingPreStakingAllocationOrYearsNotAllowed
-		}
 	}
-	st.Bonus = PreStakingBonusesPerYear[uint8(st.Years)]
+	if st.Allocation == 0 || st.Years == 0 {
+		st.Allocation = 0
+		st.Years = 0
+		st.Bonus = 0
+	} else {
+		st.Bonus = PreStakingBonusesPerYear[uint8(st.Years)]
+	}
+
 	existing = &preStaking{
-		DeserializedUsersKey:      model.DeserializedUsersKey{ID: id},
-		PreStakingBonusField:      model.PreStakingBonusField{PreStakingBonus: st.Bonus},
-		PreStakingAllocationField: model.PreStakingAllocationField{PreStakingAllocation: st.Allocation},
+		DeserializedUsersKey:                model.DeserializedUsersKey{ID: id},
+		PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: st.Bonus},
+		PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: st.Allocation},
 	}
 
 	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)
