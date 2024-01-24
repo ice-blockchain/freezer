@@ -83,6 +83,7 @@ type (
 	KYCState struct {
 		KYCStepsCreatedAtField
 		KYCStepsLastUpdatedAtField
+		KYCQuizResetAtField
 		KYCStepPassedField
 		KYCStepBlockedField
 	}
@@ -255,10 +256,10 @@ type (
 		PreStakingAllocation float64 `redis:"pre_staking_allocation,omitempty"`
 	}
 	PreStakingAllocationResettableField struct {
-		PreStakingAllocation float64 `redis:"pre_staking_allocation"`
+		PreStakingAllocation *FlexibleFloat64 `redis:"pre_staking_allocation,omitempty"`
 	}
 	PreStakingBonusResettableField struct {
-		PreStakingBonus float64 `redis:"pre_staking_bonus"`
+		PreStakingBonus *FlexibleFloat64 `redis:"pre_staking_bonus,omitempty"`
 	}
 	ExtraBonusField struct {
 		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
@@ -310,6 +311,10 @@ type (
 	}
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
+	}
+
+	KYCQuizResetAtField struct {
+		KYCQuizResetAt *TimeSlice `json:"kycQuizResetAt" redis:"kyc_quiz_reset_at"`
 	}
 )
 
@@ -406,6 +411,31 @@ func (kyc *KYCState) KYCStepAttempted(kycStep users.KYCStep) bool {
 
 func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, duration stdlibtime.Duration) bool {
 	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
+}
+
+func (kyc *KYCState) QuizWillBeReset(past *time.Time) bool {
+	return kyc.compareQuizReset(func(quizReset *time.Time) bool {
+		return quizReset.After(*past.Time)
+	})
+}
+func (kyc *KYCState) QuizWasReset(future *time.Time) bool {
+	return kyc.compareQuizReset(func(quizReset *time.Time) bool {
+		return quizReset.Before(*future.Time)
+	})
+}
+func (kyc *KYCState) compareQuizReset(cmp func(quizReset *time.Time) bool) bool {
+	res := false
+	if kyc.KYCQuizResetAt != nil {
+		for _, quizResettedDate := range *kyc.KYCQuizResetAt {
+			if cmp(quizResettedDate) {
+				res = true
+
+				break
+			}
+		}
+	}
+
+	return res
 }
 
 type (

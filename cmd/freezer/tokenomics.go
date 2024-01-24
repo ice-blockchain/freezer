@@ -85,11 +85,14 @@ func (s *service) GetPreStakingSummary( //nolint:gocritic // False negative.
 	preStaking, err := s.tokenomicsRepository.GetPreStakingSummary(contextWithHashCode(ctx, req), req.Data.UserID)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to get user's pre-staking summary for userID:%v", req.Data.UserID)
-		if errors.Is(err, tokenomics.ErrNotFound) {
+		switch {
+		case errors.Is(err, tokenomics.ErrNotFound):
 			return nil, server.NotFound(err, userPreStakingNotEnabledErrorCode)
+		case errors.Is(err, tokenomics.ErrPrestakingDisabled):
+			return nil, server.ForbiddenWithCode(err, prestakingDisabledForUser)
+		default:
+			return nil, server.Unexpected(err)
 		}
-
-		return nil, server.Unexpected(err)
 	}
 
 	return server.OK(preStaking), nil

@@ -117,6 +117,8 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
+		model.PreStakingAllocationResettableField
+		model.PreStakingBonusResettableField
 	}
 
 	referralUpdated struct {
