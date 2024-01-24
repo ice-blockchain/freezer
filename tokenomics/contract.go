@@ -126,12 +126,12 @@ type (
 	}
 	PreStakingSummary struct {
 		*PreStaking
-		Bonus *float64 `json:"bonus,omitempty" example:"100.00"`
+		Bonus float64 `json:"bonus" example:"100.00"`
 	}
 	PreStaking struct {
-		UserID     string   `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		Years      *uint64  `json:"years,omitempty" example:"1"`
-		Allocation *float64 `json:"allocation,omitempty" example:"100.00"`
+		UserID     string  `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		Years      uint64  `json:"years" example:"1"`
+		Allocation float64 `json:"allocation" example:"100.00"`
 	}
 	MiningRateBonuses struct {
 		T1         float64 `json:"t1,omitempty" example:"100.00"`

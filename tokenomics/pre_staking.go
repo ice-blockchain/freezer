@@ -14,12 +14,6 @@ import (
 type (
 	preStaking struct {
 		model.DeserializedUsersKey
-		model.PreStakingBonusField
-		model.PreStakingAllocationField
-	}
-
-	preStakingResettable struct {
-		model.DeserializedUsersKey
 		model.PreStakingBonusResettableField
 		model.PreStakingAllocationResettableField
 	}
@@ -34,10 +28,10 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 
 	return &PreStakingSummary{
 		PreStaking: &PreStaking{
-			Years:      &years,
-			Allocation: &ps.PreStakingAllocation,
+			Years:      years,
+			Allocation: ps.PreStakingAllocation,
 		},
-		Bonus: &ps.PreStakingBonus,
+		Bonus: ps.PreStakingBonus,
 	}, nil
 }
 
@@ -65,29 +59,27 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	if existing != nil {
 		existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
-		if existing.PreStakingAllocation == *st.Allocation && existingYears == *st.Years {
-			st.Allocation = &existing.PreStakingAllocation
-			st.Years = &existingYears
-			st.Bonus = &existing.PreStakingBonus
+		if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {
+			st.Allocation = existing.PreStakingAllocation
+			st.Years = existingYears
+			st.Bonus = existing.PreStakingBonus
 
 			return nil
 		}
 	}
-	if *st.Allocation == 0 || *st.Years == 0 {
-		*st.Allocation = 0
-		*st.Years = 0
-		bonus := 0.0
-		st.Bonus = &bonus
+	if st.Allocation == 0 || st.Years == 0 {
+		st.Allocation = 0
+		st.Years = 0
+		st.Bonus = 0
 	} else {
-		bonus := PreStakingBonusesPerYear[uint8(*st.Years)]
-		st.Bonus = &bonus
+		st.Bonus = PreStakingBonusesPerYear[uint8(st.Years)]
 	}
 
-	ps := &preStakingResettable{
+	existing = &preStaking{
 		DeserializedUsersKey:                model.DeserializedUsersKey{ID: id},
-		PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: *st.Bonus},
-		PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: *st.Allocation},
+		PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: st.Bonus},
+		PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: st.Allocation},
 	}
 
-	return errors.Wrapf(storage.Set(ctx, r.db, ps), "failed to replace preStaking for %#v", st)
+	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)
 }

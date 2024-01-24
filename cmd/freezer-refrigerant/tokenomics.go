@@ -154,13 +154,12 @@ func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	if *req.Data.Allocation > maxAllocation {
 		*req.Data.Allocation = maxAllocation
 	}
-	years := uint64(*req.Data.Years)
 	allocation := float64(*req.Data.Allocation)
 	st := &tokenomics.PreStakingSummary{
 		PreStaking: &tokenomics.PreStaking{
 			UserID:     req.Data.UserID,
-			Years:      &years,
-			Allocation: &allocation,
+			Years:      uint64(*req.Data.Years),
+			Allocation: allocation,
 		},
 	}
 	if err := s.tokenomicsProcessor.StartOrUpdatePreStaking(contextWithHashCode(ctx, req), st); err != nil {
