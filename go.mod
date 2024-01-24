@@ -12,7 +12,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.11
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ice-blockchain/eskimo v1.273.0
+	github.com/ice-blockchain/eskimo v1.278.0
 	github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb
 	github.com/ice-blockchain/wintr v1.133.0
 	github.com/imroc/req/v3 v3.42.3
@@ -34,7 +34,7 @@ require (
 	cloud.google.com/go/firestore v1.14.0 // indirect
 	cloud.google.com/go/iam v1.1.5 // indirect
 	cloud.google.com/go/longrunning v0.5.4 // indirect
-	cloud.google.com/go/storage v1.36.0 // indirect
+	cloud.google.com/go/storage v1.37.0 // indirect
 	cosmossdk.io/math v1.2.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	firebase.google.com/go/v4 v4.13.0 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dmarkham/enumer v1.5.9 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v25.0.0+incompatible // indirect
+	github.com/docker/docker v25.0.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect

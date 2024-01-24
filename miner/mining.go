@@ -14,6 +14,8 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
+	wasResurrected := !updatedUser.ResurrectSoloUsedAt.IsNil() && updatedUser.ResurrectSoloUsedAt.Equal(*now.Time)
+
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
@@ -21,7 +23,10 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT1PendingApplied = updatedUser.BalanceT1Pending
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 			updatedUser.BalanceLastUpdatedAt = now
-
+			needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
+			if wasResurrected && needInstantSlashing {
+				updatedUser.ResurrectSoloUsedAt = nil
+			}
 			return updatedUser, false, IDT0Changed, 0, 0
 		}
 
@@ -78,18 +83,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2Pending = 0
 		updatedUser.BalanceT2PendingApplied = 0
 	}
-	needSlashDueToQuizReset := false
-	if usr.KYCQuizResetAt != nil {
-		for _, quizResettedDate := range *usr.KYCQuizResetAt {
-			if updatedUser.BalanceLastUpdatedAt.After(*quizResettedDate.Time) {
-				needSlashDueToQuizReset = true
-
-				break
-			}
-		}
+	needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
+	if wasResurrected && needInstantSlashing {
+		updatedUser.ResurrectSoloUsedAt = nil
 	}
-
-	if needSlashDueToQuizReset {
+	if needInstantSlashing {
 		updatedUser.applyInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
 	}
 	if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) {
@@ -108,14 +106,14 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT0 += rate
 			mintedAmount += rate
 
-			if updatedUser.SlashingRateForT0 != 0 {
+			if updatedUser.SlashingRateForT0 != 0 && (!needInstantSlashing) {
 				updatedUser.SlashingRateForT0 = 0
 			}
 		}
 		if tMinus1Ref != nil && !tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) {
 			updatedUser.BalanceForTMinus1 += 5 * baseMiningRate * elapsedTimeFraction / 100
 
-			if updatedUser.SlashingRateForTMinus1 != 0 {
+			if updatedUser.SlashingRateForTMinus1 != 0 && (!needInstantSlashing) {
 				updatedUser.SlashingRateForTMinus1 = 0
 			}
 		}
@@ -221,9 +219,13 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
-	if needSlashDueToQuizReset {
-		updatedUser.restoreInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
+	if needInstantSlashing {
+		updatedUser.SlashingRateSolo = 0
+		updatedUser.SlashingRateT0 = 0
+		updatedUser.SlashingRateForT0 = 0
+		updatedUser.SlashingRateForTMinus1 = 0
 	}
+
 	return updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0
 }
 
@@ -253,19 +255,6 @@ func (updatedUser *user) applyInstantSlashing(usr *user, t0Ref, tMinus1Ref *refe
 	}
 	if tMinus1Ref != nil {
 		updatedUser.SlashingRateForTMinus1 = usr.BalanceForTMinus1 / elapsedTimeFraction
-	}
-}
-func (updatedUser *user) restoreInstantSlashing(usr *user, t0Ref, tMinus1Ref *referral, unAppliedSoloPending, elapsedTimeFraction float64) {
-	updatedUser.SlashingRateSolo -= (usr.BalanceSolo / elapsedTimeFraction)
-	if unAppliedSoloPending != 0 {
-		updatedUser.SlashingRateSolo -= unAppliedSoloPending / elapsedTimeFraction
-	}
-	if t0Ref != nil {
-		updatedUser.SlashingRateT0 -= usr.BalanceT0 / elapsedTimeFraction
-		updatedUser.SlashingRateForT0 -= usr.BalanceForT0 / elapsedTimeFraction
-	}
-	if tMinus1Ref != nil {
-		updatedUser.SlashingRateForTMinus1 -= usr.BalanceForTMinus1 / elapsedTimeFraction
 	}
 }
 
