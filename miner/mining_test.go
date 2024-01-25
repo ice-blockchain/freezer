@@ -3,6 +3,7 @@
 package miner
 
 import (
+	"github.com/ice-blockchain/freezer/model"
 	"testing"
 	stdlibtime "time"
 
@@ -161,6 +162,110 @@ func testSoloMiningNoExtraBonus(t *testing.T) {
 		require.EqualValues(t, 0, pendingAmountForT0)
 		require.EqualValues(t, 4, m.BalanceForT0)
 		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+	})
+	t.Run("no KYCQuizResetAt => balance is accumulated between mine calls", func(t *testing.T) {
+		t.Parallel()
+		m := newUser()
+		m.ActiveT1Referrals = 4
+		m.ActiveT2Referrals = 20
+		m.IDT0, m.IDTMinus1 = 1, 2
+		ref := newRef()
+		tMinus1Ref := newRef()
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(testMiningBase, testTime, m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 16, m.BalanceSolo)
+		require.EqualValues(t, 4, m.BalanceT0)
+		require.EqualValues(t, 4, m.BalanceForT0)
+		require.EqualValues(t, 16, m.BalanceT1)
+		require.EqualValues(t, 16, m.BalanceT2)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+
+		m.IDT0, m.IDTMinus1 = 1, 2
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 = mine(testMiningBase, timeDelta(1*stdlibtime.Hour), m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 32, m.BalanceSolo)
+		require.EqualValues(t, 8, m.BalanceT0)
+		require.EqualValues(t, 8, m.BalanceForT0)
+		require.EqualValues(t, 32, m.BalanceT1)
+		require.EqualValues(t, 32, m.BalanceT2)
+		require.EqualValues(t, 1.6, m.BalanceForTMinus1)
+		require.False(t, IDT0Changed)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
+	})
+	t.Run("with KYCQuizResetAt after now => balance is reset on next iteration to mined value for the past time", func(t *testing.T) {
+		t.Parallel()
+		m := newUser()
+		m.ActiveT1Referrals = 4
+		m.ActiveT2Referrals = 20
+		m.IDT0, m.IDTMinus1 = 1, 2
+		ref := newRef()
+		tMinus1Ref := newRef()
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(testMiningBase, testTime, m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 16, m.BalanceSolo)
+		require.EqualValues(t, 4, m.BalanceT0)
+		require.EqualValues(t, 4, m.BalanceForT0)
+		require.EqualValues(t, 16, m.BalanceT1)
+		require.EqualValues(t, 16, m.BalanceT2)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+
+		kycResetAt := model.TimeSlice([]*time.Time{timeDelta(61 * stdlibtime.Minute)})
+		m.KYCQuizResetAt = &kycResetAt
+		m.IDT0, m.IDTMinus1 = 1, 2
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 = mine(testMiningBase, timeDelta(1*stdlibtime.Hour), m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 16, m.BalanceSolo)
+		require.EqualValues(t, 4, m.BalanceT0)
+		require.EqualValues(t, 4, m.BalanceForT0)
+		require.EqualValues(t, 16, m.BalanceT1)
+		require.EqualValues(t, 16, m.BalanceT2)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+		require.False(t, IDT0Changed)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
+	})
+	t.Run("with KYCQuizResetAt before balanceUpdatedAt => it is passed and no balance reset", func(t *testing.T) {
+		t.Parallel()
+		m := newUser()
+		m.ActiveT1Referrals = 4
+		m.ActiveT2Referrals = 20
+		m.IDT0, m.IDTMinus1 = 1, 2
+		ref := newRef()
+		tMinus1Ref := newRef()
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(testMiningBase, testTime, m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 16, m.BalanceSolo)
+		require.EqualValues(t, 4, m.BalanceT0)
+		require.EqualValues(t, 4, m.BalanceForT0)
+		require.EqualValues(t, 16, m.BalanceT1)
+		require.EqualValues(t, 16, m.BalanceT2)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
+		require.EqualValues(t, 0.8, m.BalanceForTMinus1)
+
+		kycResetAt := model.TimeSlice([]*time.Time{timeDelta(59 * stdlibtime.Minute)})
+		m.KYCQuizResetAt = &kycResetAt
+		m.IDT0, m.IDTMinus1 = 1, 2
+		m.BalanceLastUpdatedAt = timeDelta(1 * stdlibtime.Hour)
+		m, _, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 = mine(testMiningBase, timeDelta(1*stdlibtime.Hour), m, ref, tMinus1Ref)
+		require.NotNil(t, m)
+		require.EqualValues(t, 32, m.BalanceSolo)
+		require.EqualValues(t, 8, m.BalanceT0)
+		require.EqualValues(t, 8, m.BalanceForT0)
+		require.EqualValues(t, 32, m.BalanceT1)
+		require.EqualValues(t, 32, m.BalanceT2)
+		require.EqualValues(t, 1.6, m.BalanceForTMinus1)
+		require.False(t, IDT0Changed)
+		require.EqualValues(t, 0, pendingAmountForTMinus1)
+		require.EqualValues(t, 0, pendingAmountForT0)
 	})
 }
 

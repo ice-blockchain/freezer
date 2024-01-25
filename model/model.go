@@ -85,6 +85,7 @@ type (
 		KYCStepsLastUpdatedAtField
 		KYCStepPassedField
 		KYCStepBlockedField
+		KYCQuizResetAtField
 	}
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
 		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
@@ -311,6 +312,10 @@ type (
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
+
+	KYCQuizResetAtField struct {
+		KYCQuizResetAt *TimeSlice `json:"kycQuizResetAt" redis:"kyc_quiz_reset_at"`
+	}
 )
 
 type (
@@ -406,6 +411,20 @@ func (kyc *KYCState) KYCStepAttempted(kycStep users.KYCStep) bool {
 
 func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, duration stdlibtime.Duration) bool {
 	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
+}
+
+func (kyc *KYCState) WasQuizReset(past *time.Time) bool {
+	res := false
+	if kyc.KYCQuizResetAt != nil {
+		for _, quizResettedDate := range *kyc.KYCQuizResetAt {
+			if quizResettedDate.After(*past.Time) {
+				res = true
+
+				break
+			}
+		}
+	}
+	return res
 }
 
 type (

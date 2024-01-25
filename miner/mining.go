@@ -14,6 +14,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
+
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
@@ -78,7 +79,21 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2Pending = 0
 		updatedUser.BalanceT2PendingApplied = 0
 	}
-
+	needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
+	if needInstantSlashing {
+		pendingResurrectionForTMinus1 = 0
+		pendingResurrectionForT0 = 0
+		updatedUser.BalanceSolo = 0
+		updatedUser.BalanceT1 = 0
+		updatedUser.BalanceT2 = 0
+		if tMinus1Ref != nil {
+			updatedUser.BalanceForTMinus1 = 0
+		}
+		if t0Ref != nil {
+			updatedUser.BalanceForT0 = 0
+			updatedUser.BalanceT0 = 0
+		}
+	}
 	if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) {
 		if !updatedUser.ExtraBonusStartedAt.IsNil() && now.Before(updatedUser.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration)) {
 			rate := (100 + float64(updatedUser.ExtraBonus)) * baseMiningRate * elapsedTimeFraction / 100.
@@ -95,14 +110,14 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT0 += rate
 			mintedAmount += rate
 
-			if updatedUser.SlashingRateForT0 != 0 {
+			if updatedUser.SlashingRateForT0 != 0 && (!needInstantSlashing) {
 				updatedUser.SlashingRateForT0 = 0
 			}
 		}
 		if tMinus1Ref != nil && !tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.After(*now.Time) {
 			updatedUser.BalanceForTMinus1 += 5 * baseMiningRate * elapsedTimeFraction / 100
 
-			if updatedUser.SlashingRateForTMinus1 != 0 {
+			if updatedUser.SlashingRateForTMinus1 != 0 && (!needInstantSlashing) {
 				updatedUser.SlashingRateForTMinus1 = 0
 			}
 		}
@@ -207,6 +222,13 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalMinted += mintedStandard + mintedPreStaking
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
+
+	if needInstantSlashing {
+		updatedUser.SlashingRateSolo = 0
+		updatedUser.SlashingRateT0 = 0
+		updatedUser.SlashingRateForT0 = 0
+		updatedUser.SlashingRateForTMinus1 = 0
+	}
 
 	return updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0
 }
