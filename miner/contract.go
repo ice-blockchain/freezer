@@ -58,7 +58,6 @@ type (
 		model.ExtraBonusStartedAtField
 		model.ReferralsCountChangeGuardUpdatedAtField
 		model.KYCState
-		model.KYCQuizResetAtField
 		model.MiningBlockchainAccountAddressField
 		model.CountryField
 		model.UsernameField
