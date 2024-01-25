@@ -14,7 +14,6 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
-	wasResurrected := !updatedUser.ResurrectSoloUsedAt.IsNil() && updatedUser.ResurrectSoloUsedAt.Equal(*now.Time)
 
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
@@ -23,10 +22,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT1PendingApplied = updatedUser.BalanceT1Pending
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 			updatedUser.BalanceLastUpdatedAt = now
-			needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
-			if wasResurrected && needInstantSlashing {
-				updatedUser.ResurrectSoloUsedAt = nil
-			}
+
 			return updatedUser, false, IDT0Changed, 0, 0
 		}
 
@@ -84,9 +80,6 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2PendingApplied = 0
 	}
 	needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
-	if wasResurrected && needInstantSlashing {
-		updatedUser.ResurrectSoloUsedAt = nil
-	}
 	if needInstantSlashing {
 		updatedUser.applyInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
 	}

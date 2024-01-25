@@ -15,10 +15,9 @@ func resurrect(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (pendingR
 		} else {
 			resurrectDelta = timeSpent.Hours()
 		}
-		amountSolo := usr.SlashingRateSolo * resurrectDelta
-		amountT0 := usr.SlashingRateT0 * resurrectDelta
-		usr.BalanceSolo += amountSolo
-		usr.BalanceT0 += amountT0
+
+		usr.BalanceSolo += usr.SlashingRateSolo * resurrectDelta
+		usr.BalanceT0 += usr.SlashingRateT0 * resurrectDelta
 		mintedAmount := (usr.SlashingRateSolo + usr.SlashingRateT0) * resurrectDelta
 		mintedStandard, mintedPreStaking := tokenomics.ApplyPreStaking(mintedAmount, usr.PreStakingAllocation, usr.PreStakingBonus)
 		usr.BalanceTotalMinted += mintedStandard + mintedPreStaking

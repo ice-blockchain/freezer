@@ -413,11 +413,11 @@ func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, d
 	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
 }
 
-func (kyc *KYCState) WasQuizReset(now *time.Time) bool {
+func (kyc *KYCState) WasQuizReset(past *time.Time) bool {
 	res := false
 	if kyc.KYCQuizResetAt != nil {
 		for _, quizResettedDate := range *kyc.KYCQuizResetAt {
-			if quizResettedDate.After(*now.Time) {
+			if quizResettedDate.After(*past.Time) {
 				res = true
 
 				break
