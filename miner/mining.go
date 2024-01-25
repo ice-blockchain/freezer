@@ -81,7 +81,18 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	}
 	needInstantSlashing := usr.WasQuizReset(updatedUser.BalanceLastUpdatedAt)
 	if needInstantSlashing {
-		updatedUser.applyInstantSlashing(usr, t0Ref, tMinus1Ref, unAppliedSoloPending, elapsedTimeFraction)
+		pendingResurrectionForTMinus1 = 0
+		pendingResurrectionForT0 = 0
+		updatedUser.BalanceSolo = 0
+		updatedUser.BalanceT1 = 0
+		updatedUser.BalanceT2 = 0
+		if tMinus1Ref != nil {
+			updatedUser.BalanceForTMinus1 = 0
+		}
+		if t0Ref != nil {
+			updatedUser.BalanceForT0 = 0
+			updatedUser.BalanceT0 = 0
+		}
 	}
 	if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) {
 		if !updatedUser.ExtraBonusStartedAt.IsNil() && now.Before(updatedUser.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration)) {
@@ -235,20 +246,6 @@ func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *re
 	}
 
 	return nil
-}
-
-func (updatedUser *user) applyInstantSlashing(usr *user, t0Ref, tMinus1Ref *referral, unAppliedSoloPending, elapsedTimeFraction float64) {
-	updatedUser.SlashingRateSolo = (usr.BalanceSolo / elapsedTimeFraction)
-	if unAppliedSoloPending != 0 {
-		updatedUser.SlashingRateSolo += unAppliedSoloPending / elapsedTimeFraction
-	}
-	if t0Ref != nil {
-		updatedUser.SlashingRateT0 = usr.BalanceT0 / elapsedTimeFraction
-		updatedUser.SlashingRateForT0 = usr.BalanceForT0 / elapsedTimeFraction
-	}
-	if tMinus1Ref != nil {
-		updatedUser.SlashingRateForTMinus1 = usr.BalanceForTMinus1 / elapsedTimeFraction
-	}
 }
 
 func (u *user) isAbsoluteZero() bool {
