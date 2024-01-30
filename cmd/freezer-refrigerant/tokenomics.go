@@ -164,11 +164,14 @@ func (s *service) StartOrUpdatePreStaking( //nolint:gocritic // False negative.
 	}
 	if err := s.tokenomicsProcessor.StartOrUpdatePreStaking(contextWithHashCode(ctx, req), st); err != nil {
 		err = errors.Wrapf(err, "failed to StartOrUpdatePreStaking for %#v", req.Data)
-		if errors.Is(err, tokenomics.ErrRelationNotFound) {
+		switch {
+		case errors.Is(err, tokenomics.ErrRelationNotFound):
 			return nil, server.NotFound(err, userNotFoundErrorCode)
+		case errors.Is(err, tokenomics.ErrPrestakingDisabled):
+			return nil, server.ForbiddenWithCode(err, prestakingDisabledForUser)
+		default:
+			return nil, server.Unexpected(err)
 		}
-
-		return nil, server.Unexpected(err)
 	}
 
 	return server.OK(st), nil
