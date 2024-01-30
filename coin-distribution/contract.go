@@ -37,6 +37,7 @@ type (
 		NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error
 		GetCollectorSettings(ctx context.Context) (*CollectorSettings, error)
 		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
+		CollectMainnetPoolRewardContributionsForReview(ctx context.Context, records *ByEarnerForReview) error
 	}
 	CollectorSettings struct {
 		DeniedCountries          map[string]struct{}

@@ -38,9 +38,10 @@ type (
 // Private API.
 
 const (
-	applicationYamlKey       = "miner"
-	parentApplicationYamlKey = "tokenomics"
-	requestDeadline          = 30 * stdlibtime.Second
+	applicationYamlKey               = "miner"
+	parentApplicationYamlKey         = "tokenomics"
+	mainnetRewardPoolContributionKey = "mainnet_reward_pool_contribution"
+	requestDeadline                  = 30 * stdlibtime.Second
 )
 
 // .
@@ -82,12 +83,19 @@ type (
 		model.ResurrectT0UsedAtField
 		model.ResurrectTMinus1UsedAtField
 		model.SoloLastEthereumCoinDistributionProcessedAtField
+		model.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		model.ForT0LastEthereumCoinDistributionProcessedAtField
+		model.ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		model.ForTMinus1LastEthereumCoinDistributionProcessedAtField
+		model.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		model.BalanceSoloEthereumPendingField
 		model.BalanceT0EthereumPendingField
 		model.BalanceT1EthereumPendingField
 		model.BalanceT2EthereumPendingField
+		model.BalanceSoloMainnetRewardPoolContributionPendingField
+		model.BalanceT0MainnetRewardPoolContributionPendingField
+		model.BalanceT1MainnetRewardPoolContributionPendingField
+		model.BalanceT2MainnetRewardPoolContributionPendingField
 		model.DeserializedUsersKey
 		model.IDT0Field
 		model.IDTMinus1Field
@@ -110,6 +118,12 @@ type (
 		model.BalanceT2EthereumField
 		model.BalanceForT0EthereumField
 		model.BalanceForTMinus1EthereumField
+		model.BalanceSoloMainnetRewardPoolContributionField
+		model.BalanceT0MainnetRewardPoolContributionField
+		model.BalanceT1MainnetRewardPoolContributionField
+		model.BalanceT2MainnetRewardPoolContributionField
+		model.BalanceForT0MainnetRewardPoolContributionField
+		model.BalanceForTMinus1MainnetRewardPoolContributionField
 		model.SlashingRateSoloField
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
@@ -182,8 +196,11 @@ type (
 			Min stdlibtime.Duration `yaml:"min"`
 			Max stdlibtime.Duration `yaml:"max"`
 		} `yaml:"ethereumDistributionFrequency" mapstructure:"ethereumDistributionFrequency"`
-		Workers     int64 `yaml:"workers"`
-		BatchSize   int64 `yaml:"batchSize"`
-		Development bool  `yaml:"development"`
+		MainnetRewardPoolContributionEthAddress string `yaml:"mainnetRewardPoolContributionEthAddress"`
+		MainnetRewardPoolContributionUserID     string `yaml:"mainnetRewardPoolContributionUserId"`
+		Workers                                 int64  `yaml:"workers"`
+		BatchSize                               int64  `yaml:"batchSize"`
+		MainnetRewardPoolContributionPercentage int64  `yaml:"mainnetRewardPoolContributionPercentage"`
+		Development                             bool   `yaml:"development"`
 	}
 )

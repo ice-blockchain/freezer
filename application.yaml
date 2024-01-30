@@ -184,6 +184,9 @@ miner:
   workers: 2
   batchSize: 100
   wintr/connectors/storage/v2: *db
+  mainnetRewardPoolContributionPercentage: 30
+  mainnetRewardPoolContributionEthAddress: bogus
+  mainnetRewardPoolContributionUserId: rewards-bogus
 coin-distribution:
   alert-slack-webhook: https://hooks.slack.com/services/dummy/dummy/dummy
   environment: local

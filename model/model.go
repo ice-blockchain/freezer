@@ -30,8 +30,11 @@ type (
 		MiningSessionSoloDayOffLastAwardedAtField
 		ExtraBonusLastClaimAvailableAtField
 		SoloLastEthereumCoinDistributionProcessedAtField
+		SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		ForT0LastEthereumCoinDistributionProcessedAtField
+		ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		ForTMinus1LastEthereumCoinDistributionProcessedAtField
+		ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
 		KYCState
 		ProfilePictureNameField
 		UsernameField
@@ -62,6 +65,12 @@ type (
 		BalanceT2EthereumField
 		BalanceForT0EthereumField
 		BalanceForTMinus1EthereumField
+		BalanceSoloMainnetRewardPoolContributionField
+		BalanceT0MainnetRewardPoolContributionField
+		BalanceT1MainnetRewardPoolContributionField
+		BalanceT2MainnetRewardPoolContributionField
+		BalanceForT0MainnetRewardPoolContributionField
+		BalanceForTMinus1MainnetRewardPoolContributionField
 		SlashingRateSoloField
 		SlashingRateT0Field
 		SlashingRateT1Field
@@ -90,11 +99,20 @@ type (
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
 		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
+	SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
+		SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"solo_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
+	}
 	ForT0LastEthereumCoinDistributionProcessedAtField struct {
 		ForT0LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
+	ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
+		ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
+	}
 	ForTMinus1LastEthereumCoinDistributionProcessedAtField struct {
 		ForTMinus1LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_ethereum_coin_distribution_processed_at,omitempty"`
+	}
+	ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
+		ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`
@@ -189,8 +207,14 @@ type (
 	BalanceSoloEthereumField struct {
 		BalanceSoloEthereum float64 `redis:"balance_solo_ethereum"`
 	}
+	BalanceSoloMainnetRewardPoolContributionField struct {
+		BalanceSoloMainnetRewardPoolContribution float64 `redis:"balance_solo_mainnet_reward_pool_contribution"`
+	}
 	BalanceSoloEthereumPendingField struct {
 		BalanceSoloEthereumPending *FlexibleFloat64 `redis:"balance_solo_ethereum_pending,omitempty"`
+	}
+	BalanceSoloMainnetRewardPoolContributionPendingField struct {
+		BalanceSoloMainnetRewardPoolContributionPending *FlexibleFloat64 `redis:"balance_solo_mainnet_reward_pool_contribution_pending,omitempty"`
 	}
 	BalanceT0Field struct {
 		BalanceT0 float64 `redis:"balance_t0"`
@@ -198,8 +222,14 @@ type (
 	BalanceT0EthereumField struct {
 		BalanceT0Ethereum float64 `redis:"balance_t0_ethereum"`
 	}
+	BalanceT0MainnetRewardPoolContributionField struct {
+		BalanceT0MainnetRewardPoolContribution float64 `redis:"balance_t0_mainnet_reward_pool_contribution"`
+	}
 	BalanceT0EthereumPendingField struct {
 		BalanceT0EthereumPending *FlexibleFloat64 `redis:"balance_t0_ethereum_pending,omitempty"`
+	}
+	BalanceT0MainnetRewardPoolContributionPendingField struct {
+		BalanceT0MainnetRewardPoolContributionPending *FlexibleFloat64 `redis:"balance_t0_mainnet_reward_pool_contribution_pending,omitempty"`
 	}
 	BalanceT1Field struct {
 		BalanceT1 float64 `redis:"balance_t1"`
@@ -207,8 +237,14 @@ type (
 	BalanceT1EthereumField struct {
 		BalanceT1Ethereum float64 `redis:"balance_t1_ethereum"`
 	}
+	BalanceT1MainnetRewardPoolContributionField struct {
+		BalanceT1MainnetRewardPoolContribution float64 `redis:"balance_t1_mainnet_reward_pool_contribution"`
+	}
 	BalanceT1EthereumPendingField struct {
 		BalanceT1EthereumPending *FlexibleFloat64 `redis:"balance_t1_ethereum_pending,omitempty"`
+	}
+	BalanceT1MainnetRewardPoolContributionPendingField struct {
+		BalanceT1MainnetRewardPoolContributionPending *FlexibleFloat64 `redis:"balance_t1_mainnet_reward_pool_contribution_pending,omitempty"`
 	}
 	BalanceT2Field struct {
 		BalanceT2 float64 `redis:"balance_t2"`
@@ -216,8 +252,14 @@ type (
 	BalanceT2EthereumField struct {
 		BalanceT2Ethereum float64 `redis:"balance_t2_ethereum"`
 	}
+	BalanceT2MainnetRewardPoolContributionField struct {
+		BalanceT2MainnetRewardPoolContribution float64 `redis:"balance_t2_mainnet_reward_pool_contribution"`
+	}
 	BalanceT2EthereumPendingField struct {
 		BalanceT2EthereumPending *FlexibleFloat64 `redis:"balance_t2_ethereum_pending,omitempty"`
+	}
+	BalanceT2MainnetRewardPoolContributionPendingField struct {
+		BalanceT2MainnetRewardPoolContributionPending *FlexibleFloat64 `redis:"balance_t2_mainnet_reward_pool_contribution_pending,omitempty"`
 	}
 	BalanceForT0Field struct {
 		BalanceForT0 float64 `redis:"balance_for_t0"`
@@ -225,11 +267,17 @@ type (
 	BalanceForT0EthereumField struct {
 		BalanceForT0Ethereum float64 `redis:"balance_for_t0_ethereum"`
 	}
+	BalanceForT0MainnetRewardPoolContributionField struct {
+		BalanceForT0MainnetRewardPoolContribution float64 `redis:"balance_for_t0_mainnet_reward_pool_contribution"`
+	}
 	BalanceForTMinus1Field struct {
 		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
 	}
 	BalanceForTMinus1EthereumField struct {
 		BalanceForTMinus1Ethereum float64 `redis:"balance_for_tminus1_ethereum"`
+	}
+	BalanceForTMinus1MainnetRewardPoolContributionField struct {
+		BalanceForTMinus1MainnetRewardPoolContribution float64 `redis:"balance_for_tminus1_mainnet_reward_pool_contribution"`
 	}
 	SlashingRateSoloField struct {
 		SlashingRateSolo float64 `redis:"slashing_rate_solo"`

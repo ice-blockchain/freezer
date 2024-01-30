@@ -130,34 +130,36 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		log.Error(dwhClient.Close())
 	}()
 	var (
-		batchNumber                                                          int64
-		totalBatches                                                         uint64
-		iteration                                                            uint64
-		now, lastIterationStartedAt                                          = time.Now(), time.Now()
-		currentAdoption                                                      = m.getAdoption(ctx, m.db, workerNumber)
-		workers                                                              = cfg.Workers
-		batchSize                                                            = cfg.BatchSize
-		userKeys, userHistoryKeys, referralKeys                              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
-		userResults, referralResults                                         = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
-		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
-		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
-		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining           = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
-		balanceT1EthereumIncr, balanceT2EthereumIncr                         = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
-		pendingBalancesForTMinus1, pendingBalancesForT0                      = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
-		referralsThatStoppedMining                                           = make([]*referralThatStoppedMining, 0, batchSize)
-		coinDistributions                                                    = make([]*coindistribution.ByEarnerForReview, 0, 4*batchSize)
-		msgResponder                                                         = make(chan error, 3*batchSize)
-		msgs                                                                 = make([]*messagebroker.Message, 0, 3*batchSize)
-		errs                                                                 = make([]error, 0, 3*batchSize)
-		updatedUsers                                                         = make([]*UpdatedUser, 0, batchSize)
-		extraBonusOnlyUpdatedUsers                                           = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
-		referralsCountGuardOnlyUpdatedUsers                                  = make([]*referralCountGuardUpdatedUser, 0, batchSize)
-		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
-		histories                                                            = make([]*model.User, 0, batchSize)
-		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
-		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
-		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
-		startedCoinDistributionCollecting                                    = isCoinDistributionCollectorEnabled(now)
+		batchNumber                                                                            int64
+		totalBatches                                                                           uint64
+		iteration                                                                              uint64
+		mainnetRewardPoolContributions                                                         float64
+		now, lastIterationStartedAt                                                            = time.Now(), time.Now()
+		currentAdoption                                                                        = m.getAdoption(ctx, m.db, workerNumber)
+		workers                                                                                = cfg.Workers
+		batchSize                                                                              = cfg.BatchSize
+		userKeys, userHistoryKeys, referralKeys                                                = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
+		userResults, referralResults                                                           = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
+		t0Referrals, tMinus1Referrals                                                          = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
+		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue                   = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
+		t1ReferralsThatStoppedMining, t2ReferralsThatStoppedMining                             = make(map[int64]uint32, batchSize), make(map[int64]uint32, batchSize)
+		balanceT1EthereumIncr, balanceT2EthereumIncr                                           = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
+		balanceT1MainnetRewardPoolContributionIncr, balanceT2MainnetRewardPoolContributionIncr = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
+		pendingBalancesForTMinus1, pendingBalancesForT0                                        = make(map[int64]float64, batchSize), make(map[int64]float64, batchSize)
+		referralsThatStoppedMining                                                             = make([]*referralThatStoppedMining, 0, batchSize)
+		coinDistributions                                                                      = make([]*coindistribution.ByEarnerForReview, 0, 4*batchSize)
+		msgResponder                                                                           = make(chan error, 3*batchSize)
+		msgs                                                                                   = make([]*messagebroker.Message, 0, 3*batchSize)
+		errs                                                                                   = make([]error, 0, 3*batchSize)
+		updatedUsers                                                                           = make([]*UpdatedUser, 0, batchSize)
+		extraBonusOnlyUpdatedUsers                                                             = make([]*extrabonusnotifier.UpdatedUser, 0, batchSize)
+		referralsCountGuardOnlyUpdatedUsers                                                    = make([]*referralCountGuardUpdatedUser, 0, batchSize)
+		referralsUpdated                                                                       = make([]*referralUpdated, 0, batchSize)
+		histories                                                                              = make([]*model.User, 0, batchSize)
+		userGlobalRanks                                                                        = make([]redis.Z, 0, batchSize)
+		historyColumns, historyInsertMetadata                                                  = dwh.InsertDDL(int(batchSize))
+		shouldSynchronizeBalanceFunc                                                           = func(batchNumberArg uint64) bool { return false }
+		startedCoinDistributionCollecting                                                      = isCoinDistributionCollectorEnabled(now)
 	)
 	if startedCoinDistributionCollecting {
 		m.coinDistributionStartedSignaler <- struct{}{}
@@ -192,6 +194,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if batchNumber == 0 || currentAdoption == nil {
 			currentAdoption = m.getAdoption(ctx, m.db, workerNumber)
 		}
+		mainnetRewardPoolContributions = 0
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
 		msgs, errs = msgs[:0], errs[:0]
@@ -226,6 +229,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		for k := range balanceT2EthereumIncr {
 			delete(balanceT2EthereumIncr, k)
+		}
+		for k := range balanceT1MainnetRewardPoolContributionIncr {
+			delete(balanceT1MainnetRewardPoolContributionIncr, k)
+		}
+		for k := range balanceT2MainnetRewardPoolContributionIncr {
+			delete(balanceT2MainnetRewardPoolContributionIncr, k)
 		}
 		for k := range pendingBalancesForTMinus1 {
 			delete(pendingBalancesForTMinus1, k)
@@ -371,13 +380,22 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						tMinus1Ref = tMinus1Referrals[updatedUser.IDTMinus1]
 					}
 				}
-				userCoinDistributions, balanceDistributedForT0, balanceDistributedForTMinus1 := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
+				userCoinDistributions, userMainnetRewardPoolContributions, balanceDistributedForT0, balanceDistributedForTMinus1, balanceDistributedForT0MainnetRewardPoolContribution, balanceDistributedForTMinus1MainnetRewardPoolContribution := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
 				coinDistributions = append(coinDistributions, userCoinDistributions...)
+				if userMainnetRewardPoolContributions > 0 {
+					mainnetRewardPoolContributions += userMainnetRewardPoolContributions
+				}
 				if balanceDistributedForT0 > 0 {
 					balanceT1EthereumIncr[t0Ref.ID] += balanceDistributedForT0
 				}
 				if balanceDistributedForTMinus1 > 0 {
 					balanceT2EthereumIncr[tMinus1Ref.ID] += balanceDistributedForTMinus1
+				}
+				if balanceDistributedForT0MainnetRewardPoolContribution > 0 {
+					balanceT1MainnetRewardPoolContributionIncr[t0Ref.ID] += balanceDistributedForT0MainnetRewardPoolContribution
+				}
+				if balanceDistributedForTMinus1MainnetRewardPoolContribution > 0 {
+					balanceT2MainnetRewardPoolContributionIncr[tMinus1Ref.ID] += balanceDistributedForTMinus1MainnetRewardPoolContribution
 				}
 				if tMinus1Ref != nil && tMinus1Ref.ID != 0 && pendingAmountForTMinus1 != 0 {
 					pendingBalancesForTMinus1[tMinus1Ref.ID] += pendingAmountForTMinus1
@@ -476,13 +494,20 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 
 		/******************************************************************************************************************************************************
-			7. Processing Ethereum Coin Distributions for eligible users.
+			7. Processing Ethereum & Mainnet pool reward Coin Distributions for eligible users.
 		******************************************************************************************************************************************************/
 
 		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if err := m.coinDistributionRepository.CollectCoinDistributionsForReview(reqCtx, coinDistributions); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to CollectCoinDistributionsForReview for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+			reqCancel()
+			resetVars(false)
+
+			continue
+		}
+		if err := m.coinDistributionRepository.CollectMainnetPoolRewardContributionsForReview(reqCtx, prepareMainnetRewardPoolContributionRecord(mainnetRewardPoolContributions, now)); err != nil {
+			log.Error(errors.Wrapf(err, "[miner] failed to CollectMainnetPoolRewardContributionsDistributionsForReview for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)
 
@@ -508,7 +533,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		var pipeliner redis.Pipeliner
 		var transactional bool
-		if len(pendingBalancesForTMinus1)+len(pendingBalancesForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
+		if len(pendingBalancesForTMinus1)+len(pendingBalancesForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(balanceT1MainnetRewardPoolContributionIncr)+len(balanceT2MainnetRewardPoolContributionIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
 			pipeliner = m.db.TxPipeline()
 			transactional = true
 		} else {
@@ -576,6 +601,22 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					continue
 				}
 				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idTMinus1), "balance_t2_ethereum_pending", amount).Err(); err != nil {
+					return err
+				}
+			}
+			for idT0, amount := range balanceT1MainnetRewardPoolContributionIncr {
+				if amount == 0 {
+					continue
+				}
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t1_mainnet_reward_pool_contribution_pending", amount).Err(); err != nil {
+					return err
+				}
+			}
+			for idT0, amount := range balanceT2MainnetRewardPoolContributionIncr {
+				if amount == 0 {
+					continue
+				}
+				if err := pipeliner.HIncrByFloat(reqCtx, model.SerializedUsersKey(idT0), "balance_t2_mainnet_reward_pool_contribution_pending", amount).Err(); err != nil {
 					return err
 				}
 			}

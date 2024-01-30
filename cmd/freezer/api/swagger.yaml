@@ -78,6 +78,9 @@ definitions:
       total:
         example: 1,243.02
         type: string
+      totalMainnnetRewardPoolContributions:
+        example: 1,243.02
+        type: string
       totalMiningBlockchain:
         example: 1,243.02
         type: string

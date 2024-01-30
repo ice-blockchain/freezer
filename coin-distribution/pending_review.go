@@ -278,6 +278,31 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner [%v]", len(records))
 }
 
+func (r *repository) CollectMainnetPoolRewardContributionsForReview(ctx context.Context, record *ByEarnerForReview) error {
+	if record == nil {
+		return nil
+	}
+	const columns = 9
+	args := make([]any, 0, columns)
+	args = append(args,
+		record.CreatedAt.Time,
+		record.CreatedAt.Time,
+		record.InternalID,
+		int64(record.Balance*100),
+		record.Username,
+		record.ReferredByUsername,
+		record.UserID,
+		record.EarnerUserID,
+		record.EthAddress)
+	sql := `INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
+											 VALUES ($1,        $2, $3,         $4,     $5,      $6,                  $7,     $8,            $9)
+						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
+							SET balance = coin_distributions_by_earner.balance + EXCLUDED.balance`
+	_, err := storage.Exec(ctx, r.db, sql, args...)
+
+	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner for mainnet pool reward contributions [%v]", record)
+}
+
 func generateValuesSQLParams(index, columns int) string {
 	params := make([]string, 0, columns)
 	for ii := 1; ii <= columns; ii++ {
