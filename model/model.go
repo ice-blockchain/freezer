@@ -413,17 +413,17 @@ func (kyc *KYCState) DelayPassedSinceLastKYCStepAttempt(kycStep users.KYCStep, d
 	return kyc.KYCStepAttempted(kycStep) && time.Now().Sub(*(*kyc.KYCStepsLastUpdatedAt)[kycStep-1].Time) >= duration
 }
 
-func (kyc *KYCState) QuizWillBeReset(past *time.Time) bool {
-	return kyc.compareQuizReset(func(quizReset *time.Time) bool {
+func (kyc *KYCState) MustDisablePreStaking(past *time.Time) bool {
+	return kyc.comparePreStakingReset(func(quizReset *time.Time) bool {
 		return quizReset.After(*past.Time)
 	})
 }
-func (kyc *KYCState) QuizWasReset(future *time.Time) bool {
-	return kyc.compareQuizReset(func(quizReset *time.Time) bool {
+func (kyc *KYCState) PreStakingAlreadyDisabled(future *time.Time) bool {
+	return kyc.comparePreStakingReset(func(quizReset *time.Time) bool {
 		return quizReset.Before(*future.Time)
 	})
 }
-func (kyc *KYCState) compareQuizReset(cmp func(quizReset *time.Time) bool) bool {
+func (kyc *KYCState) comparePreStakingReset(cmp func(quizReset *time.Time) bool) bool {
 	res := false
 	if kyc.KYCQuizResetAt != nil {
 		for _, quizResettedDate := range *kyc.KYCQuizResetAt {

@@ -80,7 +80,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2Pending = 0
 		updatedUser.BalanceT2PendingApplied = 0
 	}
-	needPrestakingReset := usr.QuizWillBeReset(updatedUser.BalanceLastUpdatedAt)
+	needPrestakingReset := usr.MustDisablePreStaking(updatedUser.BalanceLastUpdatedAt)
 	if needPrestakingReset {
 		zero := model.FlexibleFloat64(0.0)
 		updatedUser.PreStakingAllocation = 0.0

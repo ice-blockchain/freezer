@@ -28,8 +28,8 @@ type (
 
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error) {
 	ps, _, err := r.getPreStaking(ctx, userID)
-	if err != nil || (ps != nil && (ps.PreStakingAllocation == 0 || ps.QuizWasReset(time.Now()))) {
-		if err == nil && ps.QuizWasReset(time.Now()) {
+	if err != nil || (ps != nil && (ps.PreStakingAllocation == 0 || ps.PreStakingAlreadyDisabled(time.Now()))) {
+		if err == nil && ps.PreStakingAlreadyDisabled(time.Now()) {
 			err = ErrPrestakingDisabled
 		} else if err == nil && ps.PreStakingAllocation == 0 {
 			err = ErrNotFound
@@ -72,7 +72,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 
 	isPrestakingDisabled := false
 	if existing != nil {
-		isPrestakingDisabled = existing.QuizWasReset(time.Now())
+		isPrestakingDisabled = existing.PreStakingAlreadyDisabled(time.Now())
 		if !isPrestakingDisabled {
 			existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
 			if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {

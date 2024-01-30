@@ -41,7 +41,7 @@ var (
 	ErrMiningDisabled                         = errors.New("mining is disabled")
 	ErrRaceCondition                          = errors.New("race condition")
 	ErrGlobalRankHidden                       = errors.New("global rank is hidden")
-	ErrPrestakingDisabled                     = errors.New("disabled")
+	ErrPrestakingDisabled                     = errors.New("pre-staking disabled")
 	PreStakingBonusesPerYear                  = map[uint8]float64{
 		0: 0,
 		1: 35,
