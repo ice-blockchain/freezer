@@ -119,6 +119,7 @@ type (
 		model.ExtraBonusDaysClaimNotAvailableField
 		model.PreStakingAllocationResettableField
 		model.PreStakingBonusResettableField
+		model.KYCQuizResetAtAppliedField
 	}
 
 	referralUpdated struct {

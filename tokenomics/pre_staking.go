@@ -23,6 +23,7 @@ type (
 		model.PreStakingBonusField
 		model.PreStakingAllocationField
 		model.KYCState
+		model.KYCQuizResetAtAppliedField
 	}
 )
 
@@ -72,7 +73,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 
 	isPrestakingDisabled := false
 	if existing != nil {
-		isPrestakingDisabled = existing.PreStakingAlreadyDisabled(time.Now())
+		isPrestakingDisabled = existing.PreStakingAlreadyDisabled(time.Now()) || (existing.KYCQuizResetAt != nil && existing.KYCQuizResetAt.Equals(existing.KYCQuizResetAtApplied)) //nolint:lll // .
 		if !isPrestakingDisabled {
 			existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
 			if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {
