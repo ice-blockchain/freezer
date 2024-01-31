@@ -37,7 +37,6 @@ type (
 		NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error
 		GetCollectorSettings(ctx context.Context) (*CollectorSettings, error)
 		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
-		CollectMainnetPoolRewardContributionsForReview(ctx context.Context, records *ByEarnerForReview) error
 	}
 	CollectorSettings struct {
 		DeniedCountries          map[string]struct{}
@@ -208,8 +207,10 @@ type (
 			ContractAddress string `yaml:"contractAddress" mapstructure:"contract-address"`
 			ChainID         int64  `yaml:"chainId"         mapstructure:"chain-id"`
 		} `yaml:"ethereum" mapstructure:"ethereum"`
-		StartHours  int  `yaml:"startHours"  mapstructure:"start-hours"`
-		EndHours    int  `yaml:"endHours"    mapstructure:"end-hours"`
-		Development bool `yaml:"development" mapstructure:"development"`
+		MainnetRewardPoolContributionEthAddress string `yaml:"mainnetRewardPoolContributionEthAddress"`
+		MainnetRewardPoolContributionUserID     string `yaml:"mainnetRewardPoolContributionUserId"`
+		StartHours                              int    `yaml:"startHours"  mapstructure:"start-hours"`
+		EndHours                                int    `yaml:"endHours"    mapstructure:"end-hours"`
+		Development                             bool   `yaml:"development" mapstructure:"development"`
 	}
 )

@@ -73,18 +73,18 @@ type (
 		Balances[string]
 	}
 	Balances[DENOM ~float64 | ~string] struct {
-		Total                                DENOM  `json:"total,omitempty" swaggertype:"string" example:"1,243.02"`
-		BaseFactor                           DENOM  `json:"baseFactor,omitempty" swaggerignore:"true" swaggertype:"string" example:"1,243.02"`
-		Standard                             DENOM  `json:"standard,omitempty" swaggertype:"string" example:"1,243.02"`
-		PreStaking                           DENOM  `json:"preStaking,omitempty" swaggertype:"string" example:"1,243.02"`
-		TotalNoPreStakingBonus               DENOM  `json:"totalNoPreStakingBonus,omitempty" swaggertype:"string" example:"1,243.02"`
-		T1                                   DENOM  `json:"t1,omitempty" swaggertype:"string" example:"1,243.02"`
-		T2                                   DENOM  `json:"t2,omitempty" swaggertype:"string" example:"1,243.02"`
-		TotalReferrals                       DENOM  `json:"totalReferrals,omitempty" swaggertype:"string" example:"1,243.02"`
-		TotalMiningBlockchain                DENOM  `json:"totalMiningBlockchain,omitempty" swaggertype:"string" example:"1,243.02"`
-		TotalMainnnetRewardPoolContributions DENOM  `json:"totalMainnnetRewardPoolContributions,omitempty" swaggertype:"string" example:"1,243.02"`
-		UserID                               string `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
-		miningBlockchainAccountAddress       string
+		Total                              DENOM  `json:"total,omitempty" swaggertype:"string" example:"1,243.02"`
+		BaseFactor                         DENOM  `json:"baseFactor,omitempty" swaggerignore:"true" swaggertype:"string" example:"1,243.02"`
+		Standard                           DENOM  `json:"standard,omitempty" swaggertype:"string" example:"1,243.02"`
+		PreStaking                         DENOM  `json:"preStaking,omitempty" swaggertype:"string" example:"1,243.02"`
+		TotalNoPreStakingBonus             DENOM  `json:"totalNoPreStakingBonus,omitempty" swaggertype:"string" example:"1,243.02"`
+		T1                                 DENOM  `json:"t1,omitempty" swaggertype:"string" example:"1,243.02"`
+		T2                                 DENOM  `json:"t2,omitempty" swaggertype:"string" example:"1,243.02"`
+		TotalReferrals                     DENOM  `json:"totalReferrals,omitempty" swaggertype:"string" example:"1,243.02"`
+		TotalMiningBlockchain              DENOM  `json:"totalMiningBlockchain,omitempty" swaggertype:"string" example:"1,243.02"`
+		TotalMainnetRewardPoolContribution DENOM  `json:"totalMainnetRewardPoolContribution,omitempty" swaggertype:"string" example:"1,243.02"`
+		UserID                             string `json:"userId,omitempty" swaggerignore:"true" example:"did:ethr:0x4B73C58370AEfcEf86A6021afCDe5673511376B2"`
+		miningBlockchainAccountAddress     string
 	}
 	BalanceHistoryBalanceDiff struct {
 		Amount   string  `json:"amount" example:"1,243.02"`
@@ -98,10 +98,11 @@ type (
 		TimeSeries []*BalanceHistoryEntry     `json:"timeSeries"`
 	}
 	TotalCoins struct {
-		Total      float64 `json:"total" example:"111111.2423"`
-		Blockchain float64 `json:"blockchain" example:"111111.2423"`
-		Standard   float64 `json:"standard" example:"111111.2423"`
-		PreStaking float64 `json:"preStaking" example:"111111.2423"`
+		Total                         float64 `json:"total" example:"111111.2423"`
+		Blockchain                    float64 `json:"blockchain" example:"111111.2423"`
+		Standard                      float64 `json:"standard" example:"111111.2423"`
+		PreStaking                    float64 `json:"preStaking" example:"111111.2423"`
+		MainnetRewardPoolContribution float64 `json:"mainnetRewardPoolContribution" example:"111111.2423"`
 	}
 	TotalCoinsTimeSeriesDataPoint struct {
 		Date stdlibtime.Time `json:"date" example:"2022-01-03T16:20:52.156534Z"`

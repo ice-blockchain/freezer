@@ -265,42 +265,17 @@ func (r *repository) CollectCoinDistributionsForReview(ctx context.Context, reco
 		ix++
 	}
 	sql := fmt.Sprintf(`INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
-																 VALUES %v
+																 VALUES %[1]v
 						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
 							SET 
 								created_at = EXCLUDED.created_at,
-								balance = EXCLUDED.balance,
+								balance = CASE WHEN coin_distributions_by_earner.eth_address = '%[2]v' AND coin_distributions_by_earner.user_id = '%[3]v' THEN coin_distributions_by_earner.balance + EXCLUDED.balance ELSE EXCLUDED.balance END,
 								username = EXCLUDED.username,
 								referred_by_username = EXCLUDED.referred_by_username,
-								eth_address = EXCLUDED.eth_address`, strings.Join(values, ",\n"))
+								eth_address = EXCLUDED.eth_address`, strings.Join(values, ",\n"), cfg.MainnetRewardPoolContributionEthAddress, cfg.MainnetRewardPoolContributionUserID)
 	_, err := storage.Exec(ctx, r.db, sql, args...)
 
 	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner [%v]", len(records))
-}
-
-func (r *repository) CollectMainnetPoolRewardContributionsForReview(ctx context.Context, record *ByEarnerForReview) error {
-	if record == nil {
-		return nil
-	}
-	const columns = 9
-	args := make([]any, 0, columns)
-	args = append(args,
-		record.CreatedAt.Time,
-		record.CreatedAt.Time,
-		record.InternalID,
-		int64(record.Balance*100),
-		record.Username,
-		record.ReferredByUsername,
-		record.UserID,
-		record.EarnerUserID,
-		record.EthAddress)
-	sql := `INSERT INTO coin_distributions_by_earner(created_at,day,internal_id,balance,username,referred_by_username,user_id,earner_user_id,eth_address) 
-											 VALUES ($1,        $2, $3,         $4,     $5,      $6,                  $7,     $8,            $9)
-						ON CONFLICT (day, user_id, earner_user_id) DO UPDATE
-							SET balance = coin_distributions_by_earner.balance + EXCLUDED.balance`
-	_, err := storage.Exec(ctx, r.db, sql, args...)
-
-	return errors.Wrapf(err, "failed to insert into coin_distributions_by_earner for mainnet pool reward contributions [%v]", record)
 }
 
 func generateValuesSQLParams(index, columns int) string {

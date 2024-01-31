@@ -207,9 +207,9 @@ func (u *user) processEthereumCoinDistribution(
 		u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 		u.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
 
-		u.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
-		u.ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
-		u.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+		u.SoloLastMainnetRewardPoolContributionProcessedAt = nil
+		u.ForT0LastMainnetRewardPoolContributionProcessedAt = nil
+		u.ForTMinus1LastMainnetRewardPoolContributionProcessedAt = nil
 
 		return nil, 0, 0, 0, 0, 0
 	}
@@ -292,13 +292,13 @@ func (u *user) processEthereumCoinDistribution(
 			u.SoloLastEthereumCoinDistributionProcessedAt = nil
 		}
 		if mainnetRewardPoolContributionSum > 0 {
-			u.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt = now
+			u.SoloLastMainnetRewardPoolContributionProcessedAt = now
 		} else {
-			u.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+			u.SoloLastMainnetRewardPoolContributionProcessedAt = nil
 		}
 	} else {
 		u.SoloLastEthereumCoinDistributionProcessedAt = nil
-		u.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+		u.SoloLastMainnetRewardPoolContributionProcessedAt = nil
 	}
 
 	if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now, t0.ID) && t0.isEligibleForSelfForEthereumDistribution(now, u.ForT0LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
@@ -314,9 +314,9 @@ func (u *user) processEthereumCoinDistribution(
 			balanceDistributedForT0 = 0
 		}
 		if balanceDistributedForT0MainnetRewardPoolContribution > 0 {
-			u.ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAt = now
+			u.ForT0LastMainnetRewardPoolContributionProcessedAt = now
 		} else {
-			u.ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+			u.ForT0LastMainnetRewardPoolContributionProcessedAt = nil
 			balanceDistributedForT0MainnetRewardPoolContribution = 0
 		}
 	} else {
@@ -336,14 +336,14 @@ func (u *user) processEthereumCoinDistribution(
 			balanceDistributedForTMinus1 = 0
 		}
 		if balanceDistributedForTMinus1MainnetRewardPoolContribution > 0 {
-			u.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt = now
+			u.ForTMinus1LastMainnetRewardPoolContributionProcessedAt = now
 		} else {
-			u.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+			u.ForTMinus1LastMainnetRewardPoolContributionProcessedAt = nil
 			balanceDistributedForTMinus1MainnetRewardPoolContribution = 0
 		}
 	} else {
 		u.ForTMinus1LastEthereumCoinDistributionProcessedAt = nil
-		u.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt = nil
+		u.ForTMinus1LastMainnetRewardPoolContributionProcessedAt = nil
 	}
 
 	return records, mainnetRewardPoolContributionSum, balanceDistributedForT0, balanceDistributedForTMinus1, balanceDistributedForT0MainnetRewardPoolContribution, balanceDistributedForTMinus1MainnetRewardPoolContribution
@@ -372,7 +372,7 @@ func wasNotProcessedToday(now, lastEthereumCoinDistributionProcessedAt *time.Tim
 
 func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) (ethIce float64, mainnetRewardPoolContributionEth float64) {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceSolo, u.PreStakingAllocation, u.PreStakingBonus)
-	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceSoloEthereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceSoloEthereum-u.BalanceSoloMainnetRewardPoolContribution, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
 	if ethIce <= 0 {
 		return 0, 0
 	}
@@ -389,7 +389,7 @@ func (u *user) processEthereumCoinDistributionForSolo(now *time.Time) (ethIce fl
 
 func (u *user) processEthereumCoinDistributionForT0(now *time.Time) (ethIce float64, mainnetRewardPoolContributionEth float64) {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceT0, u.PreStakingAllocation, u.PreStakingBonus)
-	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceT0Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceT0Ethereum-u.BalanceT0MainnetRewardPoolContribution, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
 	if ethIce <= 0 {
 		return 0, 0
 	}
@@ -407,7 +407,7 @@ func (u *user) processEthereumCoinDistributionForT0(now *time.Time) (ethIce floa
 // The double `For` is intended, cuz it's ForXX, where XX can be Solo/T0/ForT1/ForTMinus1.
 func (u *user) processEthereumCoinDistributionForForT0(t0 *referral, now *time.Time) (ethIce float64, mainnetRewardPoolContributionEth float64) {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceForT0, t0.PreStakingAllocation, t0.PreStakingBonus)
-	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForT0Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForT0Ethereum-u.BalanceForT0MainnetRewardPoolContribution, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
 	if ethIce <= 0 {
 		return 0, 0
 	}
@@ -425,7 +425,7 @@ func (u *user) processEthereumCoinDistributionForForT0(t0 *referral, now *time.T
 // The double `For` is intended, cuz it's ForXX, where XX can be Solo/T0/ForT1/ForTMinus1.
 func (u *user) processEthereumCoinDistributionForForTMinus1(tMinus1 *referral, now *time.Time) (ethIce float64, mainnetRewardPoolContributionEth float64) {
 	standard, _ := tokenomics.ApplyPreStaking(u.BalanceForTMinus1, tMinus1.PreStakingAllocation, tMinus1.PreStakingBonus)
-	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForTMinus1Ethereum, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
+	ethIce = coindistribution.CalculateEthereumDistributionICEBalance(standard-u.BalanceForTMinus1Ethereum-u.BalanceForTMinus1MainnetRewardPoolContribution, cfg.EthereumDistributionFrequency.Min, cfg.EthereumDistributionFrequency.Max, now, cfg.coinDistributionCollectorSettings.Load().EndDate) //nolint:lll // .
 	if ethIce <= 0 {
 		return 0, 0
 	}

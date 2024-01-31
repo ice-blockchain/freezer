@@ -42,6 +42,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 				child.Standard = stats.BalanceTotalStandard
 				child.PreStaking = stats.BalanceTotalPreStaking
 				child.Blockchain = stats.BalanceTotalEthereum
+				child.MainnetRewardPoolContribution = stats.BalanceTotalMainnetRewardPoolContribution
 				child.Total = stats.BalanceTotal
 				break
 			}

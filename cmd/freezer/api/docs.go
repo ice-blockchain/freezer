@@ -776,7 +776,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "1,243.02"
                 },
-                "totalMainnnetRewardPoolContributions": {
+                "totalMainnetRewardPoolContribution": {
                     "type": "string",
                     "example": "1,243.02"
                 },
@@ -976,6 +976,10 @@ const docTemplate = `{
                     "type": "number",
                     "example": 111111.2423
                 },
+                "mainnetRewardPoolContribution": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
                 "preStaking": {
                     "type": "number",
                     "example": 111111.2423
@@ -1006,6 +1010,10 @@ const docTemplate = `{
                 "date": {
                     "type": "string",
                     "example": "2022-01-03T16:20:52.156534Z"
+                },
+                "mainnetRewardPoolContribution": {
+                    "type": "number",
+                    "example": 111111.2423
                 },
                 "preStaking": {
                     "type": "number",

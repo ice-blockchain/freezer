@@ -133,7 +133,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		batchNumber                                                                            int64
 		totalBatches                                                                           uint64
 		iteration                                                                              uint64
-		mainnetRewardPoolContributions                                                         float64
+		mainnetRewardPoolContribution                                                          float64
 		now, lastIterationStartedAt                                                            = time.Now(), time.Now()
 		currentAdoption                                                                        = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                                                = cfg.Workers
@@ -194,7 +194,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if batchNumber == 0 || currentAdoption == nil {
 			currentAdoption = m.getAdoption(ctx, m.db, workerNumber)
 		}
-		mainnetRewardPoolContributions = 0
+		mainnetRewardPoolContribution = 0
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
 		msgs, errs = msgs[:0], errs[:0]
@@ -380,10 +380,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						tMinus1Ref = tMinus1Referrals[updatedUser.IDTMinus1]
 					}
 				}
-				userCoinDistributions, userMainnetRewardPoolContributions, balanceDistributedForT0, balanceDistributedForTMinus1, balanceDistributedForT0MainnetRewardPoolContribution, balanceDistributedForTMinus1MainnetRewardPoolContribution := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
+				userCoinDistributions, userMainnetRewardPoolContribution, balanceDistributedForT0, balanceDistributedForTMinus1, balanceDistributedForT0MainnetRewardPoolContribution, balanceDistributedForTMinus1MainnetRewardPoolContribution := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
 				coinDistributions = append(coinDistributions, userCoinDistributions...)
-				if userMainnetRewardPoolContributions > 0 {
-					mainnetRewardPoolContributions += userMainnetRewardPoolContributions
+				if userMainnetRewardPoolContribution > 0 {
+					mainnetRewardPoolContribution += userMainnetRewardPoolContribution
 				}
 				if balanceDistributedForT0 > 0 {
 					balanceT1EthereumIncr[t0Ref.ID] += balanceDistributedForT0
@@ -497,17 +497,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			7. Processing Ethereum & Mainnet pool reward Coin Distributions for eligible users.
 		******************************************************************************************************************************************************/
 
+		if mainnetRewardPoolContribution > 0 {
+			coinDistributions = append(coinDistributions, prepareMainnetRewardPoolContributionRecord(mainnetRewardPoolContribution, now))
+		}
 		before = time.Now()
 		reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 		if err := m.coinDistributionRepository.CollectCoinDistributionsForReview(reqCtx, coinDistributions); err != nil {
 			log.Error(errors.Wrapf(err, "[miner] failed to CollectCoinDistributionsForReview for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
-			reqCancel()
-			resetVars(false)
-
-			continue
-		}
-		if err := m.coinDistributionRepository.CollectMainnetPoolRewardContributionsForReview(reqCtx, prepareMainnetRewardPoolContributionRecord(mainnetRewardPoolContributions, now)); err != nil {
-			log.Error(errors.Wrapf(err, "[miner] failed to CollectMainnetPoolRewardContributionsDistributionsForReview for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
 			reqCancel()
 			resetVars(false)
 

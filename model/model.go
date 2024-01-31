@@ -30,11 +30,11 @@ type (
 		MiningSessionSoloDayOffLastAwardedAtField
 		ExtraBonusLastClaimAvailableAtField
 		SoloLastEthereumCoinDistributionProcessedAtField
-		SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		SoloLastMainnetRewardPoolContributionProcessedAtField
 		ForT0LastEthereumCoinDistributionProcessedAtField
-		ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		ForT0LastMainnetRewardPoolContributionProcessedAtField
 		ForTMinus1LastEthereumCoinDistributionProcessedAtField
-		ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		ForTMinus1LastMainnetRewardPoolContributionProcessedAtField
 		KYCState
 		ProfilePictureNameField
 		UsernameField
@@ -99,20 +99,20 @@ type (
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
 		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
-	SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
-		SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"solo_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
+	SoloLastMainnetRewardPoolContributionProcessedAtField struct {
+		SoloLastMainnetRewardPoolContributionProcessedAt *time.Time `redis:"solo_last_mainnet_reward_pool_contribution_processed_at,omitempty"`
 	}
 	ForT0LastEthereumCoinDistributionProcessedAtField struct {
 		ForT0LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
-	ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
-		ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"for_t0_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
+	ForT0LastMainnetRewardPoolContributionProcessedAtField struct {
+		ForT0LastMainnetRewardPoolContributionProcessedAt *time.Time `redis:"for_t0_last_mainnet_reward_pool_contribution_processed_at,omitempty"`
 	}
 	ForTMinus1LastEthereumCoinDistributionProcessedAtField struct {
 		ForTMinus1LastEthereumCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_ethereum_coin_distribution_processed_at,omitempty"`
 	}
-	ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField struct {
-		ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAt *time.Time `redis:"for_tminus1_last_mainnet_reward_pool_contribution_coin_distribution_processed_at,omitempty"`
+	ForTMinus1LastMainnetRewardPoolContributionProcessedAtField struct {
+		ForTMinus1LastMainnetRewardPoolContributionProcessedAt *time.Time `redis:"for_tminus1_last_mainnet_reward_pool_contribution_processed_at,omitempty"`
 	}
 	BalanceLastUpdatedAtField struct {
 		BalanceLastUpdatedAt *time.Time `redis:"balance_last_updated_at,omitempty"`

@@ -83,11 +83,11 @@ type (
 		model.ResurrectT0UsedAtField
 		model.ResurrectTMinus1UsedAtField
 		model.SoloLastEthereumCoinDistributionProcessedAtField
-		model.SoloLastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		model.SoloLastMainnetRewardPoolContributionProcessedAtField
 		model.ForT0LastEthereumCoinDistributionProcessedAtField
-		model.ForT0LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		model.ForT0LastMainnetRewardPoolContributionProcessedAtField
 		model.ForTMinus1LastEthereumCoinDistributionProcessedAtField
-		model.ForTMinus1LastMainnetRewardPoolContributionCoinDistributionProcessedAtField
+		model.ForTMinus1LastMainnetRewardPoolContributionProcessedAtField
 		model.BalanceSoloEthereumPendingField
 		model.BalanceT0EthereumPendingField
 		model.BalanceT1EthereumPendingField

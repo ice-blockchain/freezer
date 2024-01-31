@@ -78,7 +78,7 @@ definitions:
       total:
         example: 1,243.02
         type: string
-      totalMainnnetRewardPoolContributions:
+      totalMainnetRewardPoolContribution:
         example: 1,243.02
         type: string
       totalMiningBlockchain:
@@ -219,6 +219,9 @@ definitions:
       blockchain:
         example: 111111.2423
         type: number
+      mainnetRewardPoolContribution:
+        example: 111111.2423
+        type: number
       preStaking:
         example: 111111.2423
         type: number
@@ -241,6 +244,9 @@ definitions:
       date:
         example: "2022-01-03T16:20:52.156534Z"
         type: string
+      mainnetRewardPoolContribution:
+        example: 111111.2423
+        type: number
       preStaking:
         example: 111111.2423
         type: number

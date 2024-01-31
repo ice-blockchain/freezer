@@ -62,15 +62,15 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 
 	return &BalanceSummary{
 		Balances: Balances[string]{
-			Total:                                fmt.Sprintf(floatToStringFormatter, soloStandard+soloPreStaking+t1Standard+t1PreStaking+t2Standard+t2PreStaking),
-			TotalNoPreStakingBonus:               fmt.Sprintf(floatToStringFormatter, res[0].BalanceSolo+res[0].BalanceT0+res[0].BalanceT1+res[0].BalanceT2),
-			Standard:                             fmt.Sprintf(floatToStringFormatter, soloStandard+t1Standard+t2Standard),
-			PreStaking:                           fmt.Sprintf(floatToStringFormatter, soloPreStaking+t1PreStaking+t2PreStaking),
-			T1:                                   fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking),
-			T2:                                   fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
-			TotalReferrals:                       fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
-			TotalMiningBlockchain:                fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum),                                                                                     //nolint:lll // .
-			TotalMainnnetRewardPoolContributions: fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloMainnetRewardPoolContribution+res[0].BalanceT0MainnetRewardPoolContribution+res[0].BalanceT1MainnetRewardPoolContribution+res[0].BalanceT2MainnetRewardPoolContribution), //nolint:lll // .
+			Total:                              fmt.Sprintf(floatToStringFormatter, soloStandard+soloPreStaking+t1Standard+t1PreStaking+t2Standard+t2PreStaking),
+			TotalNoPreStakingBonus:             fmt.Sprintf(floatToStringFormatter, res[0].BalanceSolo+res[0].BalanceT0+res[0].BalanceT1+res[0].BalanceT2),
+			Standard:                           fmt.Sprintf(floatToStringFormatter, soloStandard+t1Standard+t2Standard),
+			PreStaking:                         fmt.Sprintf(floatToStringFormatter, soloPreStaking+t1PreStaking+t2PreStaking),
+			T1:                                 fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking),
+			T2:                                 fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
+			TotalReferrals:                     fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
+			TotalMiningBlockchain:              fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum),                                                                                     //nolint:lll // .
+			TotalMainnetRewardPoolContribution: fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloMainnetRewardPoolContribution+res[0].BalanceT0MainnetRewardPoolContribution+res[0].BalanceT1MainnetRewardPoolContribution+res[0].BalanceT2MainnetRewardPoolContribution), //nolint:lll // .
 		},
 	}, nil
 }
