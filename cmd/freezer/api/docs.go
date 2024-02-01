@@ -776,6 +776,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "1,243.02"
                 },
+                "totalMainnetRewardPoolContribution": {
+                    "type": "string",
+                    "example": "1,243.02"
+                },
                 "totalMiningBlockchain": {
                     "type": "string",
                     "example": "1,243.02"
