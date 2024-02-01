@@ -87,7 +87,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.PreStakingBonus = 0.0
 		updatedUser.PreStakingAllocationResettableField = model.PreStakingAllocationResettableField{&zero}
 		updatedUser.PreStakingBonusResettableField = model.PreStakingBonusResettableField{&zero}
-		var applied = make([]*time.Time, 0)
+		var applied = make([]*time.Time, 0, 1)
 		if usr.KYCQuizResetAtApplied != nil {
 			applied = *usr.KYCQuizResetAtApplied
 		}
@@ -258,7 +258,7 @@ func (usr *user) MustDisablePreStaking() (unprocessedResets []*time.Time) {
 	if usr.KYCQuizResetAt == nil {
 		return nil
 	}
-	unprocessedResets = make([]*time.Time, 0)
+	unprocessedResets = make([]*time.Time, 0, 1)
 	if usr.KYCQuizResetAtApplied == nil || len(*usr.KYCQuizResetAtApplied) < len(*usr.KYCQuizResetAt) {
 		startIndex := 0
 		if usr.KYCQuizResetAtApplied != nil {
