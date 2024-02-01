@@ -9,6 +9,7 @@ import (
 
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/time"
 )
 
 type (
@@ -21,19 +22,14 @@ type (
 		model.DeserializedUsersKey
 		model.PreStakingBonusField
 		model.PreStakingAllocationField
-		model.KYCQuizResetAtField
-		model.KYCQuizResetAtAppliedField
+		model.KYCState
 	}
 )
 
-func (p *preStakingWithKYC) PreStakingAlreadyDisabled() bool {
-	return p.KYCQuizResetAt != nil && len(*p.KYCQuizResetAt) > 0 && p.KYCQuizResetAt.Equals(p.KYCQuizResetAtApplied)
-}
-
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error) {
 	ps, _, err := r.getPreStaking(ctx, userID)
-	if err != nil || (ps != nil && (ps.PreStakingAllocation == 0 || ps.PreStakingAlreadyDisabled())) {
-		if err == nil && ps.PreStakingAlreadyDisabled() {
+	if err != nil || (ps != nil && (ps.PreStakingAllocation == 0 || ps.PreStakingAlreadyDisabled(time.Now()))) {
+		if err == nil && ps.PreStakingAlreadyDisabled(time.Now()) {
 			err = ErrPrestakingDisabled
 		} else if err == nil && ps.PreStakingAllocation == 0 {
 			err = ErrNotFound
@@ -76,7 +72,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 
 	isPrestakingDisabled := false
 	if existing != nil {
-		isPrestakingDisabled = existing.PreStakingAlreadyDisabled()
+		isPrestakingDisabled = existing.PreStakingAlreadyDisabled(time.Now())
 		if !isPrestakingDisabled {
 			existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
 			if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {

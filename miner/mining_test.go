@@ -488,7 +488,7 @@ func testSoloMiningWithPreStaking(t *testing.T) {
 		require.Nil(t, m.UpdatedUser.PreStakingBonus)
 		require.Nil(t, m.UpdatedUser.PreStakingAllocation)
 	})
-	t.Run("with KYCQuizResetAt after now and not applied => prestaking reset occurs", func(t *testing.T) {
+	t.Run("with KYCQuizResetAt after now => prestaking reset occurs", func(t *testing.T) {
 		t.Parallel()
 		m := newUser()
 		m.PreStakingAllocation = 100
@@ -503,11 +503,8 @@ func testSoloMiningWithPreStaking(t *testing.T) {
 		require.NotNil(t, m.UpdatedUser.PreStakingAllocation)
 		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingBonus)
 		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.True(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		require.True(t, m.KYCQuizResetAtApplied.Equals(&kycResetAt))
 	})
-	t.Run("with KYCQuizResetAt before balanceUpdatedAt and not applied => prestaking resets", func(t *testing.T) {
+	t.Run("with KYCQuizResetAt before balanceUpdatedAt => no prestaking reset", func(t *testing.T) {
 		t.Parallel()
 		m := newUser()
 		m.PreStakingAllocation = 100
@@ -518,87 +515,11 @@ func testSoloMiningWithPreStaking(t *testing.T) {
 		m.BalanceLastUpdatedAt = testTime
 		m, _, _, _, _ = mine(testMiningBase, testTime, m, nil, nil)
 		require.NotNil(t, m)
-		require.EqualValues(t, 0, m.PreStakingBonus)
-		require.EqualValues(t, 0, m.PreStakingAllocation)
-		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingBonus)
-		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.True(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		require.True(t, m.KYCQuizResetAtApplied.Equals(&kycResetAt))
-	})
-	t.Run("with KYCQuizResetAt already applied -> no prestaking reset", func(t *testing.T) {
-		t.Parallel()
-		m := newUser()
-		m.PreStakingAllocation = 100
-		m.PreStakingBonus = 250
-		kycResetAt := model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second)})
-		m.KYCQuizResetAt = &kycResetAt
-		m.KYCQuizResetAtApplied = &kycResetAt
-		m.BalanceSolo = testMiningBase
-		m.BalanceLastUpdatedAt = testTime
-		m, _, _, _, _ = mine(testMiningBase, testTime, m, nil, nil)
-		require.NotNil(t, m)
 		require.EqualValues(t, 250, m.PreStakingBonus)
 		require.EqualValues(t, 100, m.PreStakingAllocation)
 		require.Nil(t, m.UpdatedUser.PreStakingBonus)
 		require.Nil(t, m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.True(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		require.True(t, m.KYCQuizResetAtApplied.Equals(&kycResetAt))
 	})
-
-	t.Run("new value is added to KYCQuizResetAt which is not applied yet -> reset occurs", func(t *testing.T) {
-		t.Parallel()
-		m := newUser()
-		m.PreStakingAllocation = 100
-		m.PreStakingBonus = 250
-		kycResetAt := model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second), timeDelta(1 * stdlibtime.Second)})
-		applied := model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second)})
-		m.KYCQuizResetAt = &kycResetAt
-		m.KYCQuizResetAtApplied = &applied
-		m.BalanceSolo = testMiningBase
-		m.BalanceLastUpdatedAt = testTime
-		m, _, _, _, _ = mine(testMiningBase, testTime, m, nil, nil)
-		require.NotNil(t, m)
-		require.EqualValues(t, 0, m.PreStakingBonus)
-		require.EqualValues(t, 0, m.PreStakingAllocation)
-		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingBonus)
-		require.EqualValues(t, model.FlexibleFloat64(0.0), *m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.True(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		require.True(t, m.KYCQuizResetAtApplied.Equals(&kycResetAt))
-	})
-	t.Run("when KYCQuizResetAt rolls back no reset occurs and applied is not updated", func(t *testing.T) {
-		t.Parallel()
-		m := newUser()
-		m.PreStakingAllocation = 100
-		m.PreStakingBonus = 250
-		kycResetAt := model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second), timeDelta(1 * stdlibtime.Second)})
-		applied := model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second), timeDelta(1 * stdlibtime.Second)})
-		m.KYCQuizResetAt = &kycResetAt
-		m.KYCQuizResetAtApplied = &applied
-		m.BalanceSolo = testMiningBase
-		m.BalanceLastUpdatedAt = testTime
-		m, _, _, _, _ = mine(testMiningBase, testTime, m, nil, nil)
-		require.NotNil(t, m)
-		require.EqualValues(t, 250, m.PreStakingBonus)
-		require.EqualValues(t, 100, m.PreStakingAllocation)
-		require.Nil(t, m.UpdatedUser.PreStakingBonus)
-		require.Nil(t, m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.True(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		kycResetAt = model.TimeSlice([]*time.Time{timeDelta(-1 * stdlibtime.Second)})
-		m, _, _, _, _ = mine(testMiningBase, testTime, m, nil, nil)
-		require.NotNil(t, m)
-		require.EqualValues(t, 250, m.PreStakingBonus)
-		require.EqualValues(t, 100, m.PreStakingAllocation)
-		require.Nil(t, m.UpdatedUser.PreStakingBonus)
-		require.Nil(t, m.UpdatedUser.PreStakingAllocation)
-		require.NotNil(t, m.KYCQuizResetAtApplied)
-		require.False(t, m.KYCQuizResetAtApplied.Equals(m.KYCQuizResetAt))
-		require.True(t, m.KYCQuizResetAtApplied.Equals(&applied))
-	})
-
 	t.Run("total and prestaking balances re-calculated after prestaking reset", func(t *testing.T) {
 		t.Parallel()
 		m := newUser()
