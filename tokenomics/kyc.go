@@ -97,7 +97,8 @@ func (r *repository) validateKYC(ctx context.Context, userID string, state *getC
 	if err := r.overrideKYCStateWithEskimoKYCState(ctx, userID, state, skipKYCSteps); err != nil {
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
-	if state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep) {
+	if (state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) ||
+		(state.KYCStepBlocked == users.QuizKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
 		})
@@ -136,11 +137,6 @@ func (r *repository) validateKYC(ctx context.Context, userID string, state *getC
 	case users.Social1KYCStep:
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
 			return err
-		}
-		if r.isKYCStepForced(users.QuizKYCStep, state.UserID) || (!state.MiningSessionSoloLastStartedAt.IsNil() && r.isQuizRequired(state) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) { //nolint:lll // .
-			return terror.New(ErrKYCRequired, map[string]any{
-				"kycSteps": []users.KYCStep{users.QuizKYCStep},
-			})
 		}
 	case users.QuizKYCStep:
 		if err := r.verifyLivenessKYC(ctx, state); err != nil {
