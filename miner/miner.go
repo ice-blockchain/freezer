@@ -337,7 +337,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if wasPrestakingReset {
-				msgs = append(msgs, tokenomics.PreStakingMessage(ctx, usr.UserID, usr.PreStakingBonus, usr.PreStakingAllocation, nil))
+				msgs = append(msgs, tokenomics.PreStakingMessage(ctx, freezerMinerProducer, cfg.MessageBroker.Topics[6].Name, usr.UserID, usr.PreStakingBonus, usr.PreStakingAllocation, nil))
 			}
 			if updatedUser != nil {
 				var extraBonusIndex uint16

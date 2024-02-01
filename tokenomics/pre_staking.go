@@ -132,10 +132,13 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 					PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: &bonus},
 					PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: &alloc},
 				}
+				rollbackCtx, cancel := context.WithTimeout(context.Background(), requestDeadline)
+				defer cancel()
+				rErr := storage.Set(rollbackCtx, r.db, prestaking)
 
 				return multierror.Append(
 					sErr,
-					storage.Set(ctx, r.db, prestaking),
+					rErr,
 				).ErrorOrNil()
 			}
 		}
@@ -147,7 +150,7 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	return errors.Wrapf(err, "failed to replace preStaking for %#v", st)
 }
 
-func PreStakingMessage(ctx context.Context, userID string, existingBonus, existingAllocation float64, newPrestaking *PreStakingSummary) *messagebroker.Message {
+func PreStakingMessage(ctx context.Context, producer, topic, userID string, existingBonus, existingAllocation float64, newPrestaking *PreStakingSummary) *messagebroker.Message {
 	if newPrestaking == nil {
 		newPrestaking = &PreStakingSummary{
 			Bonus: 0,
@@ -163,30 +166,29 @@ func PreStakingMessage(ctx context.Context, userID string, existingBonus, existi
 	}
 	snapshot := &PreStakingSnapshot{
 		PreStakingSummary: newPrestaking,
-	}
-	if existingAllocation != 0 && existingBonus != 0 {
-		snapshot.Before = &PreStakingSummary{
+		Before: &PreStakingSummary{
 			PreStaking: &PreStaking{
 				UserID:     newPrestaking.UserID,
 				Years:      uint64(PreStakingYearsByPreStakingBonuses[existingBonus]),
 				Allocation: existingAllocation,
 			},
 			Bonus: existingBonus,
-		}
+		},
 	}
+
 	valueBytes, err := json.MarshalContext(ctx, snapshot)
 	log.Panic(errors.Wrapf(err, "failed to marshal %#v", newPrestaking))
 
 	return &messagebroker.Message{
-		Headers: map[string]string{"producer": "freezer"},
+		Headers: map[string]string{"producer": producer},
 		Key:     newPrestaking.UserID,
-		Topic:   cfg.MessageBroker.Topics[6].Name,
+		Topic:   topic,
 		Value:   valueBytes,
 	}
 }
 
 func (r *repository) sendPreStakingSnapshotMessage(ctx context.Context, existingBonus, existingAllocation float64, st *PreStakingSummary) error {
-	msg := PreStakingMessage(ctx, st.UserID, existingBonus, existingAllocation, st)
+	msg := PreStakingMessage(ctx, freezerRefrigerantProducer, r.cfg.MessageBroker.Topics[6].Name, st.UserID, existingBonus, existingAllocation, st)
 	responder := make(chan error, 1)
 	defer close(responder)
 	r.mb.SendMessage(ctx, msg, responder)

@@ -232,9 +232,9 @@ const (
 	routinesCountToInitCoinsCacheOnStartup = 10
 	totalCoinStatsCacheLockKey             = "totalCoinStatsCache"
 	totalCoinStatsCacheLockDuration        = 1 * stdlibtime.Minute
-)
 
-var cfg Config
+	freezerRefrigerantProducer = "freezer-refrigerant"
+)
 
 type (
 	usersTableSource struct {
