@@ -3,7 +3,6 @@
 package miner
 
 import (
-	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -15,7 +14,6 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
 	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
-
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
@@ -80,23 +78,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.BalanceT2Pending = 0
 		updatedUser.BalanceT2PendingApplied = 0
 	}
-	upcomingPrestakingResets := usr.MustDisablePreStaking()
-	if len(upcomingPrestakingResets) > 0 {
-		zero := model.FlexibleFloat64(0.0)
-		updatedUser.PreStakingAllocation = 0.0
-		updatedUser.PreStakingBonus = 0.0
-		updatedUser.PreStakingAllocationResettableField = model.PreStakingAllocationResettableField{&zero}
-		updatedUser.PreStakingBonusResettableField = model.PreStakingBonusResettableField{&zero}
-		var applied = make([]*time.Time, 0, 1)
-		if usr.KYCQuizResetAtApplied != nil {
-			applied = *usr.KYCQuizResetAtApplied
-		}
-		appliedVal := model.TimeSlice(append(applied, upcomingPrestakingResets...))
-		updatedUser.KYCQuizResetAtAppliedField = model.KYCQuizResetAtAppliedField{KYCQuizResetAtApplied: &appliedVal}
-	} else {
-		updatedUser.PreStakingAllocationResettableField = model.PreStakingAllocationResettableField{nil}
-		updatedUser.PreStakingBonusResettableField = model.PreStakingBonusResettableField{nil}
-	}
+
 	if updatedUser.MiningSessionSoloEndedAt.After(*now.Time) {
 		if !updatedUser.ExtraBonusStartedAt.IsNil() && now.Before(updatedUser.ExtraBonusStartedAt.Add(cfg.ExtraBonuses.Duration)) {
 			rate := (100 + float64(updatedUser.ExtraBonus)) * baseMiningRate * elapsedTimeFraction / 100.
@@ -252,25 +234,4 @@ func (u *user) isAbsoluteZero() bool {
 		u.BalanceSoloPending-u.BalanceSoloPendingApplied == 0 &&
 		u.BalanceForT0 == 0 &&
 		u.BalanceForTMinus1 == 0
-}
-
-func (usr *user) MustDisablePreStaking() (unprocessedResets []*time.Time) {
-	if usr.KYCQuizResetAt == nil {
-		return nil
-	}
-	unprocessedResets = make([]*time.Time, 0, 1)
-	if usr.KYCQuizResetAtApplied == nil || len(*usr.KYCQuizResetAtApplied) < len(*usr.KYCQuizResetAt) {
-		startIndex := 0
-		if usr.KYCQuizResetAtApplied != nil {
-			startIndex = len(*usr.KYCQuizResetAtApplied)
-			if startIndex >= len(*usr.KYCQuizResetAt) {
-				return nil
-			}
-		}
-		for i := startIndex; i < len(*usr.KYCQuizResetAt); i++ {
-			unprocessedResets = append(unprocessedResets, (*usr.KYCQuizResetAt)[i])
-		}
-	}
-
-	return unprocessedResets
 }

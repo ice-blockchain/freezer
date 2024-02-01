@@ -33,16 +33,16 @@ const (
 )
 
 var (
-	ErrNotFound                               = errors.New("not found")
-	ErrRelationNotFound                       = errors.New("relationship not found")
-	ErrDuplicate                              = errors.New("duplicate")
-	ErrNegativeMiningProgressDecisionRequired = errors.New("you have negative mining progress, please decide what to do with it")
-	ErrKYCRequired                            = errors.New("user needs to complete one or more kyc steps or skip any of them(if allowed)")
-	ErrMiningDisabled                         = errors.New("mining is disabled")
-	ErrRaceCondition                          = errors.New("race condition")
-	ErrGlobalRankHidden                       = errors.New("global rank is hidden")
-	ErrPrestakingDisabled                     = errors.New("pre-staking disabled")
-	PreStakingBonusesPerYear                  = map[uint8]float64{
+	ErrNotFound                                        = errors.New("not found")
+	ErrRelationNotFound                                = errors.New("relationship not found")
+	ErrDuplicate                                       = errors.New("duplicate")
+	ErrNegativeMiningProgressDecisionRequired          = errors.New("you have negative mining progress, please decide what to do with it")
+	ErrKYCRequired                                     = errors.New("user needs to complete one or more kyc steps or skip any of them(if allowed)")
+	ErrMiningDisabled                                  = errors.New("mining is disabled")
+	ErrRaceCondition                                   = errors.New("race condition")
+	ErrGlobalRankHidden                                = errors.New("global rank is hidden")
+	ErrDecreasingPreStakingAllocationOrYearsNotAllowed = errors.New("decreasing pre-staking allocation or years not allowed")
+	PreStakingBonusesPerYear                           = map[uint8]float64{
 		0: 0,
 		1: 35,
 		2: 70,

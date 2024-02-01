@@ -58,7 +58,6 @@ const (
 const (
 	userNotFoundErrorCode             = "USER_NOT_FOUND"
 	userPreStakingNotEnabledErrorCode = "PRE_STAKING_NOT_ENABLED"
-	prestakingDisabledForUser         = "PRE_STAKING_DISABLED"
 	globalRankHiddenErrorCode         = "GLOBAL_RANK_HIDDEN"
 	invalidPropertiesErrorCode        = "INVALID_PROPERTIES"
 )
