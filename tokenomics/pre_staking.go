@@ -5,10 +5,14 @@ package tokenomics
 import (
 	"context"
 
+	"github.com/goccy/go-json"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 
 	"github.com/ice-blockchain/freezer/model"
+	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
+	"github.com/ice-blockchain/wintr/log"
 )
 
 type (
@@ -108,10 +112,84 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	}
 	if !isPrestakingDisabled || (existing != nil && existing.PreStakingAllocation != 0) {
 		err = storage.Set(ctx, r.db, prestaking)
+		if err == nil {
+			exisingBonus, existingAllocation := 0.0, 0.0
+			if existing != nil {
+				exisingBonus, existingAllocation = existing.PreStakingBonus, existing.PreStakingAllocation
+			}
+			if sErr := r.sendPreStakingSnapshotMessage(ctx, exisingBonus, existingAllocation, st); sErr != nil {
+				if existing == nil {
+					existing = &preStakingWithKYC{
+						DeserializedUsersKey:      model.DeserializedUsersKey{ID: id},
+						PreStakingBonusField:      model.PreStakingBonusField{0},
+						PreStakingAllocationField: model.PreStakingAllocationField{0},
+					}
+				}
+				bonus = model.FlexibleFloat64(existing.PreStakingBonus)
+				alloc = model.FlexibleFloat64(existing.PreStakingAllocation)
+				prestaking = &preStaking{
+					DeserializedUsersKey:                model.DeserializedUsersKey{ID: id},
+					PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: &bonus},
+					PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: &alloc},
+				}
+
+				return multierror.Append(
+					sErr,
+					storage.Set(ctx, r.db, prestaking),
+				).ErrorOrNil()
+			}
+		}
 	}
 	if isPrestakingDisabled && err == nil {
 		err = ErrPrestakingDisabled
 	}
 
 	return errors.Wrapf(err, "failed to replace preStaking for %#v", st)
+}
+
+func PreStakingMessage(ctx context.Context, userID string, existingBonus, existingAllocation float64, newPrestaking *PreStakingSummary) *messagebroker.Message {
+	if newPrestaking == nil {
+		newPrestaking = &PreStakingSummary{
+			Bonus: 0,
+			PreStaking: &PreStaking{
+				UserID:     userID,
+				Years:      0,
+				Allocation: 0,
+			},
+		}
+	}
+	if newPrestaking.Years == 0 {
+		newPrestaking.Years = uint64(PreStakingYearsByPreStakingBonuses[newPrestaking.Bonus])
+	}
+	snapshot := &PreStakingSnapshot{
+		PreStakingSummary: newPrestaking,
+	}
+	if existingAllocation != 0 && existingBonus != 0 {
+		snapshot.Before = &PreStakingSummary{
+			PreStaking: &PreStaking{
+				UserID:     newPrestaking.UserID,
+				Years:      uint64(PreStakingYearsByPreStakingBonuses[existingBonus]),
+				Allocation: existingAllocation,
+			},
+			Bonus: existingBonus,
+		}
+	}
+	valueBytes, err := json.MarshalContext(ctx, snapshot)
+	log.Panic(errors.Wrapf(err, "failed to marshal %#v", newPrestaking))
+
+	return &messagebroker.Message{
+		Headers: map[string]string{"producer": "freezer"},
+		Key:     newPrestaking.UserID,
+		Topic:   cfg.MessageBroker.Topics[6].Name,
+		Value:   valueBytes,
+	}
+}
+
+func (r *repository) sendPreStakingSnapshotMessage(ctx context.Context, existingBonus, existingAllocation float64, st *PreStakingSummary) error {
+	msg := PreStakingMessage(ctx, st.UserID, existingBonus, existingAllocation, st)
+	responder := make(chan error, 1)
+	defer close(responder)
+	r.mb.SendMessage(ctx, msg, responder)
+
+	return errors.Wrapf(<-responder, "failed to send `%v` message to broker", msg.Topic)
 }

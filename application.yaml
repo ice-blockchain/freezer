@@ -83,6 +83,10 @@ tokenomics: &tokenomics
         partitions: 10
         replicationFactor: 1
         retention: 10s
+      - name: pre-stakings-table
+        partitions: 10
+        replicationFactor: 1
+        retention: 10s
       ### The next topics are not owned by this service, but are needed to be created for the local/test environment.
       - name: users-table
         partitions: 10

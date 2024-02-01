@@ -133,6 +133,11 @@ type (
 		Years      uint64  `json:"years" example:"1"`
 		Allocation float64 `json:"allocation" example:"100.00"`
 	}
+
+	PreStakingSnapshot struct {
+		*PreStakingSummary
+		Before *PreStakingSummary `json:"before,omitempty"`
+	}
 	MiningRateBonuses struct {
 		T1         float64 `json:"t1,omitempty" example:"100.00"`
 		T2         float64 `json:"t2,omitempty" example:"200.00"`
@@ -228,6 +233,8 @@ const (
 	totalCoinStatsCacheLockKey             = "totalCoinStatsCache"
 	totalCoinStatsCacheLockDuration        = 1 * stdlibtime.Minute
 )
+
+var cfg Config
 
 type (
 	usersTableSource struct {

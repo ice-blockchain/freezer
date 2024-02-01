@@ -332,9 +332,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if isAdvancedTeamDisabled(usr.LatestDevice) {
 				usr.ActiveT2Referrals = 0
 			}
-			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
+			updatedUser, shouldGenerateHistory, IDT0Changed, wasPrestakingReset, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
+			}
+			if wasPrestakingReset {
+				msgs = append(msgs, tokenomics.PreStakingMessage(ctx, usr.UserID, usr.PreStakingBonus, usr.PreStakingAllocation, nil))
 			}
 			if updatedUser != nil {
 				var extraBonusIndex uint16

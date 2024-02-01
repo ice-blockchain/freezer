@@ -26,10 +26,11 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func New(ctx context.Context, _ context.CancelFunc) Repository {
-	var cfg Config
+func init() {
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
+}
 
+func New(ctx context.Context, _ context.CancelFunc) Repository {
 	db := storage.MustConnect(ctx, applicationYamlKey)
 	dwhClient := dwh.MustConnect(ctx, applicationYamlKey)
 	repo := &repository{
@@ -55,8 +56,6 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 }
 
 func StartProcessor(ctx context.Context, cancel context.CancelFunc) Processor {
-	var cfg Config
-	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 	prc := &processor{repository: &repository{
 		cfg:           &cfg,
 		db:            storage.MustConnect(context.Background(), applicationYamlKey),
