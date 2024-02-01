@@ -27,7 +27,7 @@ type (
 )
 
 func (p *preStakingWithKYC) PreStakingAlreadyDisabled() bool {
-	return p.KYCQuizResetAt != nil && p.KYCQuizResetAt.Equals(p.KYCQuizResetAtApplied)
+	return p.KYCQuizResetAt != nil && len(*p.KYCQuizResetAt) > 0 && p.KYCQuizResetAt.Equals(p.KYCQuizResetAtApplied)
 }
 
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error) {
