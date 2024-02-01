@@ -8,9 +8,9 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
-func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory, IDT0Changed bool, pendingAmountForTMinus1, pendingAmountForT0 float64) {
+func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *user, shouldGenerateHistory, IDT0Changed, prestakingWasReset bool, pendingAmountForTMinus1, pendingAmountForT0 float64) {
 	if usr == nil || usr.MiningSessionSoloStartedAt.IsNil() || usr.MiningSessionSoloEndedAt.IsNil() {
-		return nil, false, false, 0, 0
+		return nil, false, false, false, 0, 0
 	}
 	clonedUser1 := *usr
 	updatedUser = &clonedUser1
@@ -24,10 +24,10 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 			updatedUser.BalanceLastUpdatedAt = now
 
-			return updatedUser, false, IDT0Changed, 0, 0
+			return updatedUser, false, IDT0Changed, false, 0, 0
 		}
 
-		return nil, false, IDT0Changed, 0, 0
+		return nil, false, IDT0Changed, false, 0, 0
 	}
 
 	if updatedUser.BalanceLastUpdatedAt.IsNil() {
@@ -87,7 +87,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 		updatedUser.PreStakingBonus = 0.0
 		updatedUser.PreStakingAllocationResettableField = model.PreStakingAllocationResettableField{&zero}
 		updatedUser.PreStakingBonusResettableField = model.PreStakingBonusResettableField{&zero}
-		var applied = make([]*time.Time, 0, 1)
+		applied := make([]*time.Time, 0, 1)
 		if usr.KYCQuizResetAtApplied != nil {
 			applied = *usr.KYCQuizResetAtApplied
 		}
@@ -226,7 +226,7 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser.BalanceTotalSlashed += slashedStandard + slashedPreStaking
 	updatedUser.BalanceLastUpdatedAt = now
 
-	return updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0
+	return updatedUser, shouldGenerateHistory, IDT0Changed, len(upcomingPrestakingResets) > 0, pendingAmountForTMinus1, pendingAmountForT0
 }
 
 func updateT0AndTMinus1ReferralsForUserHasNeverMined(usr *user) (updatedUser *referralUpdated) {
