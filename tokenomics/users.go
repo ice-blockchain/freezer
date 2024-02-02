@@ -165,7 +165,8 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 	}
 	type (
 		LocalUser struct {
-			model.KYCState
+			model.KYCStepsCreatedAtField
+			model.KYCStepsLastUpdatedAtField
 			model.UserIDField
 			model.ProfilePictureNameField
 			model.UsernameField
@@ -173,6 +174,8 @@ func (s *usersTableSource) replaceUser(ctx context.Context, usr *users.User) err
 			model.MiningBlockchainAccountAddressField
 			model.BlockchainAccountAddressField
 			model.DeserializedUsersKey
+			model.KYCStepPassedField
+			model.KYCStepBlockedField
 			model.HideRankingField
 		}
 		readOnlyUser struct {

@@ -189,6 +189,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		model.NewsSeenField
 		model.PreStakingAllocationField
 		model.UTCOffsetField
+		model.KYCStepBlockedField
 	}](ctx, r.db, model.SerializedUsersKey(id))
 	if err != nil || len(ms) == 0 {
 		if err == nil {
@@ -226,6 +227,7 @@ func (r *repository) GetMiningSummary(ctx context.Context, userID string) (*Mini
 		MiningRates:                 r.calculateMiningRateSummaries(t0, extraBonus, ms[0].PreStakingAllocation, ms[0].PreStakingBonus, ms[0].ActiveT1Referrals, t2, currentAdoption.BaseMiningRate, negativeMiningRate, ms[0].BalanceTotalStandard+ms[0].BalanceTotalPreStaking, now, ms[0].MiningSessionSoloEndedAt), //nolint:lll // .
 		ExtraBonusSummary:           ExtraBonusSummary{AvailableExtraBonus: availableExtraBonusVal},
 		MiningStarted:               !ms[0].MiningSessionSoloStartedAt.IsNil(),
+		KYCStepBlocked:              ms[0].KYCStepBlocked,
 	}, nil
 }
 

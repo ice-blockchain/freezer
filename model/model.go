@@ -85,6 +85,8 @@ type (
 		KYCStepsLastUpdatedAtField
 		KYCStepPassedField
 		KYCStepBlockedField
+		KYCQuizCompletedField
+		KYCQuizDisabledField
 	}
 	SoloLastEthereumCoinDistributionProcessedAtField struct {
 		SoloLastEthereumCoinDistributionProcessedAt *time.Time `redis:"solo_last_ethereum_coin_distribution_processed_at,omitempty"`
@@ -311,6 +313,14 @@ type (
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
 	}
+
+	KYCQuizCompletedField struct {
+		KYCQuizCompleted bool `json:"kycQuizCompleted" redis:"kyc_quiz_completed"`
+	}
+
+	KYCQuizDisabledField struct {
+		KYCQuizDisabled bool `json:"kycQuizDisabled" redis:"kyc_quiz_disabled"`
+	}
 )
 
 type (
@@ -392,6 +402,7 @@ func CalculateMiningStreak(now, start, end *time.Time, miningSessionDuration std
 
 func (kyc *KYCState) KYCStepPassedCorrectly(kycStep users.KYCStep) bool {
 	return (kyc.KYCStepBlocked == users.NoneKYCStep || kyc.KYCStepBlocked > kycStep) &&
+		(kycStep != users.QuizKYCStep || (kyc.KYCQuizCompleted && !kyc.KYCQuizDisabled)) &&
 		kyc.KYCStepPassed >= kycStep &&
 		kyc.KYCStepAttempted(kycStep)
 }
