@@ -255,10 +255,10 @@ type (
 		PreStakingAllocation float64 `redis:"pre_staking_allocation,omitempty"`
 	}
 	PreStakingAllocationResettableField struct {
-		PreStakingAllocation float64 `redis:"pre_staking_allocation"`
+		PreStakingAllocation *FlexibleFloat64 `redis:"pre_staking_allocation,omitempty"`
 	}
 	PreStakingBonusResettableField struct {
-		PreStakingBonus float64 `redis:"pre_staking_bonus"`
+		PreStakingBonus *FlexibleFloat64 `redis:"pre_staking_bonus,omitempty"`
 	}
 	ExtraBonusField struct {
 		ExtraBonus float64 `redis:"extra_bonus,omitempty"`
@@ -310,6 +310,13 @@ type (
 	}
 	KYCStepBlockedField struct {
 		KYCStepBlocked users.KYCStep `json:"kycStepBlocked" redis:"kyc_step_blocked"`
+	}
+
+	KYCQuizResetAtField struct {
+		KYCQuizResetAt *TimeSlice `json:"kycQuizResetAt" redis:"kyc_quiz_reset_at"`
+	}
+	KYCQuizResetAtAppliedField struct {
+		KYCQuizResetAtApplied *TimeSlice `redis:"kyc_quiz_reset_at_applied,omitempty"`
 	}
 )
 

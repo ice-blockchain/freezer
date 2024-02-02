@@ -17,11 +17,28 @@ type (
 		model.PreStakingBonusResettableField
 		model.PreStakingAllocationResettableField
 	}
+	preStakingWithKYC struct {
+		model.DeserializedUsersKey
+		model.PreStakingBonusField
+		model.PreStakingAllocationField
+		model.KYCQuizResetAtField
+		model.KYCQuizResetAtAppliedField
+	}
 )
+
+func (p *preStakingWithKYC) PreStakingAlreadyDisabled() bool {
+	return p.KYCQuizResetAt != nil && len(*p.KYCQuizResetAt) > 0 && p.KYCQuizResetAt.Equals(p.KYCQuizResetAtApplied)
+}
 
 func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*PreStakingSummary, error) {
 	ps, _, err := r.getPreStaking(ctx, userID)
-	if err != nil {
+	if err != nil || (ps != nil && (ps.PreStakingAllocation == 0 || ps.PreStakingAlreadyDisabled())) {
+		if err == nil && ps.PreStakingAlreadyDisabled() {
+			err = ErrPrestakingDisabled
+		} else if err == nil && ps.PreStakingAllocation == 0 {
+			err = ErrNotFound
+		}
+
 		return nil, errors.Wrapf(err, "failed to getPreStaking for userID:%v", userID)
 	}
 
@@ -34,14 +51,14 @@ func (r *repository) GetPreStakingSummary(ctx context.Context, userID string) (*
 	}, nil
 }
 
-func (r *repository) getPreStaking(ctx context.Context, userID string) (*preStaking, int64, error) {
+func (r *repository) getPreStaking(ctx context.Context, userID string) (*preStakingWithKYC, int64, error) {
 	id, err := GetOrInitInternalID(ctx, r.db, userID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "failed to getOrInitInternalID for userID:%v", userID)
 	}
-	usr, err := storage.Get[preStaking](ctx, r.db, model.SerializedUsersKey(id))
-	if err != nil || len(usr) == 0 || usr[0].PreStakingAllocation == 0 {
-		if err == nil && (len(usr) == 0 || usr[0].PreStakingAllocation == 0) {
+	usr, err := storage.Get[preStakingWithKYC](ctx, r.db, model.SerializedUsersKey(id))
+	if err != nil || len(usr) == 0 {
+		if err == nil && (len(usr) == 0) {
 			err = ErrNotFound
 		}
 
@@ -56,14 +73,23 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return errors.Wrapf(err, "failed to getPreStaking for userID:%v", st.UserID)
 	}
-	if existing != nil {
-		existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
-		if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {
-			st.Allocation = existing.PreStakingAllocation
-			st.Years = existingYears
-			st.Bonus = existing.PreStakingBonus
 
-			return nil
+	isPrestakingDisabled := false
+	if existing != nil {
+		isPrestakingDisabled = existing.PreStakingAlreadyDisabled()
+		if !isPrestakingDisabled {
+			existingYears := uint64(PreStakingYearsByPreStakingBonuses[existing.PreStakingBonus])
+			if existing.PreStakingAllocation == st.Allocation && existingYears == st.Years {
+				st.Allocation = existing.PreStakingAllocation
+				st.Years = existingYears
+				st.Bonus = existing.PreStakingBonus
+
+				return nil
+			}
+		} else {
+			st.Allocation = 0
+			st.Years = 0
+			st.Bonus = 0
 		}
 	}
 	if st.Allocation == 0 || st.Years == 0 {
@@ -73,12 +99,19 @@ func (r *repository) StartOrUpdatePreStaking(ctx context.Context, st *PreStaking
 	} else {
 		st.Bonus = PreStakingBonusesPerYear[uint8(st.Years)]
 	}
-
-	existing = &preStaking{
+	bonus := model.FlexibleFloat64(st.Bonus)
+	alloc := model.FlexibleFloat64(st.Allocation)
+	prestaking := &preStaking{
 		DeserializedUsersKey:                model.DeserializedUsersKey{ID: id},
-		PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: st.Bonus},
-		PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: st.Allocation},
+		PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: &bonus},
+		PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: &alloc},
+	}
+	if !isPrestakingDisabled || (existing != nil && existing.PreStakingAllocation != 0) {
+		err = storage.Set(ctx, r.db, prestaking)
+	}
+	if isPrestakingDisabled && err == nil {
+		err = ErrPrestakingDisabled
 	}
 
-	return errors.Wrapf(storage.Set(ctx, r.db, existing), "failed to replace preStaking for %#v", st)
+	return errors.Wrapf(err, "failed to replace preStaking for %#v", st)
 }

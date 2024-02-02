@@ -488,6 +488,7 @@ func (r *repository) overrideKYCStateWithEskimoKYCState(ctx context.Context, use
 			model.CountryField
 			model.MiningBlockchainAccountAddressField
 			model.KYCState
+			model.KYCQuizResetAtField
 			model.DeserializedUsersKey
 		}
 		if err3 := json.Unmarshal(data, &usr); err3 != nil {

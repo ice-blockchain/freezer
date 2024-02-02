@@ -58,6 +58,7 @@ type (
 		model.ExtraBonusStartedAtField
 		model.ReferralsCountChangeGuardUpdatedAtField
 		model.KYCState
+		model.KYCQuizResetAtField
 		model.MiningBlockchainAccountAddressField
 		model.CountryField
 		model.UsernameField
@@ -117,6 +118,9 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
+		model.PreStakingAllocationResettableField
+		model.PreStakingBonusResettableField
+		model.KYCQuizResetAtAppliedField
 	}
 
 	referralUpdated struct {
