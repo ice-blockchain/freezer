@@ -66,7 +66,7 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 			T2:                                 fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
 			TotalReferrals:                     fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
 			TotalMiningBlockchain:              fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum), //nolint:lll // .
-			TotalMainnetRewardPoolContribution: fmt.Sprintf(floatToStringFormatter, 111.0),
+			TotalMainnetRewardPoolContribution: fmt.Sprintf(floatToStringFormatter, 0.0),
 		},
 	}, nil
 }
