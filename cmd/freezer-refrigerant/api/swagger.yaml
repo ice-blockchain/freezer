@@ -166,6 +166,10 @@ definitions:
       availableExtraBonus:
         example: 2
         type: number
+      kycStepBlocked:
+        allOf:
+        - $ref: '#/definitions/users.KYCStep'
+        example: 2
       miningRates:
         $ref: '#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string'
       miningSession:

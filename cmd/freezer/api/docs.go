@@ -923,6 +923,14 @@ const docTemplate = `{
                     "type": "number",
                     "example": 2
                 },
+                "kycStepBlocked": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/users.KYCStep"
+                        }
+                    ],
+                    "example": 2
+                },
                 "miningRates": {
                     "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string"
                 },
@@ -1020,6 +1028,35 @@ const docTemplate = `{
                     "example": 111111.2423
                 }
             }
+        },
+        "users.KYCStep": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10
+            ],
+            "x-enum-varnames": [
+                "NoneKYCStep",
+                "FacialRecognitionKYCStep",
+                "LivenessDetectionKYCStep",
+                "Social1KYCStep",
+                "QuizKYCStep",
+                "Social2KYCStep",
+                "Social3KYCStep",
+                "Social4KYCStep",
+                "Social5KYCStep",
+                "Social6KYCStep",
+                "Social7KYCStep"
+            ]
         }
     }
 }`

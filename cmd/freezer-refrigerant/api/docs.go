@@ -738,6 +738,14 @@ const docTemplate = `{
                     "type": "number",
                     "example": 2
                 },
+                "kycStepBlocked": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/users.KYCStep"
+                        }
+                    ],
+                    "example": 2
+                },
                 "miningRates": {
                     "$ref": "#/definitions/tokenomics.MiningRates-tokenomics_MiningRateSummary-string"
                 },
