@@ -175,6 +175,8 @@ func TestEskimoToFreezerKYCStateDeserialization_WithNullsInsideSlice(t *testing.
 			KYCStepsLastUpdatedAtField
 			KYCStepPassedField
 			KYCStepBlockedField
+			KYCQuizCompletedField
+			KYCQuizDisabledField
 		}
 	)
 	var deserializedUser KYCState
@@ -185,10 +187,12 @@ func TestEskimoToFreezerKYCStateDeserialization_WithNullsInsideSlice(t *testing.
 		KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{nil, t2, nil, t3, {Time: new(stdlibtime.Time)}}},
 		KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: stepB},
 		KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: stepA},
+		KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: false},
+		KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
 	}, deserializedUser)
 	serializedUser2, err := json.Marshal(deserializedUser)
 	require.NoError(t, err)
-	assert.Equal(t, `{"kycStepsCreatedAt":[null,"2221-11-11T11:11:11.000000011Z",null,null,null,null],"kycStepsLastUpdatedAt":[null,"2222-11-11T11:11:11.000000011Z",null,"2223-11-11T11:11:11.000000011Z","0001-01-01T00:00:00Z"],"kycStepPassed":5,"kycStepBlocked":2}`, string(serializedUser2)) //nolint:lll // .
+	assert.Equal(t, `{"kycStepsCreatedAt":[null,"2221-11-11T11:11:11.000000011Z",null,null,null,null],"kycStepsLastUpdatedAt":[null,"2222-11-11T11:11:11.000000011Z",null,"2223-11-11T11:11:11.000000011Z","0001-01-01T00:00:00Z"],"kycStepPassed":5,"kycStepBlocked":2,"kycQuizCompleted":false,"kycQuizDisabled":false}`, string(serializedUser2)) //nolint:lll // .
 
 	serializedKYCStepsCreatedAt, err := deserializedUser.KYCStepsCreatedAt.MarshalText()
 	require.NoError(t, err)
@@ -200,6 +204,24 @@ func TestEskimoToFreezerKYCStateDeserialization_WithNullsInsideSlice(t *testing.
 	deserializedTimeSlice := new(TimeSlice)
 	require.NoError(t, deserializedTimeSlice.UnmarshalBinary(serializedKYCStepsLastUpdatedAtField))
 	assert.EqualValues(t, &TimeSlice{nil, t2, nil, t3, {Time: new(stdlibtime.Time)}}, deserializedTimeSlice)
+
+	err = json.Unmarshal(serializedUser, &deserializedUser)
+	require.NoError(t, err)
+
+	assert.EqualValues(t, KYCState{
+		KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{nil, t1, nil, nil, nil, nil}}, //nolint:lll // .
+		KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{nil, t2, nil, t3, {Time: new(stdlibtime.Time)}}},
+		KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: stepB},
+		KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: stepA},
+		KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: false},
+		KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+	}, deserializedUser)
+	deserializedUser.KYCQuizCompleted = true
+	deserializedUser.KYCQuizDisabled = true
+	serializedUser3, err := json.Marshal(deserializedUser)
+	require.NoError(t, err)
+	assert.Equal(t, `{"kycStepsCreatedAt":[null,"2221-11-11T11:11:11.000000011Z",null,null,null,null],"kycStepsLastUpdatedAt":[null,"2222-11-11T11:11:11.000000011Z",null,"2223-11-11T11:11:11.000000011Z","0001-01-01T00:00:00Z"],"kycStepPassed":5,"kycStepBlocked":2,"kycQuizCompleted":true,"kycQuizDisabled":true}`, string(serializedUser3)) //nolint:lll // .
+
 }
 
 //nolint:funlen // .
@@ -236,6 +258,8 @@ func TestEskimoToFreezerKYCStateDeserialization_WithEmptySlices(t *testing.T) {
 			KYCStepsLastUpdatedAtField
 			KYCStepPassedField
 			KYCStepBlockedField
+			KYCQuizCompletedField
+			KYCQuizDisabledField
 		}
 	)
 	var deserializedUser KYCState
@@ -246,7 +270,7 @@ func TestEskimoToFreezerKYCStateDeserialization_WithEmptySlices(t *testing.T) {
 	}, deserializedUser)
 	serializedUser2, err := json.Marshal(deserializedUser)
 	require.NoError(t, err)
-	assert.Equal(t, `{"kycStepsCreatedAt":null,"kycStepsLastUpdatedAt":null,"kycStepPassed":0,"kycStepBlocked":0}`, string(serializedUser2))
+	assert.Equal(t, `{"kycStepsCreatedAt":null,"kycStepsLastUpdatedAt":null,"kycStepPassed":0,"kycStepBlocked":0,"kycQuizCompleted":false,"kycQuizDisabled":false}`, string(serializedUser2))
 
 	var deserializedUserTmp KYCState
 	err = json.Unmarshal(serializedUserTmp, &deserializedUserTmp)
@@ -254,7 +278,7 @@ func TestEskimoToFreezerKYCStateDeserialization_WithEmptySlices(t *testing.T) {
 	assert.EqualValues(t, KYCState{}, deserializedUserTmp)
 	serializedUserTmp2, err := json.Marshal(deserializedUserTmp)
 	require.NoError(t, err)
-	assert.Equal(t, `{"kycStepsCreatedAt":null,"kycStepsLastUpdatedAt":null,"kycStepPassed":0,"kycStepBlocked":0}`, string(serializedUserTmp2))
+	assert.Equal(t, `{"kycStepsCreatedAt":null,"kycStepsLastUpdatedAt":null,"kycStepPassed":0,"kycStepBlocked":0,"kycQuizCompleted":false,"kycQuizDisabled":false}`, string(serializedUserTmp2))
 
 	var nilTs *TimeSlice
 	t1, err := nilTs.MarshalText()
@@ -307,4 +331,112 @@ func TestEskimoToFreezerKYCStateDeserialization_WithEmptySlices(t *testing.T) {
 		_ = deserializedTimeSlice4.UnmarshalBinary([]byte("2221-11-11T11:11:11.000000011Z"))
 	})
 	assert.EqualValues(t, (*TimeSlice)(nil), deserializedTimeSlice4)
+}
+
+func TestKYCStepPassedCorrectly(t *testing.T) {
+	t.Parallel()
+
+	t.Run("blocked = None, step = quiz(4), quizCompleted = true && !quizDisabled, stepPassed >= kycStep, arg = QuizKYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, true, kycState.KYCStepPassedCorrectly(users.QuizKYCStep))
+	})
+
+	t.Run("blocked = FacialRecognition, step = quiz(4), quizCompleted = true && !quizDisabled, stepPassed >= kycStep, arg = QuizKYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.FacialRecognitionKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, false, kycState.KYCStepPassedCorrectly(users.QuizKYCStep))
+	})
+
+	t.Run("blocked = None, step = quiz(4), quizCompleted = false && !quizDisabled, stepPassed >= kycStep, arg = QuizKYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: false},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, false, kycState.KYCStepPassedCorrectly(users.QuizKYCStep))
+	})
+
+	t.Run("blocked = None, step = quiz(4), quizCompleted = true && quizDisabled, stepPassed >= kycStep, arg = QuizKYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: true},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, false, kycState.KYCStepPassedCorrectly(users.QuizKYCStep))
+	})
+
+	t.Run("blocked = None, step = Social1KYCStep(3), quizCompleted = true && !quizDisabled, stepPassed >= kycStep, arg = Social1KYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.Social1KYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: true},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, true, kycState.KYCStepPassedCorrectly(users.Social1KYCStep))
+	})
+
+	t.Run("blocked = None, step = Social1KYCStep(3), quizCompleted = false && quizDisabled, stepPassed >= kycStep, arg = Social1KYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: false},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: true},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, true, kycState.KYCStepPassedCorrectly(users.Social1KYCStep))
+	})
+
+	t.Run("blocked = None, step = Social2KYCStep(5), quizCompleted = true && !quizDisabled, stepPassed >= kycStep, arg = QuizKYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.Social2KYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), time.Now()}},
+		}
+		assert.Equal(t, true, kycState.KYCStepPassedCorrectly(users.QuizKYCStep))
+	})
+
+	t.Run("blocked = None, step = Social2KYCStep(5), quizCompleted = false && !quizDisabled, stepPassed >= kycStep, arg = Social2KYCStep", func(t *testing.T) {
+		t.Parallel()
+		kycState := KYCState{
+			KYCQuizCompletedField:      KYCQuizCompletedField{KYCQuizCompleted: false},
+			KYCStepPassedField:         KYCStepPassedField{KYCStepPassed: users.Social2KYCStep},
+			KYCStepBlockedField:        KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizDisabledField:       KYCQuizDisabledField{KYCQuizDisabled: false},
+			KYCStepsCreatedAtField:     KYCStepsCreatedAtField{KYCStepsCreatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), nil, time.Now()}},
+			KYCStepsLastUpdatedAtField: KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &TimeSlice{time.Now(), time.Now(), time.Now(), nil, time.Now()}},
+		}
+		assert.Equal(t, true, kycState.KYCStepPassedCorrectly(users.Social2KYCStep))
+	})
 }
