@@ -62,6 +62,12 @@ type (
 		BalanceT2EthereumField
 		BalanceForT0EthereumField
 		BalanceForTMinus1EthereumField
+		BalanceSoloEthereumMainnetRewardPoolContributionField
+		BalanceT0EthereumMainnetRewardPoolContributionField
+		BalanceT1EthereumMainnetRewardPoolContributionField
+		BalanceT2EthereumMainnetRewardPoolContributionField
+		BalanceForT0EthereumMainnetRewardPoolContributionField
+		BalanceForTMinus1EthereumMainnetRewardPoolContributionField
 		SlashingRateSoloField
 		SlashingRateT0Field
 		SlashingRateT1Field
@@ -190,6 +196,9 @@ type (
 	BalanceSoloEthereumField struct {
 		BalanceSoloEthereum float64 `redis:"balance_solo_ethereum"`
 	}
+	BalanceSoloEthereumMainnetRewardPoolContributionField struct {
+		BalanceSoloEthereumMainnetRewardPoolContribution float64 `redis:"balance_solo_ethereum_mainnet_reward_pool_contribution"`
+	}
 	BalanceSoloEthereumPendingField struct {
 		BalanceSoloEthereumPending *FlexibleFloat64 `redis:"balance_solo_ethereum_pending,omitempty"`
 	}
@@ -198,6 +207,9 @@ type (
 	}
 	BalanceT0EthereumField struct {
 		BalanceT0Ethereum float64 `redis:"balance_t0_ethereum"`
+	}
+	BalanceT0EthereumMainnetRewardPoolContributionField struct {
+		BalanceT0EthereumMainnetRewardPoolContribution float64 `redis:"balance_t0_ethereum_mainnet_reward_pool_contribution"`
 	}
 	BalanceT0EthereumPendingField struct {
 		BalanceT0EthereumPending *FlexibleFloat64 `redis:"balance_t0_ethereum_pending,omitempty"`
@@ -208,6 +220,9 @@ type (
 	BalanceT1EthereumField struct {
 		BalanceT1Ethereum float64 `redis:"balance_t1_ethereum"`
 	}
+	BalanceT1EthereumMainnetRewardPoolContributionField struct {
+		BalanceT1EthereumMainnetRewardPoolContribution float64 `redis:"balance_t1_ethereum_mainnet_reward_pool_contribution"`
+	}
 	BalanceT1EthereumPendingField struct {
 		BalanceT1EthereumPending *FlexibleFloat64 `redis:"balance_t1_ethereum_pending,omitempty"`
 	}
@@ -216,6 +231,9 @@ type (
 	}
 	BalanceT2EthereumField struct {
 		BalanceT2Ethereum float64 `redis:"balance_t2_ethereum"`
+	}
+	BalanceT2EthereumMainnetRewardPoolContributionField struct {
+		BalanceT2EthereumMainnetRewardPoolContribution float64 `redis:"balance_t2_ethereum_mainnet_reward_pool_contribution"`
 	}
 	BalanceT2EthereumPendingField struct {
 		BalanceT2EthereumPending *FlexibleFloat64 `redis:"balance_t2_ethereum_pending,omitempty"`
@@ -226,11 +244,17 @@ type (
 	BalanceForT0EthereumField struct {
 		BalanceForT0Ethereum float64 `redis:"balance_for_t0_ethereum"`
 	}
+	BalanceForT0EthereumMainnetRewardPoolContributionField struct {
+		BalanceForT0EthereumMainnetRewardPoolContribution float64 `redis:"balance_for_t0_ethereum_mainnet_reward_pool_contribution"`
+	}
 	BalanceForTMinus1Field struct {
 		BalanceForTMinus1 float64 `redis:"balance_for_tminus1"`
 	}
 	BalanceForTMinus1EthereumField struct {
 		BalanceForTMinus1Ethereum float64 `redis:"balance_for_tminus1_ethereum"`
+	}
+	BalanceForTMinus1EthereumMainnetRewardPoolContributionField struct {
+		BalanceForTMinus1EthereumMainnetRewardPoolContribution float64 `redis:"balance_for_tminus1_ethereum_mainnet_reward_pool_contribution"`
 	}
 	SlashingRateSoloField struct {
 		SlashingRateSolo float64 `redis:"slashing_rate_solo"`

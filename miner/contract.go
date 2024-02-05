@@ -110,6 +110,10 @@ type (
 		model.BalanceT2EthereumField
 		model.BalanceForT0EthereumField
 		model.BalanceForTMinus1EthereumField
+		model.BalanceSoloEthereumMainnetRewardPoolContributionField
+		model.BalanceT0EthereumMainnetRewardPoolContributionField
+		model.BalanceT1EthereumMainnetRewardPoolContributionField
+		model.BalanceT2EthereumMainnetRewardPoolContributionField
 		model.SlashingRateSoloField
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
@@ -180,8 +184,10 @@ type (
 			Min stdlibtime.Duration `yaml:"min"`
 			Max stdlibtime.Duration `yaml:"max"`
 		} `yaml:"ethereumDistributionFrequency" mapstructure:"ethereumDistributionFrequency"`
-		Workers     int64 `yaml:"workers"`
-		BatchSize   int64 `yaml:"batchSize"`
-		Development bool  `yaml:"development"`
+		MainnetRewardPoolContributionEthAddress string  `yaml:"mainnetRewardPoolContributionEthAddress" mapstructure:"mainnetRewardPoolContributionEthAddress"`
+		MainnetRewardPoolContributionPercentage float64 `yaml:"mainnetRewardPoolContributionPercentage" mapstructure:"mainnetRewardPoolContributionPercentage"`
+		Workers                                 int64   `yaml:"workers"`
+		BatchSize                               int64   `yaml:"batchSize"`
+		Development                             bool    `yaml:"development"`
 	}
 )

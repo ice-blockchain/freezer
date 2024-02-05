@@ -39,6 +39,10 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 		model.BalanceT0EthereumField
 		model.BalanceT1EthereumField
 		model.BalanceT2EthereumField
+		model.BalanceSoloEthereumMainnetRewardPoolContributionField
+		model.BalanceT0EthereumMainnetRewardPoolContributionField
+		model.BalanceT1EthereumMainnetRewardPoolContributionField
+		model.BalanceT2EthereumMainnetRewardPoolContributionField
 		model.PreStakingBonusField
 		model.PreStakingAllocationField
 	}](ctx, r.db, model.SerializedUsersKey(id))
@@ -65,8 +69,8 @@ func (r *repository) GetBalanceSummary( //nolint:lll // .
 			T1:                                 fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking),
 			T2:                                 fmt.Sprintf(floatToStringFormatter, t2Standard+t2PreStaking),
 			TotalReferrals:                     fmt.Sprintf(floatToStringFormatter, t1Standard+t1PreStaking+t2Standard+t2PreStaking),
-			TotalMiningBlockchain:              fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum), //nolint:lll // .
-			TotalMainnetRewardPoolContribution: fmt.Sprintf(floatToStringFormatter, 0.0),
+			TotalMiningBlockchain:              fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereum+res[0].BalanceT0Ethereum+res[0].BalanceT1Ethereum+res[0].BalanceT2Ethereum),                                                                                                                     //nolint:lll // .
+			TotalMainnetRewardPoolContribution: fmt.Sprintf(floatToStringFormatter, res[0].BalanceSoloEthereumMainnetRewardPoolContribution+res[0].BalanceT0EthereumMainnetRewardPoolContribution+res[0].BalanceT1EthereumMainnetRewardPoolContribution+res[0].BalanceT2EthereumMainnetRewardPoolContribution), //nolint:lll // .
 		},
 	}, nil
 }

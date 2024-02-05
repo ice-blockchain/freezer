@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
        balance_t2_ethereum Float64  DEFAULT 0,
        balance_for_t0_ethereum Float64  DEFAULT 0,
        balance_for_tminus1_ethereum Float64  DEFAULT 0,
+       balance_solo_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+       balance_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+       balance_t1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+       balance_t2_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+       balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+       balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
        slashing_rate_solo Float64  DEFAULT 0,
        slashing_rate_t0 Float64  DEFAULT 0,
        slashing_rate_t1 Float64  DEFAULT 0,
@@ -93,6 +99,19 @@ ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
 
 ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_tminus1_ethereum;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_solo_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t0_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t1_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
+
+ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
 ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_blocked UInt8 DEFAULT 0 AFTER kyc_step_passed;
@@ -143,6 +162,12 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
       balance_t2_ethereum Float64  DEFAULT 0,
       balance_for_t0_ethereum Float64  DEFAULT 0,
       balance_for_tminus1_ethereum Float64  DEFAULT 0,
+      balance_solo_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+      balance_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+      balance_t1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+      balance_t2_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+      balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+      balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
       slashing_rate_solo Float64  DEFAULT 0,
       slashing_rate_t0 Float64  DEFAULT 0,
       slashing_rate_t1 Float64  DEFAULT 0,
@@ -196,6 +221,19 @@ ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
 
 ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_tminus1_ethereum;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_solo_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t0_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t1_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
+
+ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
 ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_blocked UInt8 DEFAULT 0 AFTER kyc_step_passed;
@@ -246,6 +284,12 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      balance_t2_ethereum Float64  DEFAULT 0,
      balance_for_t0_ethereum Float64  DEFAULT 0,
      balance_for_tminus1_ethereum Float64  DEFAULT 0,
+     balance_solo_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+     balance_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+     balance_t1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+     balance_t2_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+     balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
+     balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64  DEFAULT 0,
      slashing_rate_solo Float64  DEFAULT 0,
      slashing_rate_t0 Float64  DEFAULT 0,
      slashing_rate_t1 Float64  DEFAULT 0,
@@ -295,6 +339,19 @@ ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum Float64 DEFAULT 0 AFTER balance_t2_ethereum;
 ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum Float64 DEFAULT 0 AFTER balance_for_t0_ethereum;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_solo_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_tminus1_ethereum;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_solo_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t0_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_t2_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t1_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
 
 ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
