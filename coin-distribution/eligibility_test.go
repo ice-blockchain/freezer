@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	testTime = time.New(stdlibtime.Date(2023, 1, 2, 10, 50, 5, 6, stdlibtime.UTC))
+	testTime = time.New(stdlibtime.Date(2023, 1, 2, 10, 45, 5, 6, stdlibtime.UTC))
 )
 
 func TestIsEligibleForEthereumDistributionNow(t *testing.T) {
@@ -52,7 +52,6 @@ func TestIsEligibleForEthereumDistributionNow(t *testing.T) {
 	assert.True(t, isEligibleForEthereumDistributionNow(4, 24*stdlibtime.Hour, 24*28*stdlibtime.Hour, time.Now(), coinDistributionStartDate, lastCoinDistributionProcessedAt))
 	assert.True(t, isEligibleForEthereumDistributionNow(5, 24*stdlibtime.Hour, 24*28*stdlibtime.Hour, time.Now(), coinDistributionStartDate, lastCoinDistributionProcessedAt))
 }
-
 func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 	t.Parallel()
 
@@ -69,7 +68,7 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: true,
 		}
-		assert.Equal(t, true, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.True(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
 	t.Run("!enabled && forced execution", func(t *testing.T) {
@@ -85,10 +84,10 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         false,
 			ForcedExecution: true,
 		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.False(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && !forced execution && now.Hour < cs.StartHour && minute >= 50 && latestDate is not nil", func(t *testing.T) {
+	t.Run("enabled && !forced execution && now.Hour < cs.StartHour", func(t *testing.T) {
 		t.Parallel()
 
 		now := testTime
@@ -100,10 +99,10 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.False(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && !forced execution && now.Hour >= cs.StartHour && now.Before(start) && minute >= 50 && latestDate is nil", func(t *testing.T) {
+	t.Run("enabled && !forced execution && now.Hour >= cs.StartHour && now.Before(start)", func(t *testing.T) {
 		t.Parallel()
 
 		now := testTime
@@ -116,10 +115,10 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.False(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && !forced execution && now.Hour >= cs.StartHour && now.After(end) && minute >= 50 && latestDate is nil", func(t *testing.T) {
+	t.Run("enabled && !forced execution && now.Hour >= cs.StartHour && now.After(end)", func(t *testing.T) {
 		t.Parallel()
 		now := testTime
 		ethereumDistributionFrequencyMin := 1 * stdlibtime.Hour
@@ -131,10 +130,10 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.False(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && hour >= startHour && start < hour < end && latest date is nil && minute >= 50", func(t *testing.T) {
+	t.Run("enabled && hour && start < hour < end && latest date is nil", func(t *testing.T) {
 		t.Parallel()
 		now := testTime
 		ethereumDistributionFrequencyMin := 1 * stdlibtime.Hour
@@ -146,10 +145,10 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, true, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.True(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && hour && start < hour < end && !truncate(now ~ latest date) && minute >= 50", func(t *testing.T) {
+	t.Run("enabled && hour && start < hour < end && truncate(now ~ latest date)", func(t *testing.T) {
 		t.Parallel()
 		now := testTime
 		ethereumDistributionFrequencyMin := 1 * stdlibtime.Hour
@@ -161,10 +160,11 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, true, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+
+		assert.True(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 
-	t.Run("enabled && hour && start < hour < end && truncate(now ~ latest date) && minute >= 50", func(t *testing.T) {
+	t.Run("enabled && hour && start < hour < end && !truncate(now ~ latest date)", func(t *testing.T) {
 		t.Parallel()
 		now := testTime
 		ethereumDistributionFrequencyMin := 1 * stdlibtime.Hour
@@ -176,22 +176,7 @@ func TestIsCoinDistributionCollectorEnabled(t *testing.T) {
 			Enabled:         true,
 			ForcedExecution: false,
 		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
-	})
-
-	t.Run("enabled && hour && start < hour < end && !truncate(now ~ latest date) && minute < 50", func(t *testing.T) {
-		t.Parallel()
-		now := time.New(testTime.Add(-5 * stdlibtime.Minute))
-		ethereumDistributionFrequencyMin := 1 * stdlibtime.Hour
-		cs := CollectorSettings{
-			LatestDate:      time.New(testTime.Add(2 * stdlibtime.Hour)),
-			StartDate:       time.New(testTime.Add(-3 * stdlibtime.Hour)),
-			EndDate:         time.New(testTime.Add(3 * stdlibtime.Hour)),
-			StartHour:       9,
-			Enabled:         true,
-			ForcedExecution: false,
-		}
-		assert.Equal(t, false, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
+		assert.False(t, IsCoinDistributionCollectorEnabled(now, ethereumDistributionFrequencyMin, &cs))
 	})
 }
 
@@ -243,44 +228,36 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		distributionDeniedCountries := map[string]struct{}{
 			"France":  {},
 			"Germany": {},
-			"spain":   {},
 		}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.Now(), time.New(now.Add(48*stdlibtime.Hour)), time.New(now.Add(48*stdlibtime.Hour)), time.New(now.Add(-24*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.Now(), time.New(now.Add(48*stdlibtime.Hour)), time.New(now.Add(48*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(24 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{}},
-			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
+			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.FacialRecognitionKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
 		country = "france"
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
 		country = "Germany"
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
 		country = "germany"
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
-
-		country = "Spain"
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("Positive case, minEthereumDistributionICEBalanceRequired > 0 && distributedBalance >= minEthereumDistributionICEBalanceRequired", func(t *testing.T) {
+	t.Run("Positive case", func(t *testing.T) {
 		t.Parallel()
 
 		minMiningStreaksRequired := uint64(1)
@@ -290,42 +267,19 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(5*stdlibtime.Minute))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, true, res)
-	})
-
-	t.Run("Positive case, minEthereumDistributionICEBalanceRequired == 0 && distributedBalance > 0", func(t *testing.T) {
-		t.Parallel()
-
-		minMiningStreaksRequired := uint64(1)
-		standardBalance := 100.0
-		minEthereumDistributionICEBalanceRequired := 0.0
-		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
-		country := "France"
-		distributionDeniedCountries := map[string]struct{}{}
-		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(5*stdlibtime.Minute))
-		kycState := model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
-			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
-			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
-		}
-		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, true, res)
+		assert.True(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Wrong eth address", func(t *testing.T) {
@@ -338,18 +292,19 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Not enough mining streaks", func(t *testing.T) {
@@ -362,18 +317,19 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Mining session solo ended at is nil", func(t *testing.T) {
@@ -386,43 +342,21 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(-24*stdlibtime.Hour))
+		miningSessionSoloStartedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
 
 		var miningSessionSoloEndedAt *time.Time
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
-	})
-
-	t.Run("Mining session solo ended before collecting enabled", func(t *testing.T) {
-		t.Parallel()
-
-		minMiningStreaksRequired := uint64(1)
-		standardBalance := 100.0
-		minEthereumDistributionICEBalanceRequired := 10.0
-		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
-		country := "France"
-		distributionDeniedCountries := map[string]struct{}{}
-		now := testTime
-		miningSessionSoloStartedAt, ethereumDistributionEndDate, miningSessionSoloEndedAt, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(96*stdlibtime.Hour))
-		kycState := model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
-			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
-			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
-		}
-		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Mining session solo started at is nil", func(t *testing.T) {
@@ -435,19 +369,21 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(-24*stdlibtime.Hour))
+		miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
 
 		var miningSessionSoloStartedAt *time.Time
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Not enough kyc step", func(t *testing.T) {
@@ -460,61 +396,44 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.Social1KYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
 		kycState = model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.Social2KYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
 		kycState = model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour))}},
+			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), nil}},
+			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), nil}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.Social3KYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
-
-		kycState = model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour))}},
-			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.FacialRecognitionKYCStep},
-			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
-		}
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
-
-		kycState = model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour))}},
-			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.LivenessDetectionKYCStep},
-			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
-		}
-		res = IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("KYC last updated at is nil", func(t *testing.T) {
+	t.Run("Last updated at is nil", func(t *testing.T) {
 		t.Parallel()
 
 		minMiningStreaksRequired := uint64(1)
@@ -524,21 +443,22 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: nil},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("KYC previous last updated at is nil", func(t *testing.T) {
+	t.Run("Previous kyc last updated at is nil", func(t *testing.T) {
 		t.Parallel()
 
 		minMiningStreaksRequired := uint64(1)
@@ -548,21 +468,22 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
-			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
-			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), nil}},
+			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), nil, time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
+			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), nil, time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("KYC blocked < QiuzKYCStep", func(t *testing.T) {
+	t.Run("KYC blocked > kycStep", func(t *testing.T) {
 		t.Parallel()
 
 		minMiningStreaksRequired := uint64(1)
@@ -572,18 +493,19 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
 		now := testTime
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.FacialRecognitionKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Balance less than minimum distribution balance required, delta == ethereumDistributionFrequencyMax", func(t *testing.T) {
@@ -597,18 +519,19 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(24*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(24*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
 	t.Run("Balance less than minimum distribution balance required, delta > ethereumDistributionFrequencyMax", func(t *testing.T) {
@@ -622,226 +545,143 @@ func TestIsEligibleForEthereumDistribution(t *testing.T) {
 		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(48*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(48*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: true},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: false},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
-
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("Balance less than minimum distribution balance required, delta < ethereumDistributionFrequencyMax", func(t *testing.T) {
+	t.Run("Quiz completed is true/false && Quiz disabled is true", func(t *testing.T) {
 		t.Parallel()
 
 		minMiningStreaksRequired := uint64(1)
-		standardBalance := 0.0
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		now := time.New(testTime.Add(25 * stdlibtime.Hour))
-		minEthereumDistributionICEBalanceRequired := 0.0
+		standardBalance := 100.0
+		minEthereumDistributionICEBalanceRequired := 10.0
 		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
 		country := "France"
 		distributionDeniedCountries := map[string]struct{}{}
-		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, collectingEndedAt := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(23*stdlibtime.Hour)), time.New(now.Add(12*stdlibtime.Hour))
+		now := testTime
+		miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate := time.New(now.Add(-25*stdlibtime.Hour)), time.New(now.Add(13*stdlibtime.Hour)), time.New(now.Add(64*stdlibtime.Hour))
+		collectingEndedAt := time.New(now.Add(5 * stdlibtime.Hour))
 		kycState := model.KYCState{
 			KYCStepsCreatedAtField:     model.KYCStepsCreatedAtField{KYCStepsCreatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepsLastUpdatedAtField: model.KYCStepsLastUpdatedAtField{KYCStepsLastUpdatedAt: &model.TimeSlice{time.New(now.Add(1 * stdlibtime.Hour)), time.New(now.Add(2 * stdlibtime.Hour)), time.New(now.Add(3 * stdlibtime.Hour)), time.New(now.Add(4 * stdlibtime.Hour))}},
 			KYCStepPassedField:         model.KYCStepPassedField{KYCStepPassed: users.QuizKYCStep},
 			KYCStepBlockedField:        model.KYCStepBlockedField{KYCStepBlocked: users.NoneKYCStep},
+			KYCQuizCompletedField:      model.KYCQuizCompletedField{KYCQuizCompleted: false},
+			KYCQuizDisabledField:       model.KYCQuizDisabledField{KYCQuizDisabled: true},
 		}
 		miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, stdlibtime.Hour, 24*stdlibtime.Hour
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
-		res := IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now, collectingEndedAt,
-			miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax)
-		assert.Equal(t, false, res)
+		kycState.KYCQuizCompleted = true
+		assert.False(t, IsEligibleForEthereumDistribution(minMiningStreaksRequired, standardBalance, minEthereumDistributionICEBalanceRequired, ethAddress, country, distributionDeniedCountries, now,
+			collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate, kycState, miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 }
 
-func TestIsEligibleForEthereumDistributionNow(t *testing.T) {
+func TestIsEligibleForEthereumDistributionNow1(t *testing.T) {
 	t.Parallel()
 
-	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && now ~ coinDistributionStartDate", func(t *testing.T) {
+	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && today.Equal(ethereumDistributionStartDate)", func(t *testing.T) {
 		var lastEthereumCoinDistributionProcessedAt *time.Time
-		id := int64(1)
 		now := testTime
 		coinDistributionStartDate := testTime
+		latestCoinDistributionCollectingDate := testTime
 		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("!lastEthereumCoinDistributionProcessedAt.IsNil() && now ~ coinDistributionStartDate", func(t *testing.T) {
-		id := int64(1)
+	t.Run("!lastEthereumCoinDistributionProcessedAt.IsNil() && today.Equal(ethereumDistributionStartDate)", func(t *testing.T) {
 		now := testTime
 		lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate := testTime, testTime
+		latestCoinDistributionCollectingDate := testTime
 		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && now !~ coinDistributionStartDate && id !~ time", func(t *testing.T) {
-		var lastEthereumCoinDistributionProcessedAt *time.Time
-		id := int64(2)
-		now := testTime
-		coinDistributionStartDate := time.New(testTime.Add(24 * stdlibtime.Hour))
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate) && !latestCoinDistributionCollectingDate.isNil() && now.After(latestCoinDistributionCollectingDay)", func(t *testing.T) {
+		lastEthereumCoinDistributionProcessedAt, now := testTime, time.New(testTime.Add(48*stdlibtime.Hour))
+		coinDistributionStartDate := time.New(testTime.Add(-24 * stdlibtime.Hour))
+		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, 24*28*stdlibtime.Hour
+		latestCoinDistributionCollectingDate := time.New(testTime.Add(24 * stdlibtime.Hour))
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 
-		coinDistributionStartDate = time.New(testTime.Add(-24 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		lastEthereumCoinDistributionProcessedAt = now
+		now = time.New(testTime.Add(72 * stdlibtime.Hour))
+		latestCoinDistributionCollectingDate = time.New(testTime.Add(48 * stdlibtime.Hour))
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+
+		lastEthereumCoinDistributionProcessedAt = now
+		now = time.New(testTime.Add(96 * stdlibtime.Hour))
+		latestCoinDistributionCollectingDate = time.New(testTime.Add(72 * stdlibtime.Hour))
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("!lastEthereumCoinDistributionProcessedAt.IsNil() && lastEthereumCoinDistributionProcessedAt !~ now && !today.Equal(coinDistributionStartDate) && id ~ time", func(t *testing.T) {
-		id := int64(47)
-		now := time.New(testTime.Add(96 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate := time.New(testTime.Add(48*stdlibtime.Hour)), testTime
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 47
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 119
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 119
-		now = time.New(testTime.Add(144 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(120 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 25
-		now = time.New(testTime.Add(26 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(25 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate) && !latestCoinDistributionCollectingDate.isNil() && now.Before(latestCoinDistributionCollectingDay)", func(t *testing.T) {
+		lastEthereumCoinDistributionProcessedAt, now := testTime, testTime
+		coinDistributionStartDate := time.New(testTime.Add(-24 * stdlibtime.Hour))
+		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, 24*28*stdlibtime.Hour
+		latestCoinDistributionCollectingDate := time.New(testTime.Add(24 * stdlibtime.Hour))
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("!lastEthereumCoinDistributionProcessedAt.IsNil() && lastEthereumCoinDistributionProcessedAt !~ now && !today.Equal(coinDistributionStartDate) && id !~ time", func(t *testing.T) {
-		id := int64(48)
-		now := time.New(testTime.Add(96 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate := time.New(testTime.Add(48*stdlibtime.Hour)), testTime
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 48
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 98
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 99
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 97
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 121
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 122
-		now = time.New(testTime.Add(144 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(120 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 28
-		now = time.New(testTime.Add(26 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(25 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate) && latestCoinDistributionCollectingDate.isNil() && today ~ coinDistributionStartDate", func(t *testing.T) {
+		lastEthereumCoinDistributionProcessedAt, now := testTime, time.New(testTime.Add(52*stdlibtime.Hour))
+		coinDistributionStartDate := time.New(testTime.Add(48 * stdlibtime.Hour))
+		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, 24*28*stdlibtime.Hour
+		var latestCoinDistributionCollectingDate *time.Time
+		assert.True(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.True(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 
-	t.Run("!lastEthereumCoinDistributionProcessedAt.IsNil() && today.Equal(coinDistributionStartDate) && lastEthereumCoinDistributionProcessedAt !~ now && id ~ time", func(t *testing.T) {
-		id := int64(47)
-		now := time.New(testTime.Add(96 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate := time.New(testTime.Add(48*stdlibtime.Hour)), testTime
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 47
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 119
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(96 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 119
-		now = time.New(testTime.Add(144 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(120 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 25
-		now = time.New(testTime.Add(26 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(25 * stdlibtime.Hour))
-		assert.Equal(t, true, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-	})
-
-	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && now ~ coinDistributionStartDate && now !~ lastEthereumCoinDistributionProcessedAt &&  id !~ time", func(t *testing.T) {
-		id := int64(47)
-		now := testTime
-		lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate := time.New(testTime.Add(48*stdlibtime.Hour)), testTime
-		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := stdlibtime.Hour, 24*stdlibtime.Hour
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 47
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		coinDistributionStartDate = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(120 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
-
-		id = 95
-		now = time.New(testTime.Add(120 * stdlibtime.Hour))
-		coinDistributionStartDate = time.New(testTime.Add(120 * stdlibtime.Hour))
-		lastEthereumCoinDistributionProcessedAt = time.New(testTime.Add(120 * stdlibtime.Hour))
-		assert.Equal(t, false, IsEligibleForEthereumDistributionNow(id, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+	t.Run("lastEthereumCoinDistributionProcessedAt.IsNil() && !today.Equal(ethereumDistributionStartDate) && latestCoinDistributionCollectingDate.isNil() && today !~ coinDistributionStartDate", func(t *testing.T) {
+		lastEthereumCoinDistributionProcessedAt, now := testTime, time.New(testTime.Add(72*stdlibtime.Hour))
+		coinDistributionStartDate := time.New(testTime.Add(48 * stdlibtime.Hour))
+		ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax := 24*stdlibtime.Hour, 24*28*stdlibtime.Hour
+		var latestCoinDistributionCollectingDate *time.Time
+		assert.False(t, IsEligibleForEthereumDistributionNow(1, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(2, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(3, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(4, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
+		assert.False(t, IsEligibleForEthereumDistributionNow(5, now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax))
 	})
 }
 
@@ -851,24 +691,24 @@ func TestIsEthereumAddressValid(t *testing.T) {
 	t.Run("Positive case", func(t *testing.T) {
 		t.Parallel()
 		ethAddress := "0x111Fc57e1e4e7687c9195F7856C45227f269323B"
-		assert.Equal(t, true, isEthereumAddressValid(ethAddress))
+		assert.True(t, isEthereumAddressValid(ethAddress))
 	})
 
 	t.Run("Empty eth address", func(t *testing.T) {
 		t.Parallel()
 		ethAddress := ""
-		assert.Equal(t, false, isEthereumAddressValid(ethAddress))
+		assert.False(t, isEthereumAddressValid(ethAddress))
 	})
 
 	t.Run("Skip", func(t *testing.T) {
 		t.Parallel()
 		ethAddress := "skip"
-		assert.Equal(t, true, isEthereumAddressValid(ethAddress))
+		assert.True(t, isEthereumAddressValid(ethAddress))
 	})
 
 	t.Run("Not hex", func(t *testing.T) {
 		t.Parallel()
 		ethAddress := "abcdefghi"
-		assert.Equal(t, false, isEthereumAddressValid(ethAddress))
+		assert.False(t, isEthereumAddressValid(ethAddress))
 	})
 }
