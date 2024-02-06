@@ -3,6 +3,7 @@
 package miner
 
 import (
+	"fmt"
 	"testing"
 	stdlibtime "time"
 
@@ -42,7 +43,8 @@ func userEligibleForDistribution(now *time.Time, u *user, distributionCfg *coind
 		u.MiningBlockchainAccountAddress = "skip"
 	}
 	if flags&eligibleByKYC != 0 {
-		u.KYCStepPassed = users.QuizKYCStep
+		u.KYCStepPassed = users.LivenessDetectionKYCStep
+		u.KYCQuizCompleted = true
 		passedTimes := model.TimeSlice([]*time.Time{
 			timeDelta(0), timeDelta(0), timeDelta(0), timeDelta(0),
 		})
@@ -80,7 +82,8 @@ func refEligibleForDistribution(now *time.Time, r *referral, distributionCfg *co
 		r.MiningBlockchainAccountAddress = "skip"
 	}
 	if flags&eligibleByKYC != 0 {
-		r.KYCStepPassed = users.QuizKYCStep
+		r.KYCStepPassed = users.LivenessDetectionKYCStep
+		r.KYCQuizCompleted = true
 		passedTimes := model.TimeSlice([]*time.Time{
 			timeDelta(0), timeDelta(0), timeDelta(0), timeDelta(0),
 		})
@@ -105,7 +108,7 @@ func testCollectorConfig(minBalance float64, streak uint64) *coindistribution.Co
 
 	return &coindistribution.CollectorSettings{
 		DeniedCountries:          nil,
-		LatestDate:               time.New(testTime.Truncate(24 * stdlibtime.Hour).Add(364 * 24 * stdlibtime.Hour)),
+		LatestDate:               nil,
 		StartDate:                testTime,
 		EndDate:                  timeDelta(365 * 24 * stdlibtime.Hour),
 		MinBalanceRequired:       minBalance,
@@ -321,13 +324,86 @@ func Test_user_isEligibleForT0TMinus1ForEthereumDistribution(t *testing.T) {
 }
 
 func Test_processEthereumCoinDistribution(t *testing.T) {
-	ethereumDistributionDryRunModeEnabled = false
 	t.Run("coin distribution disabled", testProcessEthereumCoinDistributionDisabled)
 	t.Run("only solo eligible", testProcessEthereumCoinDistributionSolo)
 	t.Run("solo and T0 eligible", testProcessEthereumCoinDistributionT0)
 	t.Run("solo, T0 and TMinus1 are eligible", testProcessEthereumCoinDistributionT0TMinus1)
+	t.Run("reward pool distribution", testProcessEthereumCoinDistributionRewardPool)
 }
 
+func testProcessEthereumCoinDistributionRewardPool(t *testing.T) {
+	testCfg := testCollectorConfig(1, 3)
+	cfg.coinDistributionCollectorSettings.Store(testCfg)
+	cfg.MiningSessionDuration.Max = 24 * stdlibtime.Hour
+	cfg.MiningSessionDuration.Min = 12 * stdlibtime.Hour
+	cfg.MainnetRewardPoolContributionPercentage = 0.3
+	cfg.MainnetRewardPoolContributionEthAddress = "bogusRewardPool"
+	now := timeDelta(1 * stdlibtime.Hour)
+	t.Run("part of the eth is distributed to reward pool", func(t *testing.T) {
+		u := userEligibleForDistribution(now, newUser(), testCfg, cfg, eligible, 5300)
+		t0 := refEligibleForDistribution(now, newRef(), testCfg, cfg, eligible)
+		tMinus1 := refEligibleForDistribution(now, newRef(), testCfg, cfg, eligible)
+		u.BalanceForT0 = 5300
+		u.BalanceForTMinus1 = 5300
+		u.BalanceT0 = 10600
+		tMinus1.BalanceTotalStandard = 5300
+		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
+		require.EqualValues(t, 100, distributionsForT0)
+		require.EqualValues(t, 100, distributionsForTMinus1)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 70, t0))
+		require.EqualValues(t, 100, *u.BalanceSoloEthereumPending)
+		require.Contains(t, earners, earnerRewardPoolSolo(u, now, 30, cfg.MainnetRewardPoolContributionEthAddress))
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      140,
+		})
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: fmt.Sprintf("(%v,%v)", u.UserID, t0.UserID),
+			UserID:       "mainnet/reward/pool/contribution",
+			Balance:      60,
+			CreatedAt:    now,
+		})
+		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 70))
+		require.Contains(t, earners, earnerRewardPoolRef(u, now, 30, cfg.MainnetRewardPoolContributionEthAddress, t0))
+		require.EqualValues(t, 100, u.BalanceForT0Ethereum)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 70))
+		require.Contains(t, earners, earnerRewardPoolRef(u, now, 30, cfg.MainnetRewardPoolContributionEthAddress, tMinus1))
+		require.EqualValues(t, 100, u.BalanceForTMinus1Ethereum)
+		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
+		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
+		require.Equal(t, now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt)
+	})
+	t.Run("with pending balance to be applied", func(t *testing.T) {
+		const uint256max = 115792089237316195423570985008687907853269984665640564039457584007913129639935
+		u := newUser()
+		large := new(model.FlexibleFloat64)
+		require.NoError(t, large.UnmarshalText([]byte("115792089237316195423570985008687907853269984665640564039457584007913129639935")))
+		u.BalanceT1EthereumPending = large
+		u.BalanceT2EthereumPending = large
+		u.BalanceSoloEthereumPending = large
+		u.BalanceT0EthereumPending = large
+		earners, t0, tMinus1 := u.processEthereumCoinDistribution(false, now, nil, nil)
+		require.EqualValues(t, 0, t0)
+		require.EqualValues(t, 0, tMinus1)
+		require.Nil(t, earners)
+		require.EqualValues(t, float64(uint256max)*0.7, u.BalanceSoloEthereum)
+		require.EqualValues(t, float64(uint256max)*0.7, u.BalanceT1Ethereum)
+		require.EqualValues(t, float64(uint256max)*0.7, u.BalanceT2Ethereum)
+		require.EqualValues(t, float64(uint256max)*0.7, u.BalanceT0Ethereum)
+		require.EqualValues(t, float64(uint256max)*0.3, u.BalanceSoloEthereumMainnetRewardPoolContribution)
+		require.EqualValues(t, float64(uint256max)*0.3, u.BalanceT0EthereumMainnetRewardPoolContribution)
+		require.EqualValues(t, float64(uint256max)*0.3, u.BalanceT1EthereumMainnetRewardPoolContribution)
+		require.EqualValues(t, float64(uint256max)*0.3, u.BalanceT2EthereumMainnetRewardPoolContribution)
+		require.Nil(t, u.SoloLastEthereumCoinDistributionProcessedAt)
+		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
+		require.Nil(t, u.ForTMinus1LastEthereumCoinDistributionProcessedAt)
+	})
+
+}
 func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 	testCfg := testCollectorConfig(1, 3)
 	cfg.coinDistributionCollectorSettings.Store(testCfg)
@@ -343,22 +419,24 @@ func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, nil)
 		require.EqualValues(t, 100, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 3)
-		compareEarnerForUser(t, u, earners[0], now, 100, t0)
+		require.Len(t, earners, 6)
+		require.Contains(t, earners, earnerSolo(u, now, 100, t0))
 		require.EqualValues(t, 100, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
 		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, 100)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 100))
 		require.EqualValues(t, 100, u.BalanceForT0Ethereum)
 		tMinus1 := newRef()
 		tMinus1.UserID = t0.UserID
 		earners, distributionsForT0, distributionsForTMinus1 = u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 1)
+		require.Len(t, earners, 0)
 	})
 	t.Run("TMinus1 is not eligible for distribution", func(t *testing.T) {
 		u := userEligibleForDistribution(now, newUser(), testCfg, cfg, eligible, 5300)
@@ -370,17 +448,19 @@ func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 100, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 100, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 100, t0))
 		require.EqualValues(t, 100, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
 		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, 100)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 100))
 		require.EqualValues(t, 100, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -397,17 +477,19 @@ func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 100, distributionsForT0)
 		require.EqualValues(t, 100, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 100, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 100, t0))
 		require.EqualValues(t, 100, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
 		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, 100)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 100))
 		require.EqualValues(t, 100, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 100)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 100))
 		require.EqualValues(t, 100, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -424,17 +506,19 @@ func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 100, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 100, t0)
+		require.Len(t, earners, 6)
+		require.Contains(t, earners, earnerSolo(u, now, 100, t0))
 		require.EqualValues(t, 100, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
 		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, 100)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 100))
 		require.EqualValues(t, 100, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.NotContains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -457,19 +541,21 @@ func testProcessEthereumCoinDistributionT0TMinus1(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 50, distributionsForT0)
 		require.EqualValues(t, 100, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 50, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 50, t0))
 		require.EqualValues(t, 50, *u.BalanceSoloEthereumPending)
 		require.EqualValues(t, 2650, u.BalanceSoloEthereum)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 100, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      100,
+		})
 		require.EqualValues(t, 100, *u.BalanceT0EthereumPending)
 		require.EqualValues(t, 5300, u.BalanceT0Ethereum)
-		compareEarnerForRef(t, u, t0, earners[2], now, 50)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 50))
 		require.EqualValues(t, 50+2650, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 100)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 100))
 		require.EqualValues(t, 100+5300, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -495,19 +581,21 @@ func testProcessEthereumCoinDistributionT0(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 0, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 0, t0))
 		require.Nil(t, u.BalanceSoloEthereumPending)
 		require.EqualValues(t, 0, u.BalanceSoloEthereum)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 0, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      0,
+		})
 		require.Nil(t, u.BalanceT0EthereumPending)
 		require.EqualValues(t, 0, u.BalanceT0Ethereum)
-		compareEarnerForRef(t, u, t0, earners[2], now, 0)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 0))
 		require.EqualValues(t, 0, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Nil(t, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -525,17 +613,19 @@ func testProcessEthereumCoinDistributionT0(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, forT0Expected, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 200, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 200, t0))
 		require.EqualValues(t, 200, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
 		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, forT0Expected)
+		require.Contains(t, earners, earnerForRef(u, t0, now, forT0Expected))
 		require.EqualValues(t, forT0Expected, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -553,17 +643,18 @@ func testProcessEthereumCoinDistributionT0(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, forT0Expected, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 200, t0)
-		require.EqualValues(t, 200, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 200, earners[1].Balance)
-		require.EqualValues(t, 200, *u.BalanceT0EthereumPending)
-		compareEarnerForRef(t, u, t0, earners[2], now, forT0Expected)
+		require.Len(t, earners, 6)
+		require.Contains(t, earners, earnerSolo(u, now, 200, t0))
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      200,
+		})
+		require.EqualValues(t, model.FlexibleFloat64(200), *u.BalanceT0EthereumPending)
+		require.NotContains(t, earners, earnerForRef(u, t0, now, 0))
 		require.EqualValues(t, 0, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -595,18 +686,20 @@ func testProcessEthereumCoinDistributionT0(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, forT0Expected, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 200, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 200, t0))
 		require.EqualValues(t, 200, *u.BalanceSoloEthereumPending)
-		require.EqualValues(t, t0.UserID, earners[1].EarnerUserID)
-		require.EqualValues(t, u.UserID, earners[1].UserID)
-		require.EqualValues(t, now, earners[1].CreatedAt)
-		require.EqualValues(t, 100, earners[1].Balance)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      100,
+		})
 		require.EqualValues(t, 100, *u.BalanceT0EthereumPending)
 		require.EqualValues(t, u.BalanceSolo*0.5, u.BalanceT0Ethereum)
-		compareEarnerForRef(t, u, t0, earners[2], now, forT0Expected)
+		require.Contains(t, earners, earnerForRef(u, t0, now, forT0Expected))
 		require.EqualValues(t, 2650+forT0Expected, u.BalanceForT0Ethereum)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.EqualValues(t, 0, u.BalanceForTMinus1Ethereum)
 		require.Equal(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Equal(t, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -651,17 +744,19 @@ func testWithPrestaking(tb testing.TB, now *time.Time, testCfg *coindistribution
 	earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 	require.EqualValues(tb, forT0Expected, distributionsForT0)
 	require.EqualValues(tb, forTMinus1Expected, distributionsForTMinus1)
-	require.Len(tb, earners, 4)
-	compareEarnerForUser(tb, u, earners[0], now, forSoloExpected, t0)
+	require.Len(tb, earners, 8)
+	require.Contains(tb, earners, earnerSolo(u, now, forSoloExpected, t0))
 	require.EqualValues(tb, forSoloExpected, *u.BalanceSoloEthereumPending)
-	require.EqualValues(tb, t0.UserID, earners[1].EarnerUserID)
-	require.EqualValues(tb, u.UserID, earners[1].UserID)
-	require.EqualValues(tb, now, earners[1].CreatedAt)
-	require.EqualValues(tb, T0EarningsExpected, earners[1].Balance)
+	require.Contains(tb, earners, &coindistribution.ByEarnerForReview{
+		EarnerUserID: t0.UserID,
+		UserID:       u.UserID,
+		CreatedAt:    now,
+		Balance:      T0EarningsExpected,
+	})
 	require.EqualValues(tb, T0EarningsExpected, *u.BalanceT0EthereumPending)
-	compareEarnerForRef(tb, u, t0, earners[2], now, forT0Expected)
+	require.Contains(tb, earners, earnerForRef(u, t0, now, forT0Expected))
 	require.EqualValues(tb, u.BalanceForT0Ethereum, forT0Expected)
-	compareEarnerForRef(tb, u, tMinus1, earners[3], now, forTMinus1Expected)
+	require.Contains(tb, earners, earnerForRef(u, tMinus1, now, forTMinus1Expected))
 	require.EqualValues(tb, u.BalanceForTMinus1Ethereum, forTMinus1Expected)
 	require.Equal(tb, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 	require.Equal(tb, now, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -682,12 +777,17 @@ func testProcessEthereumCoinDistributionSolo(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 0, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, 0, t0))
 		require.EqualValues(t, 0, u.BalanceSoloEthereum)
-		require.EqualValues(t, 0, earners[1].Balance)
-		compareEarnerForRef(t, u, t0, earners[2], now, 0)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      0,
+		})
+		require.Contains(t, earners, earnerForRef(u, t0, now, 0))
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.Nil(t, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForTMinus1LastEthereumCoinDistributionProcessedAt)
@@ -701,12 +801,17 @@ func testProcessEthereumCoinDistributionSolo(t *testing.T) {
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
 		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, 0, t0)
+		require.NotContains(t, earners, earnerSolo(u, now, 0, t0))
 		require.Nil(t, u.BalanceSoloEthereumPending)
 		require.EqualValues(t, 0, u.BalanceSoloEthereum)
-		require.EqualValues(t, 0, earners[1].Balance)
-		compareEarnerForRef(t, u, t0, earners[2], now, 0)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.NotContains(t, earners, &coindistribution.ByEarnerForReview{
+			EarnerUserID: t0.UserID,
+			UserID:       u.UserID,
+			CreatedAt:    now,
+			Balance:      0,
+		})
+		require.Contains(t, earners, earnerForRef(u, t0, now, 0))
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		require.Nil(t, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForTMinus1LastEthereumCoinDistributionProcessedAt)
@@ -719,11 +824,11 @@ func testProcessEthereumCoinDistributionSolo(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForRef(t, u, t0, earners[2], now, 0)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 0))
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 		expectedBalance := float64(2)
-		compareEarnerForUser(t, u, earners[0], now, expectedBalance, t0)
+		require.Contains(t, earners, earnerSolo(u, now, expectedBalance, t0))
 		require.EqualValues(t, expectedBalance, *u.BalanceSoloEthereumPending)
 		require.EqualValues(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -742,13 +847,13 @@ func testProcessEthereumCoinDistributionSolo(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, tMinus1)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 4)
-		compareEarnerForUser(t, u, earners[0], now, expectedBalance, t0)
+		require.Len(t, earners, 8)
+		require.Contains(t, earners, earnerSolo(u, now, expectedBalance, t0))
 		require.EqualValues(t, expectedBalance, *u.BalanceSoloEthereumPending)
 		require.EqualValues(t, 5300, u.BalanceSoloEthereum)
 		require.EqualValues(t, 0, earners[1].Balance)
-		compareEarnerForRef(t, u, t0, earners[2], now, 0)
-		compareEarnerForRef(t, u, tMinus1, earners[3], now, 0)
+		require.Contains(t, earners, earnerForRef(u, t0, now, 0))
+		require.Contains(t, earners, earnerForRef(u, tMinus1, now, 0))
 
 		require.EqualValues(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -772,14 +877,14 @@ func testProcessEthereumCoinDistributionSolo(t *testing.T) {
 		earners, distributionsForT0, distributionsForTMinus1 := u.processEthereumCoinDistribution(true, now, t0, nil)
 		require.EqualValues(t, 0, distributionsForT0)
 		require.EqualValues(t, 0, distributionsForTMinus1)
-		require.Len(t, earners, 1)
+		require.Len(t, earners, 2)
 		expectedBalance := coindistribution.CalculateEthereumDistributionICEBalance(
 			u.BalanceSolo,
 			cfg.EthereumDistributionFrequency.Min,
 			cfg.EthereumDistributionFrequency.Max,
 			now, testCfg.EndDate,
 		)
-		compareEarnerForUser(t, u, earners[0], now, expectedBalance, t0)
+		require.Contains(t, earners, earnerSolo(u, now, expectedBalance, t0))
 		require.EqualValues(t, expectedBalance, *u.BalanceSoloEthereumPending)
 		require.EqualValues(t, now, u.SoloLastEthereumCoinDistributionProcessedAt)
 		require.Nil(t, u.ForT0LastEthereumCoinDistributionProcessedAt)
@@ -821,6 +926,65 @@ func testProcessEthereumCoinDistributionDisabled(t *testing.T) {
 	})
 
 }
+
+func earnerForRef(user *user, ref *referral, now *time.Time, expectedBalance float64) *coindistribution.ByEarnerForReview {
+	return &coindistribution.ByEarnerForReview{
+		EarnerUserID: user.UserID,
+		UserID:       ref.UserID,
+		Balance:      expectedBalance,
+		CreatedAt:    now,
+	}
+}
+func earnerSolo(user *user, now *time.Time, expectedBalance float64, t0 *referral) *coindistribution.ByEarnerForReview {
+	e := &coindistribution.ByEarnerForReview{
+		EarnerUserID: user.UserID,
+		UserID:       user.UserID,
+		Balance:      expectedBalance,
+		CreatedAt:    now,
+		InternalID:   user.ID,
+		Username:     user.Username,
+		EthAddress:   user.MiningBlockchainAccountAddress,
+	}
+	if t0 != nil {
+		e.ReferredByUsername = t0.Username
+	}
+	return e
+}
+func earnerRewardPoolSolo(user *user, now *time.Time, expectedBalance float64, addr string) *coindistribution.ByEarnerForReview {
+	const mainnetRewardPoolContributionIdentifier = "mainnet/reward/pool/contribution" // TODO: contract.
+	return &coindistribution.ByEarnerForReview{
+		EarnerUserID:       fmt.Sprintf("(%v,%v)", user.UserID, user.UserID),
+		UserID:             mainnetRewardPoolContributionIdentifier,
+		Balance:            expectedBalance,
+		CreatedAt:          now,
+		InternalID:         999999999,
+		Username:           mainnetRewardPoolContributionIdentifier,
+		EthAddress:         addr,
+		ReferredByUsername: mainnetRewardPoolContributionIdentifier,
+	}
+}
+func earnerRewardPoolRef(user *user, now *time.Time, expectedBalance float64, addr string, ref *referral) *coindistribution.ByEarnerForReview {
+	const mainnetRewardPoolContributionIdentifier = "mainnet/reward/pool/contribution" // TODO: contract.
+	return &coindistribution.ByEarnerForReview{
+		EarnerUserID: fmt.Sprintf("(%v,%v)", ref.UserID, user.UserID),
+		UserID:       mainnetRewardPoolContributionIdentifier,
+		Balance:      expectedBalance,
+		CreatedAt:    now,
+	}
+}
+
+//func earnerForRewardPool(user *user, now *time.Time, expectedBalance float64, ref *referral) *coindistribution.ByEarnerForReview {
+//	e := &coindistribution.ByEarnerForReview{
+//		EarnerUserID: fmt.S,
+//		UserID:       "mainnet/reward/pool/contribution",
+//		Balance:      expectedBalance,
+//		CreatedAt:    now,
+//		InternalID:   999999999,
+//		Username:     "mainnet/reward/pool/contribution",
+//		EthAddress:   cfg.MainnetRewardPoolContributionEthAddress,
+//	}
+//	return e
+//}
 
 func compareEarnerForRef(tb testing.TB, user *user, ref *referral, earner *coindistribution.ByEarnerForReview, now *time.Time, expectedBalance float64) {
 	tb.Helper()
