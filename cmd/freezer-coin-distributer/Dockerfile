@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: ice License 1.0
 
-# Temporary hack: https://github.com/docker-library/golang/issues/511#issuecomment-1931959053
-FROM $TARGETARCH/golang:latest AS build
+FROM golang:latest AS build
 ARG SERVICE_NAME
 ARG TARGETOS
 ARG TARGETARCH
