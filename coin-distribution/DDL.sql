@@ -171,15 +171,15 @@ language plpgsql
 declare
          zeros text := '0000000000000000';
          now timestamp := current_timestamp;
-         reward_pool bigint := 999999999;
+         reward_pool_internal_id bigint := 999999999;
 BEGIN
     delete from coin_distributions_by_earner WHERE balance = 0;
 
     insert into coin_distributions_pending_review(created_at, internal_id, ice, day, iceflakes, username, referred_by_username, user_id, eth_address)
         SELECT created_at, internal_id, ice, day, (ice::text||zeros)::uint256 AS iceflakes, username, referred_by_username, user_id, eth_address
         FROM (select
-                   min (created_at) filter ( where user_id=earner_user_id or internal_id = reward_pool)  AS created_at,
-                   min (internal_id) filter ( where user_id=earner_user_id or internal_id = reward_pool)  AS internal_id,
+                   min (created_at) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id)  AS created_at,
+                   min (internal_id) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id)  AS internal_id,
                    sum(balance) AS ice,
                    COALESCE(min (day) filter ( where user_id=earner_user_id ),to_timestamp(0)::date) AS day,
                    string_agg(username,'') AS username,
