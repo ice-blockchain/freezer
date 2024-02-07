@@ -2,7 +2,7 @@ module github.com/ice-blockchain/freezer
 
 go 1.22
 
-replace github.com/cockroachdb/pebble v1.0.0 => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
+replace github.com/cockroachdb/pebble v1.1.0 => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 
 require (
 	github.com/ClickHouse/ch-go v0.61.2
