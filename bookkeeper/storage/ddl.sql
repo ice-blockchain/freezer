@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS light.freezer_user_history
        utc_offset Int16  DEFAULT 0,
        kyc_step_passed UInt8  DEFAULT 0,
        kyc_step_blocked UInt8  DEFAULT 0,
+       kyc_quiz_completed Bool  DEFAULT FALSE,
+       kyc_quiz_disabled Bool  DEFAULT FALSE,
        hide_ranking Bool  DEFAULT FALSE,
        kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
        kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
@@ -110,6 +112,11 @@ ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
 ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
+
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_completed Bool DEFAULT FALSE AFTER kyc_step_blocked;
+ALTER TABLE light.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_disabled Bool DEFAULT FALSE AFTER kyc_quiz_completed;
 
 ALTER TABLE light.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
@@ -187,6 +194,8 @@ CREATE TABLE IF NOT EXISTS dark.freezer_user_history
       utc_offset Int16  DEFAULT 0,
       kyc_step_passed UInt8  DEFAULT 0,
       kyc_step_blocked UInt8  DEFAULT 0,
+      kyc_quiz_completed Bool  DEFAULT FALSE,
+      kyc_quiz_disabled Bool  DEFAULT FALSE,
       hide_ranking Bool  DEFAULT FALSE,
       kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
       kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
@@ -232,6 +241,11 @@ ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
 ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
+
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_completed Bool DEFAULT FALSE AFTER kyc_step_blocked;
+ALTER TABLE dark.freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_disabled Bool DEFAULT FALSE AFTER kyc_quiz_completed;
 
 ALTER TABLE dark.freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
@@ -309,6 +323,8 @@ CREATE TABLE IF NOT EXISTS freezer_user_history
      utc_offset Int16  DEFAULT 0,
      kyc_step_passed UInt8  DEFAULT 0,
      kyc_step_blocked UInt8  DEFAULT 0,
+     kyc_quiz_completed Bool  DEFAULT FALSE,
+     kyc_quiz_disabled Bool  DEFAULT FALSE,
      hide_ranking Bool  DEFAULT FALSE,
      kyc_steps_created_at Array(DateTime64(9,'UTC')) DEFAULT [],
      kyc_steps_last_updated_at Array(DateTime64(9,'UTC')) DEFAULT [],
@@ -352,6 +368,11 @@ ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_t0_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_t2_ethereum_mainnet_reward_pool_contribution;
 ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS balance_for_tminus1_ethereum_mainnet_reward_pool_contribution Float64 DEFAULT 0 AFTER balance_for_t0_ethereum_mainnet_reward_pool_contribution;
+
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_completed Bool DEFAULT FALSE AFTER kyc_step_blocked;
+ALTER TABLE freezer_user_history
+    ADD COLUMN IF NOT EXISTS kyc_quiz_disabled Bool DEFAULT FALSE AFTER kyc_quiz_completed;
 
 ALTER TABLE freezer_user_history
     ADD COLUMN IF NOT EXISTS kyc_step_passed UInt8 DEFAULT 0 AFTER utc_offset;
