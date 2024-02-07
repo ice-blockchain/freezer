@@ -181,7 +181,7 @@ BEGIN
                    min (created_at) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id)  AS created_at,
                    min (internal_id) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id)  AS internal_id,
                    sum(balance) AS ice,
-                   COALESCE(min (day) filter ( where user_id=earner_user_id ),to_timestamp(0)::date) AS day,
+                   COALESCE(min (day) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id),to_timestamp(0)::date) AS day,
                    string_agg(username,'') AS username,
                    string_agg(referred_by_username,'') AS referred_by_username,
                    user_id,
