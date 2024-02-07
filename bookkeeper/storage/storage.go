@@ -241,6 +241,8 @@ func (db *db) Insert(ctx context.Context, columns *Columns, input InsertMetadata
 		columns.utcOffset.Append(int16(usr.UTCOffset))
 		columns.kycStepPassed.Append(uint8(usr.KYCStepPassed))
 		columns.kycStepBlocked.Append(uint8(usr.KYCStepBlocked))
+		columns.kycQuizCompleted.Append(usr.KYCQuizCompleted)
+		columns.kycQuizDisabled.Append(usr.KYCQuizDisabled)
 		columns.hideRanking.Append(usr.HideRanking)
 		kycStepsCreatedAt := make([]stdlibtime.Time, 0, 6)
 		if usr.KYCStepsCreatedAt != nil {
@@ -342,11 +344,13 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		utcOffset                                              = make(proto.ColInt16, 0, rows)
 		kycStepPassed                                          = make(proto.ColUInt8, 0, rows)
 		kycStepBlocked                                         = make(proto.ColUInt8, 0, rows)
+		kycQuizCompleted                                       = make(proto.ColBool, 0, rows)
+		kycQuizDisabled                                        = make(proto.ColBool, 0, rows)
 		hideRanking                                            = make(proto.ColBool, 0, rows)
 		kycStepsCreatedAt                                      = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
 		kycStepsLastUpdatedAt                                  = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
 	)
-	input := append(make(proto.Input, 0, 64),
+	input := append(make(proto.Input, 0, 72),
 		proto.InputColumn{Name: "mining_session_solo_last_started_at", Data: miningSessionSoloLastStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_started_at", Data: miningSessionSoloStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_ended_at", Data: miningSessionSoloEndedAt},
@@ -414,6 +418,8 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		proto.InputColumn{Name: "utc_offset", Data: &utcOffset},
 		proto.InputColumn{Name: "kyc_step_passed", Data: &kycStepPassed},
 		proto.InputColumn{Name: "kyc_step_blocked", Data: &kycStepBlocked},
+		proto.InputColumn{Name: "kyc_quiz_completed", Data: &kycQuizCompleted},
+		proto.InputColumn{Name: "kyc_quiz_disabled", Data: &kycQuizDisabled},
 		proto.InputColumn{Name: "hide_ranking", Data: &hideRanking},
 		proto.InputColumn{Name: "kyc_steps_created_at", Data: kycStepsCreatedAt},
 		proto.InputColumn{Name: "kyc_steps_last_updated_at", Data: kycStepsLastUpdatedAt})
@@ -486,6 +492,8 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		utcOffset:                       &utcOffset,
 		kycStepPassed:                   &kycStepPassed,
 		kycStepBlocked:                  &kycStepBlocked,
+		kycQuizCompleted:                &kycQuizCompleted,
+		kycQuizDisabled:                 &kycQuizDisabled,
 		hideRanking:                     &hideRanking,
 		kycStepsCreatedAt:               kycStepsCreatedAt,
 		kycStepsLastUpdatedAt:           kycStepsLastUpdatedAt,

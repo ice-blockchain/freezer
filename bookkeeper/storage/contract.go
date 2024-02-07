@@ -106,6 +106,8 @@ type (
 		utcOffset                                              *proto.ColInt16
 		kycStepPassed                                          *proto.ColUInt8
 		kycStepBlocked                                         *proto.ColUInt8
+		kycQuizCompleted                                       *proto.ColBool
+		kycQuizDisabled                                        *proto.ColBool
 		hideRanking                                            *proto.ColBool
 		kycStepsCreatedAt                                      *proto.ColArr[stdlibtime.Time]
 		kycStepsLastUpdatedAt                                  *proto.ColArr[stdlibtime.Time]
