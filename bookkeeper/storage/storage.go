@@ -350,7 +350,7 @@ func InsertDDL(rows int) (*Columns, proto.Input) {
 		kycStepsCreatedAt                                      = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
 		kycStepsLastUpdatedAt                                  = proto.NewArray[stdlibtime.Time](&proto.ColDateTime64{Data: make([]proto.DateTime64, 0, 6), Location: stdlibtime.UTC, Precision: proto.PrecisionMax, PrecisionSet: true}) //nolint:lll // .
 	)
-	input := append(make(proto.Input, 0, 66),
+	input := append(make(proto.Input, 0, 72),
 		proto.InputColumn{Name: "mining_session_solo_last_started_at", Data: miningSessionSoloLastStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_started_at", Data: miningSessionSoloStartedAt},
 		proto.InputColumn{Name: "mining_session_solo_ended_at", Data: miningSessionSoloEndedAt},
