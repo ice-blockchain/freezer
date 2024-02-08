@@ -6,6 +6,7 @@ WITH valid_users AS (
                     WHERE created_at IN ['%[2]v']
                       AND kyc_step_passed >= %[3]v
                       AND (kyc_step_blocked = 0 OR kyc_step_blocked >= %[3]v + 1)
+                      AND kyc_quiz_completed = true AND kyc_quiz_disabled = false
                     ),
   valid_t1_users AS (
                     SELECT created_at, id_t0, SUM(balance_for_t0) AS balance_t1
