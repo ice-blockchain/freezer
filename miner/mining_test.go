@@ -3,12 +3,12 @@
 package miner
 
 import (
-	"github.com/google/uuid"
 	"math"
 	"math/rand"
 	"testing"
 	stdlibtime "time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ice-blockchain/wintr/time"
