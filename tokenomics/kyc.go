@@ -98,9 +98,10 @@ func (r *repository) validateKYC(ctx context.Context, userID string, state *getC
 		return errors.Wrapf(err, "failed to overrideKYCStateWithEskimoKYCState for %#v", state)
 	}
 	if (state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) ||
-		(state.KYCStepBlocked == users.QuizKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) {
+		((state.KYCStepBlocked == users.QuizKYCStep || state.KYCQuizDisabled) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) {
 		return terror.New(ErrMiningDisabled, map[string]any{
 			"kycStepBlocked": state.KYCStepBlocked,
+			"quizDisabled":   state.KYCQuizDisabled,
 		})
 	}
 	switch state.KYCStepPassed {
