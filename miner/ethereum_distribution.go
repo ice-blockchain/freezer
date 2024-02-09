@@ -172,22 +172,22 @@ func (u *user) processEthereumCoinDistribution(
 ) (records []*coindistribution.ByEarnerForReview, balanceDistributedForT0, balanceDistributedForTMinus1 float64) {
 	if !enabled {
 		if u.BalanceSoloEthereumPending != nil {
-			u.BalanceSoloEthereum += float64(*u.BalanceSoloEthereumPending) * (1.0 - cfg.MainnetRewardPoolContributionPercentage)
+			u.BalanceSoloEthereum += float64(*u.BalanceSoloEthereumPending)
 			u.BalanceSoloEthereumMainnetRewardPoolContribution += float64(*u.BalanceSoloEthereumPending) * cfg.MainnetRewardPoolContributionPercentage
 			u.BalanceSoloEthereumPending = new(model.FlexibleFloat64)
 		}
 		if u.BalanceT0EthereumPending != nil {
-			u.BalanceT0Ethereum += float64(*u.BalanceT0EthereumPending) * (1.0 - cfg.MainnetRewardPoolContributionPercentage)
+			u.BalanceT0Ethereum += float64(*u.BalanceT0EthereumPending)
 			u.BalanceT0EthereumMainnetRewardPoolContribution += float64(*u.BalanceT0EthereumPending) * cfg.MainnetRewardPoolContributionPercentage
 			u.BalanceT0EthereumPending = new(model.FlexibleFloat64)
 		}
 		if u.BalanceT1EthereumPending != nil {
-			u.BalanceT1Ethereum += float64(*u.BalanceT1EthereumPending) * (1.0 - cfg.MainnetRewardPoolContributionPercentage)
+			u.BalanceT1Ethereum += float64(*u.BalanceT1EthereumPending)
 			u.BalanceT1EthereumMainnetRewardPoolContribution += float64(*u.BalanceT1EthereumPending) * cfg.MainnetRewardPoolContributionPercentage
 			u.BalanceT1EthereumPending = new(model.FlexibleFloat64)
 		}
 		if u.BalanceT2EthereumPending != nil {
-			u.BalanceT2Ethereum += float64(*u.BalanceT2EthereumPending) * (1.0 - cfg.MainnetRewardPoolContributionPercentage)
+			u.BalanceT2Ethereum += float64(*u.BalanceT2EthereumPending)
 			u.BalanceT2EthereumMainnetRewardPoolContribution += float64(*u.BalanceT2EthereumPending) * cfg.MainnetRewardPoolContributionPercentage
 			u.BalanceT2EthereumPending = new(model.FlexibleFloat64)
 		}
