@@ -182,10 +182,10 @@ BEGIN
                    min (internal_id) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id)  AS internal_id,
                    sum(balance) AS ice,
                    COALESCE(min (day) filter ( where user_id=earner_user_id or internal_id = reward_pool_internal_id),to_timestamp(0)::date) AS day,
-                   string_agg(username,'') AS username,
-                   string_agg(referred_by_username,'') AS referred_by_username,
+                   string_agg(distinct username,'') AS username,
+                   string_agg(distinct referred_by_username,'') AS referred_by_username,
                    user_id,
-                   string_agg(eth_address,'') AS eth_address
+                   string_agg(distinct eth_address,'') AS eth_address
                 from coin_distributions_by_earner
                 group by day,user_id) AS X;
 
