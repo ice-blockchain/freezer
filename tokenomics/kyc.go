@@ -99,9 +99,12 @@ func (r *repository) validateKYC(ctx context.Context, userID string, state *getC
 	}
 	if (state.KYCStepBlocked == users.FacialRecognitionKYCStep && r.isKYCEnabled(ctx, state.LatestDevice, users.FacialRecognitionKYCStep)) ||
 		((state.KYCStepBlocked == users.QuizKYCStep || state.KYCQuizDisabled) && r.isKYCEnabled(ctx, state.LatestDevice, users.QuizKYCStep)) {
+		disabledStep := state.KYCStepBlocked
+		if state.KYCQuizDisabled {
+			disabledStep = users.QuizKYCStep
+		}
 		return terror.New(ErrMiningDisabled, map[string]any{
-			"kycStepBlocked": state.KYCStepBlocked,
-			"quizDisabled":   state.KYCQuizDisabled,
+			"kycStepBlocked": disabledStep,
 		})
 	}
 	switch state.KYCStepPassed {
