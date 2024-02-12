@@ -2,6 +2,15 @@
 
 basePath: /v1r
 definitions:
+  detailed_coin_metrics.Details:
+    properties:
+      currentPrice:
+        type: number
+      updatedAt:
+        type: string
+      volume24h:
+        type: number
+    type: object
   server.ErrorResponse:
     properties:
       code:
@@ -223,6 +232,8 @@ definitions:
       blockchain:
         example: 111111.2423
         type: number
+      blockchainDetails:
+        $ref: '#/definitions/detailed_coin_metrics.Details'
       preStaking:
         example: 111111.2423
         type: number
@@ -393,17 +404,6 @@ paths:
       - application/json
       description: Returns statistics about total coins, with an usecase breakdown.
       parameters:
-      - default: Bearer <Add access token here>
-        description: Insert your access token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - default: <Add metadata token here>
-        description: Insert your metadata token
-        in: header
-        name: X-Account-Metadata
-        type: string
       - description: number of days in the past to look for. Defaults to 3. Max is
           90.
         in: query

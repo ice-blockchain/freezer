@@ -50,6 +50,7 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
+	res.BlockchainDetails = r.detailedMetricsData.Load()
 
 	return r.enhanceWithBlockchainCoinStats(res), nil
 }
@@ -97,6 +98,48 @@ func (r *repository) getCachedTotalCoins(ctx context.Context, dates []stdlibtime
 
 func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
 	return (&dwh.TotalCoins{CreatedAt: time.New(date.Truncate(r.cfg.GlobalAggregationInterval.Child))}).Key()
+}
+
+func (r *repository) updateDetailedCoinMetrics(ctx context.Context) error {
+	detailedCoinMetrics, err := r.detailedMetricsRepo.ReadDetails(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to read detailedCoinMetrics")
+	}
+
+	r.detailedMetricsData.Store(detailedCoinMetrics)
+
+	return nil
+}
+
+func (r *repository) keepBlockchainDetailsCacheUpdated(ctx context.Context) {
+	signals := make(chan struct{}, 1)
+	ticker := stdlibtime.NewTicker(r.cfg.GlobalAggregationInterval.Child / 6) //nolint:gomnd // Not an issue.
+	defer ticker.Stop()
+
+	// Send initial signal now without waiting for the first tick.
+	signals <- struct{}{}
+
+	go func() {
+		for range ticker.C {
+			select {
+			case signals <- struct{}{}:
+			default:
+			}
+		}
+	}()
+
+	for {
+		select {
+		case <-signals:
+			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
+			if err := r.updateDetailedCoinMetrics(reqCtx); err != nil {
+				log.Error(errors.Wrap(err, "failed to update detailedCoinMetrics"))
+			}
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context, initialNow *time.Time) {

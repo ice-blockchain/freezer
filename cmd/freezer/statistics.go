@@ -98,16 +98,14 @@ func (s *service) GetAdoption( //nolint:gocritic // False negative.
 //	@Tags			Statistics
 //	@Accept			json
 //	@Produce		json
-//	@Param			Authorization		header		string	true	"Insert your access token"		default(Bearer <Add access token here>)
-//	@Param			X-Account-Metadata	header		string	false	"Insert your metadata token"	default(<Add metadata token here>)
-//	@Param			days				query		uint64	false	"number of days in the past to look for. Defaults to 3. Max is 90."
-//	@Param			tz					query		string	false	"Timezone in format +04:30 or -03:45"
-//	@Success		200					{object}	tokenomics.TotalCoinsSummary
-//	@Failure		400					{object}	server.ErrorResponse	"if validations failed"
-//	@Failure		401					{object}	server.ErrorResponse	"if not authorized"
-//	@Failure		422					{object}	server.ErrorResponse	"if syntax fails"
-//	@Failure		500					{object}	server.ErrorResponse
-//	@Failure		504					{object}	server.ErrorResponse	"if request times out"
+//	@Param			days	query		uint64	false	"number of days in the past to look for. Defaults to 3. Max is 90."
+//	@Param			tz		query		string	false	"Timezone in format +04:30 or -03:45"
+//	@Success		200		{object}	tokenomics.TotalCoinsSummary
+//	@Failure		400		{object}	server.ErrorResponse	"if validations failed"
+//	@Failure		401		{object}	server.ErrorResponse	"if not authorized"
+//	@Failure		422		{object}	server.ErrorResponse	"if syntax fails"
+//	@Failure		500		{object}	server.ErrorResponse
+//	@Failure		504		{object}	server.ErrorResponse	"if request times out"
 //	@Router			/tokenomics-statistics/total-coins [GET].
 func (s *service) GetTotalCoins( //nolint:gocritic // False negative.
 	ctx context.Context,

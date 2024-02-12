@@ -18,6 +18,7 @@ import (
 
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
+	detailedCoinMetrics "github.com/ice-blockchain/freezer/tokenomics/detailed_coin_metrics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
@@ -39,9 +40,10 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 		shutdown: func() error {
 			return multierror.Append(db.Close(), dwhClient.Close()).ErrorOrNil()
 		},
-		db:            db,
-		dwh:           dwhClient,
-		pictureClient: picture.New(applicationYamlKey),
+		db:                  db,
+		dwh:                 dwhClient,
+		pictureClient:       picture.New(applicationYamlKey),
+		detailedMetricsRepo: detailedCoinMetrics.New(),
 	}
 	go repo.startDisableAdvancedTeamCfgSyncer(ctx)
 	go repo.startBlockchainCoinStatsJSONSyncer(ctx)
@@ -50,6 +52,7 @@ func New(ctx context.Context, _ context.CancelFunc) Repository {
 	repo.mustInitTotalCoinsCache(ctx, now)
 
 	go repo.keepTotalCoinsCacheUpdated(ctx, now)
+	go repo.keepBlockchainDetailsCacheUpdated(ctx)
 
 	return repo
 }

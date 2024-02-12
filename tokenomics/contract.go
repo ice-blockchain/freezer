@@ -14,6 +14,7 @@ import (
 	"github.com/ice-blockchain/eskimo/users"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	extrabonusnotifier "github.com/ice-blockchain/freezer/extra-bonus-notifier"
+	detailedCoinMetrics "github.com/ice-blockchain/freezer/tokenomics/detailed_coin_metrics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/multimedia/picture"
@@ -108,7 +109,8 @@ type (
 		TotalCoins
 	}
 	TotalCoinsSummary struct {
-		TimeSeries []*TotalCoinsTimeSeriesDataPoint `json:"timeSeries"`
+		TimeSeries        []*TotalCoinsTimeSeriesDataPoint `json:"timeSeries"`
+		BlockchainDetails *detailedCoinMetrics.Details     `json:"blockchainDetails"`
 		TotalCoins
 	}
 	AdoptionSummary struct {
@@ -262,6 +264,8 @@ type (
 		dwh                               dwh.Client
 		mb                                messagebroker.Client
 		pictureClient                     picture.Client
+		detailedMetricsRepo               detailedCoinMetrics.Repository
+		detailedMetricsData               atomic.Pointer[detailedCoinMetrics.Details]
 	}
 
 	processor struct {
