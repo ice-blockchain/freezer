@@ -14,6 +14,7 @@ import (
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/time"
 )
@@ -40,6 +41,7 @@ type (
 const (
 	applicationYamlKey       = "miner"
 	parentApplicationYamlKey = "tokenomics"
+	quizApplicationKey       = "quiz"
 	requestDeadline          = 30 * stdlibtime.Second
 )
 
@@ -121,8 +123,14 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
+		model.KYCQuizDisabledIgnorableField
+		model.KYCQuizCompletedIgnorableField
 	}
-
+	quizStatus struct {
+		model.UserIDField
+		model.KYCQuizDisabledIgnorableField
+		model.KYCQuizCompletedIgnorableField
+	}
 	referralUpdated struct {
 		model.DeserializedUsersKey
 		model.IDT0Field
@@ -166,6 +174,7 @@ type (
 		stopCoinDistributionCollectionWorkerManager chan struct{}
 		coinDistributionWorkerMX                    *sync.Mutex
 		coinDistributionRepository                  coindistribution.Repository
+		usersDB                                     storagev2.Querier
 		mb                                          messagebroker.Client
 		db                                          storage.DB
 		dwhClient                                   dwh.Client
@@ -184,6 +193,9 @@ type (
 			Min stdlibtime.Duration `yaml:"min"`
 			Max stdlibtime.Duration `yaml:"max"`
 		} `yaml:"ethereumDistributionFrequency" mapstructure:"ethereumDistributionFrequency"`
+		Quiz struct {
+			MaxResetCount int64 `yaml:"maxResetCount"`
+		} `yaml:"quiz" mapstructure:"quiz"`
 		MainnetRewardPoolContributionEthAddress string  `yaml:"mainnetRewardPoolContributionEthAddress" mapstructure:"mainnetRewardPoolContributionEthAddress"`
 		MainnetRewardPoolContributionPercentage float64 `yaml:"mainnetRewardPoolContributionPercentage" mapstructure:"mainnetRewardPoolContributionPercentage"`
 		Workers                                 int64   `yaml:"workers"`

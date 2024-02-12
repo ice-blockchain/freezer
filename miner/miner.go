@@ -24,6 +24,7 @@ import (
 	"github.com/ice-blockchain/freezer/tokenomics"
 	appCfg "github.com/ice-blockchain/wintr/config"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
+	storagev2 "github.com/ice-blockchain/wintr/connectors/storage/v2"
 	"github.com/ice-blockchain/wintr/connectors/storage/v3"
 	"github.com/ice-blockchain/wintr/log"
 	"github.com/ice-blockchain/wintr/time"
@@ -45,6 +46,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		dwhClient:                  dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:                         new(sync.WaitGroup),
 		telemetry:                  new(telemetry).mustInit(cfg),
+		usersDB:                    storagev2.MustConnect(context.Background(), "", quizApplicationKey),
 	}
 	go mi.startDisableAdvancedTeamCfgSyncer(ctx)
 	mi.wg.Add(int(cfg.Workers))
@@ -154,6 +156,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		referralsCountGuardOnlyUpdatedUsers                                  = make([]*referralCountGuardUpdatedUser, 0, batchSize)
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
+		syncQuizStatus                                                       = make(map[int64]*quizStatus, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
@@ -232,6 +235,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		for k := range pendingBalancesForT0 {
 			delete(pendingBalancesForT0, k)
+		}
+		for k := range syncQuizStatus {
+			delete(syncQuizStatus, k)
 		}
 	}
 	for ctx.Err() == nil {
@@ -334,6 +340,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
+				if !usr.KYCState.KYCQuizDisabled && !usr.KYCState.KYCQuizCompleted {
+					syncQuizStatus[usr.ID] = &quizStatus{UserIDField: model.UserIDField{UserID: usr.UserID}}
+				}
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if updatedUser != nil {
@@ -453,6 +462,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+
+		if len(syncQuizStatus) > 0 && len(histories) > 0 {
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			if err := m.syncQuizStatus(reqCtx, syncQuizStatus, histories); err != nil {
+				log.Error(errors.Wrapf(err, "[miner] failed to sync quiz status (%v entries) batchNumber:%v,workerNumber:%v", len(syncQuizStatus), batchNumber, workerNumber))
+				reqCancel()
+				resetVars(false)
+
+				continue
+			}
+			reqCancel()
+		}
+
 		if len(userHistoryKeys) > 0 {
 			go m.telemetry.collectElapsed(5, *before.Time)
 		}
@@ -544,6 +566,10 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 			}
 			for _, value := range updatedUsers {
+				if quizUpdate, hasQuizUpdate := syncQuizStatus[value.ID]; hasQuizUpdate && quizUpdate != nil && quizUpdate.KYCQuizCompleted != nil && quizUpdate.KYCQuizDisabled != nil {
+					value.KYCQuizDisabled = quizUpdate.KYCQuizDisabled
+					value.KYCQuizCompleted = quizUpdate.KYCQuizCompleted
+				}
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err
 				}
@@ -667,6 +693,53 @@ func (m *miner) syncDisableAdvancedTeamCfg(ctx context.Context) error {
 	}
 	if strings.Join(oldCfg, "") != strings.Join(newCfg, "") {
 		log.Info(fmt.Sprintf("`disable_advanced_team_cfg` changed from: %#v, to: %#v", oldCfg, newCfg))
+	}
+
+	return nil
+}
+
+func (m *miner) syncQuizStatus(ctx context.Context, usersToSync map[int64]*quizStatus, histories []*model.User) error {
+	var params, placeholders, i = []any{cfg.Quiz.MaxResetCount}, make([]string, 0, len(usersToSync)), 1
+	for _, qs := range usersToSync {
+		params = append(params, qs.UserID)
+		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1)) //nolint:gomnd // Not a magic number.
+		i++
+	}
+	sql := fmt.Sprintf(`SELECT 
+				u.id,
+				(qr.user_id IS NOT NULL AND cardinality(qr.resets) > $1)                                                     AS kyc_quiz_disabled,
+				(qs.user_id IS NOT NULL AND qs.ended_at is not null AND qs.ended_successfully = true)                        AS kyc_quiz_completed
+				FROM users u
+					LEFT JOIN quiz_resets qr 
+						   ON qr.user_id = u.id
+					LEFT JOIN quiz_sessions qs
+						   ON qs.user_id = u.id
+					WHERE u.id IN (%v)
+		`, strings.Join(placeholders, ","))
+	res, err := storagev2.Select[struct {
+		UserID        string `db:"id"`
+		QuizDisabled  bool   `db:"kyc_quiz_disabled"`
+		QuizCompleted bool   `db:"kyc_quiz_completed"`
+	}](ctx, m.usersDB, sql, params...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch quiz status")
+	}
+	for _, qs := range res {
+		var id int64
+		for idx := range histories {
+			if qs.UserID == histories[idx].UserID {
+				id = histories[idx].ID
+			}
+			histories[idx].KYCQuizCompleted = qs.QuizCompleted
+			histories[idx].KYCQuizDisabled = qs.QuizDisabled
+		}
+		disabled := model.FlexibleBool(qs.QuizDisabled)
+		completed := model.FlexibleBool(qs.QuizCompleted)
+		usersToSync[id] = &quizStatus{
+			UserIDField:                    model.UserIDField{UserID: qs.UserID},
+			KYCQuizDisabledIgnorableField:  model.KYCQuizDisabledIgnorableField{KYCQuizDisabled: &disabled},
+			KYCQuizCompletedIgnorableField: model.KYCQuizCompletedIgnorableField{KYCQuizCompleted: &completed},
+		}
 	}
 
 	return nil
