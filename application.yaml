@@ -186,7 +186,7 @@ miner:
   wintr/connectors/storage/v2: *db
   mainnetRewardPoolContributionPercentage: 0.3
   mainnetRewardPoolContributionEthAddress: bogus
-quiz:
+kyc/quiz:
   maxResetCount: 0
   wintr/connectors/storage/v2: &usersdb
     runDDL: false
