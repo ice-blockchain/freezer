@@ -473,7 +473,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		/******************************************************************************************************************************************************
 			6. Syncing quiz state
 		******************************************************************************************************************************************************/
-
+		before = time.Now()
 		if len(syncQuizUserIDs) > 0 && len(histories) > 0 {
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			var err error
