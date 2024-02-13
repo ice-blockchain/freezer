@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	stdlibtime "time"
 
-	quizapi "github.com/ice-blockchain/eskimo/kyc/quiz/api"
+	"github.com/ice-blockchain/eskimo/kyc/quiz"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/model"
@@ -169,7 +169,7 @@ type (
 		stopCoinDistributionCollectionWorkerManager chan struct{}
 		coinDistributionWorkerMX                    *sync.Mutex
 		coinDistributionRepository                  coindistribution.Repository
-		quizClient                                  quizapi.Client
+		quizRepository                              quiz.ReadRepository
 		mb                                          messagebroker.Client
 		db                                          storage.DB
 		dwhClient                                   dwh.Client

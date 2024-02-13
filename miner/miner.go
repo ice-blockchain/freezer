@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
-	quizapi "github.com/ice-blockchain/eskimo/kyc/quiz/api"
+	"github.com/ice-blockchain/eskimo/kyc/quiz"
 	balancesynchronizer "github.com/ice-blockchain/freezer/balance-synchronizer"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
@@ -46,7 +46,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		dwhClient:                  dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:                         new(sync.WaitGroup),
 		telemetry:                  new(telemetry).mustInit(cfg),
-		quizClient:                 quizapi.NewClient(context.Background(), func() {}),
+		quizRepository:             quiz.NewReadRepository(context.Background()),
 	}
 	go mi.startDisableAdvancedTeamCfgSyncer(ctx)
 	mi.wg.Add(int(cfg.Workers))
@@ -75,7 +75,7 @@ func (m *miner) Close() error {
 		errors.Wrap(m.db.Close(), "failed to close db"),
 		errors.Wrap(m.dwhClient.Close(), "failed to close dwh"),
 		errors.Wrap(m.coinDistributionRepository.Close(), "failed to close coinDistributionRepository"),
-		errors.Wrap(m.quizClient.Close(), "failed to close quizClient"),
+		errors.Wrap(m.quizRepository.Close(), "failed to close quizClient"),
 	).ErrorOrNil()
 }
 
@@ -89,7 +89,7 @@ func (m *miner) CheckHealth(ctx context.Context) error {
 	if err := m.checkDBHealth(ctx); err != nil {
 		return err
 	}
-	if err := m.quizClient.CheckHealth(ctx); err != nil {
+	if err := m.quizRepository.CheckHealth(ctx); err != nil {
 		return err
 	}
 	type ts struct {
@@ -160,7 +160,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		referralsCountGuardOnlyUpdatedUsers                                  = make([]*referralCountGuardUpdatedUser, 0, batchSize)
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
-		quizStatuses                                                         = make(map[string]*quizapi.QuizStatus, batchSize)
+		quizStatuses                                                         = make(map[string]*quiz.QuizStatus, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
@@ -472,7 +472,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		if len(syncQuizUserIDs) > 0 && len(histories) > 0 {
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			var err error
-			quizStatuses, err = m.quizClient.GetQuizStatus(reqCtx, syncQuizUserIDs)
+			quizStatuses, err = m.quizRepository.GetQuizStatus(reqCtx, syncQuizUserIDs...)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "[miner] failed to sync quiz status (%v entries) batchNumber:%v,workerNumber:%v", len(syncQuizUserIDs), batchNumber, workerNumber))
 				reqCancel()
