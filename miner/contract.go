@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	stdlibtime "time"
 
+	quizapi "github.com/ice-blockchain/eskimo/kyc/quiz/api"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
-	"github.com/ice-blockchain/freezer/kyc/quiz"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
 	messagebroker "github.com/ice-blockchain/wintr/connectors/message_broker"
@@ -77,6 +77,7 @@ type (
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
+		userID string
 		model.ExtraBonusLastClaimAvailableAtField
 		model.BalanceLastUpdatedAtField
 		model.ResurrectSoloUsedAtField
@@ -168,7 +169,7 @@ type (
 		stopCoinDistributionCollectionWorkerManager chan struct{}
 		coinDistributionWorkerMX                    *sync.Mutex
 		coinDistributionRepository                  coindistribution.Repository
-		quizRepository                              quiz.Repository
+		quizClient                                  quizapi.Client
 		mb                                          messagebroker.Client
 		db                                          storage.DB
 		dwhClient                                   dwh.Client

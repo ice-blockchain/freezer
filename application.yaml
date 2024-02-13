@@ -188,6 +188,9 @@ miner:
   mainnetRewardPoolContributionEthAddress: bogus
 kyc/quiz:
   maxResetCount: 0
+  maxAttemptsAllowed: 3
+  availabilityWindowSeconds: 600
+  globalStartDate: '2024-02-03T16:20:52.156534Z'
   wintr/connectors/storage/v2: &usersdb
     runDDL: false
     primaryURL: postgresql://root:pass@localhost:5433/eskimo
