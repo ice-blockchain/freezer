@@ -469,6 +469,14 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		reqCancel()
 
+		if len(userHistoryKeys) > 0 {
+			go m.telemetry.collectElapsed(5, *before.Time)
+		}
+
+		/******************************************************************************************************************************************************
+			6. Syncing quiz state
+		******************************************************************************************************************************************************/
+
 		if len(syncQuizUserIDs) > 0 && len(histories) > 0 {
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			var err error
@@ -488,15 +496,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						histories[i].KYCQuizCompleted = quizSync.KYCQuizCompleted
 					}
 				}
+				go m.telemetry.collectElapsed(6, *before.Time)
 			}
 		}
 
-		if len(userHistoryKeys) > 0 {
-			go m.telemetry.collectElapsed(5, *before.Time)
-		}
-
 		/******************************************************************************************************************************************************
-			6. Inserting history/bookkeeping data.
+			7. Inserting history/bookkeeping data.
 		******************************************************************************************************************************************************/
 
 		before = time.Now()
@@ -510,11 +515,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		reqCancel()
 		if len(histories) > 0 {
-			go m.telemetry.collectElapsed(6, *before.Time)
+			go m.telemetry.collectElapsed(7, *before.Time)
 		}
 
 		/******************************************************************************************************************************************************
-			7. Processing Ethereum Coin Distributions for eligible users.
+			8. Processing Ethereum Coin Distributions for eligible users.
 		******************************************************************************************************************************************************/
 
 		before = time.Now()
@@ -528,11 +533,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		reqCancel()
 		if len(coinDistributions) > 0 {
-			go m.telemetry.collectElapsed(7, *before.Time)
+			go m.telemetry.collectElapsed(8, *before.Time)
 		}
 
 		/******************************************************************************************************************************************************
-			8. Persisting the mining progress for the users.
+			9. Persisting the mining progress for the users.
 		******************************************************************************************************************************************************/
 
 		for _, usr := range referralsThatStoppedMining {
@@ -657,7 +662,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		if transactional || len(updatedUsers) > 0 {
-			go m.telemetry.collectElapsed(8, *before.Time)
+			go m.telemetry.collectElapsed(9, *before.Time)
 		}
 
 		batchNumber++
