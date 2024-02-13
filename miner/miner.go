@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/ice-blockchain/eskimo/kyc/quiz"
 	balancesynchronizer "github.com/ice-blockchain/freezer/balance-synchronizer"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
@@ -45,6 +46,7 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 		dwhClient:                  dwh.MustConnect(context.Background(), applicationYamlKey),
 		wg:                         new(sync.WaitGroup),
 		telemetry:                  new(telemetry).mustInit(cfg),
+		quizRepository:             quiz.NewReadRepository(context.Background()),
 	}
 	go mi.startDisableAdvancedTeamCfgSyncer(ctx)
 	mi.wg.Add(int(cfg.Workers))
@@ -73,6 +75,7 @@ func (m *miner) Close() error {
 		errors.Wrap(m.db.Close(), "failed to close db"),
 		errors.Wrap(m.dwhClient.Close(), "failed to close dwh"),
 		errors.Wrap(m.coinDistributionRepository.Close(), "failed to close coinDistributionRepository"),
+		errors.Wrap(m.quizRepository.Close(), "failed to close quizClient"),
 	).ErrorOrNil()
 }
 
@@ -84,6 +87,9 @@ func (m *miner) CheckHealth(ctx context.Context) error {
 		return err
 	}
 	if err := m.checkDBHealth(ctx); err != nil {
+		return err
+	}
+	if err := m.quizRepository.CheckHealth(ctx); err != nil {
 		return err
 	}
 	type ts struct {
@@ -137,7 +143,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		currentAdoption                                                      = m.getAdoption(ctx, m.db, workerNumber)
 		workers                                                              = cfg.Workers
 		batchSize                                                            = cfg.BatchSize
-		userKeys, userHistoryKeys, referralKeys                              = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize)
+		userKeys, userHistoryKeys, referralKeys, syncQuizUserIDs             = make([]string, 0, batchSize), make([]string, 0, batchSize), make([]string, 0, 2*batchSize), make([]string, 0, batchSize)
 		userResults, referralResults                                         = make([]*user, 0, batchSize), make([]*referral, 0, 2*batchSize)
 		t0Referrals, tMinus1Referrals                                        = make(map[int64]*referral, batchSize), make(map[int64]*referral, batchSize)
 		t1ReferralsToIncrementActiveValue, t2ReferralsToIncrementActiveValue = make(map[int64]int32, batchSize), make(map[int64]int32, batchSize)
@@ -154,6 +160,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		referralsCountGuardOnlyUpdatedUsers                                  = make([]*referralCountGuardUpdatedUser, 0, batchSize)
 		referralsUpdated                                                     = make([]*referralUpdated, 0, batchSize)
 		histories                                                            = make([]*model.User, 0, batchSize)
+		quizStatuses                                                         = make(map[string]*quiz.QuizStatus, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
@@ -194,6 +201,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		userKeys, userHistoryKeys, referralKeys = userKeys[:0], userHistoryKeys[:0], referralKeys[:0]
 		userResults, referralResults = userResults[:0], referralResults[:0]
+		syncQuizUserIDs = syncQuizUserIDs[:0]
 		msgs, errs = msgs[:0], errs[:0]
 		updatedUsers = updatedUsers[:0]
 		extraBonusOnlyUpdatedUsers = extraBonusOnlyUpdatedUsers[:0]
@@ -232,6 +240,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		for k := range pendingBalancesForT0 {
 			delete(pendingBalancesForT0, k)
+		}
+		for k := range quizStatuses {
+			delete(quizStatuses, k)
 		}
 	}
 	for ctx.Err() == nil {
@@ -334,6 +345,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
+				syncQuizUserIDs = append(syncQuizUserIDs, usr.UserID)
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if updatedUser != nil {
@@ -453,12 +465,40 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			continue
 		}
 		reqCancel()
+
 		if len(userHistoryKeys) > 0 {
 			go m.telemetry.collectElapsed(5, *before.Time)
 		}
 
 		/******************************************************************************************************************************************************
-			6. Inserting history/bookkeeping data.
+			6. Syncing quiz state
+		******************************************************************************************************************************************************/
+		before = time.Now()
+		if len(syncQuizUserIDs) > 0 && len(histories) > 0 {
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			var err error
+			quizStatuses, err = m.quizRepository.GetQuizStatus(reqCtx, syncQuizUserIDs...)
+			if err != nil {
+				log.Error(errors.Wrapf(err, "[miner] failed to sync quiz status (%v entries) batchNumber:%v,workerNumber:%v", len(syncQuizUserIDs), batchNumber, workerNumber))
+				reqCancel()
+				resetVars(false)
+
+				continue
+			}
+			reqCancel()
+			if len(quizStatuses) > 0 {
+				for i := range histories {
+					if quizSync, hasQuizSync := quizStatuses[histories[i].UserID]; hasQuizSync && quizSync != nil {
+						histories[i].KYCQuizDisabled = quizSync.KYCQuizDisabled
+						histories[i].KYCQuizCompleted = quizSync.KYCQuizCompleted
+					}
+				}
+				go m.telemetry.collectElapsed(6, *before.Time)
+			}
+		}
+
+		/******************************************************************************************************************************************************
+			7. Inserting history/bookkeeping data.
 		******************************************************************************************************************************************************/
 
 		before = time.Now()
@@ -472,11 +512,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		reqCancel()
 		if len(histories) > 0 {
-			go m.telemetry.collectElapsed(6, *before.Time)
+			go m.telemetry.collectElapsed(7, *before.Time)
 		}
 
 		/******************************************************************************************************************************************************
-			7. Processing Ethereum Coin Distributions for eligible users.
+			8. Processing Ethereum Coin Distributions for eligible users.
 		******************************************************************************************************************************************************/
 
 		before = time.Now()
@@ -490,11 +530,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 		reqCancel()
 		if len(coinDistributions) > 0 {
-			go m.telemetry.collectElapsed(7, *before.Time)
+			go m.telemetry.collectElapsed(8, *before.Time)
 		}
 
 		/******************************************************************************************************************************************************
-			8. Persisting the mining progress for the users.
+			9. Persisting the mining progress for the users.
 		******************************************************************************************************************************************************/
 
 		for _, usr := range referralsThatStoppedMining {
@@ -544,6 +584,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 			}
 			for _, value := range updatedUsers {
+				if quizSync, hasQuizSync := quizStatuses[value.UserID]; hasQuizSync && quizSync != nil {
+					disabled := model.FlexibleBool(quizSync.KYCQuizDisabled)
+					completed := model.FlexibleBool(quizSync.KYCQuizCompleted)
+					value.KYCQuizDisabled = &disabled
+					value.KYCQuizCompleted = &completed
+				}
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err
 				}
@@ -615,7 +661,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		if transactional || len(updatedUsers) > 0 {
-			go m.telemetry.collectElapsed(8, *before.Time)
+			go m.telemetry.collectElapsed(9, *before.Time)
 		}
 
 		batchNumber++

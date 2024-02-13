@@ -186,6 +186,20 @@ miner:
   wintr/connectors/storage/v2: *db
   mainnetRewardPoolContributionPercentage: 0.3
   mainnetRewardPoolContributionEthAddress: bogus
+kyc/quiz:
+  maxResetCount: 0
+  maxAttemptsAllowed: 3
+  availabilityWindowSeconds: 600
+  globalStartDate: '2024-02-03T16:20:52.156534Z'
+  wintr/connectors/storage/v2: &usersdb
+    runDDL: false
+    primaryURL: postgresql://root:pass@localhost:5433/eskimo
+    timeout: 90s
+    credentials:
+      user: root
+      password: pass
+    replicaURLs:
+      - postgresql://root:pass@localhost:5433/eskimo
 coin-distribution:
   alert-slack-webhook: https://hooks.slack.com/services/dummy/dummy/dummy
   environment: local

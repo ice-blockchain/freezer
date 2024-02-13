@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	stdlibtime "time"
 
+	"github.com/ice-blockchain/eskimo/kyc/quiz"
 	dwh "github.com/ice-blockchain/freezer/bookkeeper/storage"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/model"
@@ -62,7 +63,6 @@ type (
 		model.CountryField
 		model.UsernameField
 		model.LatestDeviceField
-		model.UserIDField
 		UpdatedUser
 		model.BalanceSoloPendingField
 		model.BalanceT1PendingField
@@ -76,6 +76,7 @@ type (
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
+		model.UserIDField
 		model.ExtraBonusLastClaimAvailableAtField
 		model.BalanceLastUpdatedAtField
 		model.ResurrectSoloUsedAtField
@@ -121,8 +122,9 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
+		model.KYCQuizDisabledResettableField
+		model.KYCQuizCompletedResettableField
 	}
-
 	referralUpdated struct {
 		model.DeserializedUsersKey
 		model.IDT0Field
@@ -166,6 +168,7 @@ type (
 		stopCoinDistributionCollectionWorkerManager chan struct{}
 		coinDistributionWorkerMX                    *sync.Mutex
 		coinDistributionRepository                  coindistribution.Repository
+		quizRepository                              quiz.ReadRepository
 		mb                                          messagebroker.Client
 		db                                          storage.DB
 		dwhClient                                   dwh.Client
