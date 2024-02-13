@@ -31,7 +31,7 @@ func (t *telemetry) mustInit(cfg config) *telemetry {
 	)
 	t.cfg = cfg
 	t.registry = metrics.NewRegistry()
-	t.steps = [10]string{"mine[full iteration]", "mine", "get_users", "get_referrals", "send_messages", "get_history", "sync_quiz", "insert_history", "collect_coin_distributions", "update_users"} //nolint:lll // .
+	t.steps = [10]string{"mine[full iteration]", "mine", "get_users", "get_referrals", "send_messages", "get_history", "sync_quiz_status", "insert_history", "collect_coin_distributions", "update_users"} //nolint:lll // .
 	for ix := range &t.steps {
 		if ix > 1 {
 			t.steps[ix] = fmt.Sprintf("[%v]mine.%v", ix-1, t.steps[ix])

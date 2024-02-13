@@ -345,9 +345,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
-				if !usr.KYCState.KYCQuizDisabled && !usr.KYCState.KYCQuizCompleted {
-					syncQuizUserIDs = append(syncQuizUserIDs, usr.UserID)
-				}
+				syncQuizUserIDs = append(syncQuizUserIDs, usr.UserID)
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
 			if updatedUser != nil {
@@ -399,7 +397,6 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				if t0Ref != nil && t0Ref.ID != 0 && pendingAmountForT0 != 0 {
 					pendingBalancesForT0[t0Ref.ID] += pendingAmountForT0
 				}
-				updatedUser.UpdatedUser.userID = usr.UserID
 				updatedUsers = append(updatedUsers, &updatedUser.UpdatedUser)
 			} else {
 				extraBonusOnlyUpdatedUsr := extrabonusnotifier.UpdatedUser{
@@ -491,7 +488,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			reqCancel()
 			if len(quizStatuses) > 0 {
 				for i := range histories {
-					if quizSync, hasQuizSync := quizStatuses[histories[i].UserID]; hasQuizSync && quizSync != nil && (quizSync.KYCQuizCompleted || quizSync.KYCQuizDisabled) {
+					if quizSync, hasQuizSync := quizStatuses[histories[i].UserID]; hasQuizSync && quizSync != nil {
 						histories[i].KYCQuizDisabled = quizSync.KYCQuizDisabled
 						histories[i].KYCQuizCompleted = quizSync.KYCQuizCompleted
 					}
@@ -587,9 +584,11 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				}
 			}
 			for _, value := range updatedUsers {
-				if quizSync, hasQuizSync := quizStatuses[value.userID]; hasQuizSync && quizSync != nil && (quizSync.KYCQuizCompleted || quizSync.KYCQuizDisabled) {
-					value.KYCQuizDisabled = quizSync.KYCQuizDisabled
-					value.KYCQuizCompleted = quizSync.KYCQuizCompleted
+				if quizSync, hasQuizSync := quizStatuses[value.UserID]; hasQuizSync && quizSync != nil {
+					disabled := model.FlexibleBool(quizSync.KYCQuizDisabled)
+					completed := model.FlexibleBool(quizSync.KYCQuizCompleted)
+					value.KYCQuizDisabled = &disabled
+					value.KYCQuizCompleted = &completed
 				}
 				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
 					return err

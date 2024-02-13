@@ -63,7 +63,6 @@ type (
 		model.CountryField
 		model.UsernameField
 		model.LatestDeviceField
-		model.UserIDField
 		UpdatedUser
 		model.BalanceSoloPendingField
 		model.BalanceT1PendingField
@@ -77,7 +76,7 @@ type (
 	}
 
 	UpdatedUser struct { // This is public only because we have to embed it, and it has to be if so.
-		userID string
+		model.UserIDField
 		model.ExtraBonusLastClaimAvailableAtField
 		model.BalanceLastUpdatedAtField
 		model.ResurrectSoloUsedAtField
@@ -123,8 +122,8 @@ type (
 		model.SlashingRateForT0Field
 		model.SlashingRateForTMinus1Field
 		model.ExtraBonusDaysClaimNotAvailableField
-		model.KYCQuizDisabledField
-		model.KYCQuizCompletedField
+		model.KYCQuizDisabledResettableField
+		model.KYCQuizCompletedResettableField
 	}
 	referralUpdated struct {
 		model.DeserializedUsersKey

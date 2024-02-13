@@ -187,12 +187,6 @@ miner:
   mainnetRewardPoolContributionPercentage: 0.3
   mainnetRewardPoolContributionEthAddress: bogus
 kyc/quiz:
-  environment: local
-  enable-alerts: false
-  maxSessionDurationSeconds: 300
-  sessionCooldownSeconds: 10
-  maxQuestionsPerSession: 3
-  maxWrongAnswersPerSession: 1
   maxResetCount: 0
   maxAttemptsAllowed: 3
   availabilityWindowSeconds: 600

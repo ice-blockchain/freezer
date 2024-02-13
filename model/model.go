@@ -339,16 +339,24 @@ type (
 	}
 
 	KYCQuizCompletedField struct {
-		KYCQuizCompleted bool `json:"kycQuizCompleted" redis:"kyc_quiz_completed,omitempty"`
+		KYCQuizCompleted bool `json:"kycQuizCompleted" redis:"kyc_quiz_completed"`
 	}
 
 	KYCQuizDisabledField struct {
-		KYCQuizDisabled bool `json:"kycQuizDisabled" redis:"kyc_quiz_disabled,omitempty"`
+		KYCQuizDisabled bool `json:"kycQuizDisabled" redis:"kyc_quiz_disabled"`
+	}
+	KYCQuizCompletedResettableField struct {
+		KYCQuizCompleted *FlexibleBool `json:"kycQuizCompleted" redis:"kyc_quiz_completed,omitempty"`
+	}
+
+	KYCQuizDisabledResettableField struct {
+		KYCQuizDisabled *FlexibleBool `json:"kycQuizDisabled" redis:"kyc_quiz_disabled,omitempty"`
 	}
 )
 
 type (
 	FlexibleFloat64 float64
+	FlexibleBool    bool
 )
 
 func (ff *FlexibleFloat64) UnmarshalBinary(data []byte) error {
@@ -377,6 +385,31 @@ func (ff *FlexibleFloat64) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func (fb *FlexibleBool) UnmarshalBinary(data []byte) error {
+	return fb.UnmarshalText(data)
+}
+
+func (fb *FlexibleBool) MarshalBinary() ([]byte, error) {
+	return fb.MarshalText()
+}
+
+func (fb *FlexibleBool) MarshalText() ([]byte, error) {
+	if fb == nil {
+		return nil, nil
+	}
+
+	return []byte(strconv.FormatBool(bool(*fb))), nil
+}
+
+func (fb *FlexibleBool) UnmarshalText(text []byte) error {
+	val, err := strconv.ParseBool(string(text))
+	if err != nil {
+		return errors.Wrapf(err, "failed to ParseFloat `%v`", text)
+	}
+	*fb = FlexibleBool(val)
+
+	return nil
+}
 func (k *DeserializedUsersKey) Key() string {
 	if k == nil || k.ID == 0 {
 		return ""
