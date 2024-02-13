@@ -481,10 +481,12 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				continue
 			}
 			reqCancel()
-			for i := range histories {
-				if quizSync, hasQuizSync := quizStatuses[histories[i].UserID]; hasQuizSync && quizSync != nil && (quizSync.KYCQuizCompleted || quizSync.KYCQuizDisabled) {
-					histories[i].KYCQuizDisabled = quizSync.KYCQuizDisabled
-					histories[i].KYCQuizCompleted = quizSync.KYCQuizCompleted
+			if len(quizStatuses) > 0 {
+				for i := range histories {
+					if quizSync, hasQuizSync := quizStatuses[histories[i].UserID]; hasQuizSync && quizSync != nil && (quizSync.KYCQuizCompleted || quizSync.KYCQuizDisabled) {
+						histories[i].KYCQuizDisabled = quizSync.KYCQuizDisabled
+						histories[i].KYCQuizCompleted = quizSync.KYCQuizCompleted
+					}
 				}
 			}
 		}
