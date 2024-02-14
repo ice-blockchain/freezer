@@ -785,6 +785,10 @@ const docTemplate = `{
                 "currentPrice": {
                     "type": "number"
                 },
+                "marketCap": {
+                    "type": "number",
+                    "example": 111111.2423
+                },
                 "volume24h": {
                     "type": "number"
                 }

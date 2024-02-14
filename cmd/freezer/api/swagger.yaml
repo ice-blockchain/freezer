@@ -95,6 +95,9 @@ definitions:
     properties:
       currentPrice:
         type: number
+      marketCap:
+        example: 111111.2423
+        type: number
       volume24h:
         type: number
     type: object
