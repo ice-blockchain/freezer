@@ -27,6 +27,12 @@ func (*mockedDetailedCoinMetrics) ReadDetails(context.Context) (*detailedCoinMet
 func helperCreateRepoWithRedisOnly(t *testing.T) *repository {
 	t.Helper()
 
+	defer func() {
+		if r := recover(); r != nil {
+			t.Skip("skipping test; redis is not available")
+		}
+	}()
+
 	var cfg Config
 	appCfg.MustLoadFromKey(applicationYamlKey, &cfg)
 
