@@ -379,7 +379,7 @@ type (
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
 		DetailedCoinMetrics struct {
-			RefreshInterval stdlibtime.Duration `yaml:"refresh-interval"`
+			RefreshInterval stdlibtime.Duration `yaml:"refresh-interval" mapstructure:"refresh-interval"`
 		} `yaml:"detailed-coin-metrics"`
 	}
 )
