@@ -380,6 +380,6 @@ type (
 		} `yaml:"globalAggregationInterval"`
 		DetailedCoinMetrics struct {
 			RefreshInterval stdlibtime.Duration `yaml:"refresh-interval" mapstructure:"refresh-interval"`
-		} `yaml:"detailed-coin-metrics"`
+		} `yaml:"detailed-coin-metrics" mapstructure:"detailed-coin-metrics"`
 	}
 )
