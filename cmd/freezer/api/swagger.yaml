@@ -91,6 +91,13 @@ definitions:
         example: 1,243.02
         type: string
     type: object
+  tokenomics.BlockchainDetails:
+    properties:
+      currentPrice:
+        type: number
+      volume24h:
+        type: number
+    type: object
   tokenomics.Miner:
     properties:
       balance:
@@ -223,6 +230,8 @@ definitions:
       blockchain:
         example: 111111.2423
         type: number
+      blockchainDetails:
+        $ref: '#/definitions/tokenomics.BlockchainDetails'
       preStaking:
         example: 111111.2423
         type: number
@@ -393,17 +402,6 @@ paths:
       - application/json
       description: Returns statistics about total coins, with an usecase breakdown.
       parameters:
-      - default: Bearer <Add access token here>
-        description: Insert your access token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - default: <Add metadata token here>
-        description: Insert your metadata token
-        in: header
-        name: X-Account-Metadata
-        type: string
       - description: number of days in the past to look for. Defaults to 3. Max is
           90.
         in: query

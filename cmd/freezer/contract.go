@@ -42,7 +42,7 @@ type (
 	}
 	GetAdoptionArg   struct{}
 	GetTotalCoinsArg struct {
-		TZ   string `form:"tz" example:"+4:30"`
+		TZ   string `form:"tz" example:"+4:30" allowUnauthorized:"true"`
 		Days uint64 `form:"days" example:"7"`
 	}
 )
