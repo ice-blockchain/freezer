@@ -108,9 +108,13 @@ type (
 		Date stdlibtime.Time `json:"date" example:"2022-01-03T16:20:52.156534Z"`
 		TotalCoins
 	}
+	BlockchainDetails struct {
+		Timestamp *time.Time `json:"-" redis:"timestamp"`
+		detailedCoinMetrics.Details
+	}
 	TotalCoinsSummary struct {
 		TimeSeries        []*TotalCoinsTimeSeriesDataPoint `json:"timeSeries"`
-		BlockchainDetails *detailedCoinMetrics.Details     `json:"blockchainDetails"`
+		BlockchainDetails *BlockchainDetails               `json:"blockchainDetails"`
 		TotalCoins
 	}
 	AdoptionSummary struct {
@@ -231,6 +235,10 @@ const (
 	routinesCountToInitCoinsCacheOnStartup = 10
 	totalCoinStatsCacheLockKey             = "totalCoinStatsCache"
 	totalCoinStatsCacheLockDuration        = 1 * stdlibtime.Minute
+
+	totalCoinStatsDetailsLockKey      = "totalCoinStatsDetails"
+	totalCoinStatsDetailsLockDuration = 1 * stdlibtime.Minute
+	totalCoinStatsDetailsKey          = "totalCoinStatsDetailsData"
 )
 
 type (
@@ -265,7 +273,6 @@ type (
 		mb                                messagebroker.Client
 		pictureClient                     picture.Client
 		detailedMetricsRepo               detailedCoinMetrics.Repository
-		detailedMetricsData               atomic.Pointer[detailedCoinMetrics.Details]
 	}
 
 	processor struct {
@@ -371,5 +378,8 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
+		CoinStats struct {
+			RefreshInterval stdlibtime.Duration `yaml:"refreshInterval"`
+		} `yaml:"coinStats"`
 	}
 )

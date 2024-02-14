@@ -5,8 +5,6 @@ package detailed_coin_metrics //nolint:revive,nosnakecase,stylecheck //.
 import (
 	"context"
 	"errors"
-
-	"github.com/ice-blockchain/wintr/time"
 )
 
 type (
@@ -17,9 +15,8 @@ type (
 		ReadRepository
 	}
 	Details struct {
-		UpdatedAt    *time.Time `json:"updatedAt"`
-		CurrentPrice float64    `json:"currentPrice"`
-		Volume24h    float64    `json:"volume24h"`
+		CurrentPrice float64 `json:"currentPrice" redis:"currentPrice"`
+		Volume24h    float64 `json:"volume24h" redis:"volume24h"`
 	}
 )
 

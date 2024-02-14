@@ -50,9 +50,24 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 
 	}
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
-	res.BlockchainDetails = r.detailedMetricsData.Load()
+	details, err := r.loadCachedBlockchainDetails(ctx)
+	if err != nil {
+		log.Error(err)
+	}
+	res.BlockchainDetails = details
 
 	return r.enhanceWithBlockchainCoinStats(res), nil
+}
+
+func (r *repository) loadCachedBlockchainDetails(ctx context.Context) (*BlockchainDetails, error) {
+	vals, err := storage.Get[BlockchainDetails](ctx, r.db, totalCoinStatsDetailsKey, totalCoinStatsDetailsKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get cached blockchain details")
+	} else if len(vals) > 0 {
+		return vals[0], nil
+	}
+
+	return nil, nil
 }
 
 func (r *repository) totalCoinsDates(now *time.Time, days uint64) ([]stdlibtime.Time, []*TotalCoinsTimeSeriesDataPoint) {
@@ -100,20 +115,53 @@ func (r *repository) totalCoinsCacheKey(date stdlibtime.Time) string {
 	return (&dwh.TotalCoins{CreatedAt: time.New(date.Truncate(r.cfg.GlobalAggregationInterval.Child))}).Key()
 }
 
-func (r *repository) updateDetailedCoinMetrics(ctx context.Context) error {
+func (*BlockchainDetails) Key() string {
+	return totalCoinStatsDetailsKey
+}
+
+func (r *repository) updateCachedBlockchainDetails(ctx context.Context) error {
+	lock, err := redislock.Obtain(ctx, r.db, totalCoinStatsDetailsLockKey, totalCoinStatsDetailsLockDuration, &redislock.Options{RetryStrategy: redislock.NoRetry()})
+	if err != nil {
+		if errors.Is(err, redislock.ErrNotObtained) {
+			return nil
+		}
+
+		return errors.Wrap(err, "failed to obtain lock for totalCoinStatsDetails")
+	}
+	defer func() {
+		log.Error(errors.Wrap(lock.Release(ctx), "failed to release lock for totalCoinStatsDetails"))
+	}()
+
+	value, err := r.loadCachedBlockchainDetails(ctx)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	if value != nil && now.Sub(*value.Timestamp.Time) < r.cfg.CoinStats.RefreshInterval {
+		return nil
+	}
+
 	detailedCoinMetrics, err := r.detailedMetricsRepo.ReadDetails(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to read detailedCoinMetrics")
 	}
 
-	r.detailedMetricsData.Store(detailedCoinMetrics)
+	err = storage.Set(ctx, r.db, &BlockchainDetails{
+		Timestamp: now,
+		Details:   *detailedCoinMetrics,
+	})
 
-	return nil
+	return errors.Wrap(err, "failed to update totalCoinStatsDetails")
 }
 
 func (r *repository) keepBlockchainDetailsCacheUpdated(ctx context.Context) {
+	if r.cfg.CoinStats.RefreshInterval < stdlibtime.Minute {
+		log.Panic(fmt.Sprintf("coinStats.RefreshInterval is too low: %v, minimum is 1 minute", r.cfg.CoinStats.RefreshInterval))
+	}
+
 	signals := make(chan struct{}, 1)
-	ticker := stdlibtime.NewTicker(r.cfg.GlobalAggregationInterval.Child / 6) //nolint:gomnd // Not an issue.
+	ticker := stdlibtime.NewTicker(r.cfg.CoinStats.RefreshInterval)
 	defer ticker.Stop()
 
 	// Send initial signal now without waiting for the first tick.
@@ -132,7 +180,7 @@ func (r *repository) keepBlockchainDetailsCacheUpdated(ctx context.Context) {
 		select {
 		case <-signals:
 			reqCtx, cancel := context.WithTimeout(ctx, requestDeadline)
-			if err := r.updateDetailedCoinMetrics(reqCtx); err != nil {
+			if err := r.updateCachedBlockchainDetails(reqCtx); err != nil {
 				log.Error(errors.Wrap(err, "failed to update detailedCoinMetrics"))
 			}
 			cancel()

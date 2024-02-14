@@ -130,6 +130,8 @@ tokenomics: &tokenomics
       - 5
       - 9
       - 20
+  coinStats:
+    refreshInterval: 5m
 tokenomics_test:
   <<: *tokenomics
   messageBroker:

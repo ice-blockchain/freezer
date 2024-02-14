@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	appCfg "github.com/ice-blockchain/wintr/config"
-	"github.com/ice-blockchain/wintr/time"
 )
 
 func loadConfig() *config {
@@ -46,7 +45,6 @@ func (r *repository) ReadDetails(ctx context.Context) (*Details, error) {
 	}
 
 	return &Details{
-		UpdatedAt:    time.Now(),
 		CurrentPrice: quote.Quote[targetCurrency].Price,
 		Volume24h:    quote.Quote[targetCurrency].Volume24h,
 	}, nil
