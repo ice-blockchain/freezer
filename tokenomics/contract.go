@@ -110,6 +110,7 @@ type (
 	}
 	BlockchainDetails struct {
 		Timestamp *time.Time `json:"-" redis:"timestamp"`
+		MarketCap float64    `json:"marketCap" example:"111111.2423" redis:"market_cap"`
 		detailedCoinMetrics.Details
 	}
 	TotalCoinsSummary struct {

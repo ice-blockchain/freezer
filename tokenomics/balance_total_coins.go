@@ -56,7 +56,12 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 	res.BlockchainDetails = details
 	res.TotalCoins = res.TimeSeries[0].TotalCoins
 
-	return r.enhanceWithBlockchainCoinStats(res), nil
+	data := r.enhanceWithBlockchainCoinStats(res)
+	if data != nil && data.BlockchainDetails != nil {
+		data.BlockchainDetails.MarketCap = data.BlockchainDetails.CurrentPrice * data.Blockchain
+	}
+
+	return data, nil
 }
 
 func (r *repository) loadCachedBlockchainDetails(ctx context.Context) (*BlockchainDetails, error) {
