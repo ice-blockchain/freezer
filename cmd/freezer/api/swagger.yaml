@@ -2,15 +2,6 @@
 
 basePath: /v1r
 definitions:
-  detailed_coin_metrics.Details:
-    properties:
-      currentPrice:
-        type: number
-      updatedAt:
-        type: string
-      volume24h:
-        type: number
-    type: object
   server.ErrorResponse:
     properties:
       code:
@@ -99,6 +90,13 @@ definitions:
       totalReferrals:
         example: 1,243.02
         type: string
+    type: object
+  tokenomics.BlockchainDetails:
+    properties:
+      currentPrice:
+        type: number
+      volume24h:
+        type: number
     type: object
   tokenomics.Miner:
     properties:
@@ -233,7 +231,7 @@ definitions:
         example: 111111.2423
         type: number
       blockchainDetails:
-        $ref: '#/definitions/detailed_coin_metrics.Details'
+        $ref: '#/definitions/tokenomics.BlockchainDetails'
       preStaking:
         example: 111111.2423
         type: number

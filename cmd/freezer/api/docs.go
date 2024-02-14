@@ -653,20 +653,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "detailed_coin_metrics.Details": {
-            "type": "object",
-            "properties": {
-                "currentPrice": {
-                    "type": "number"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "volume24h": {
-                    "type": "number"
-                }
-            }
-        },
         "server.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -790,6 +776,17 @@ const docTemplate = `{
                 "totalReferrals": {
                     "type": "string",
                     "example": "1,243.02"
+                }
+            }
+        },
+        "tokenomics.BlockchainDetails": {
+            "type": "object",
+            "properties": {
+                "currentPrice": {
+                    "type": "number"
+                },
+                "volume24h": {
+                    "type": "number"
                 }
             }
         },
@@ -984,7 +981,7 @@ const docTemplate = `{
                     "example": 111111.2423
                 },
                 "blockchainDetails": {
-                    "$ref": "#/definitions/detailed_coin_metrics.Details"
+                    "$ref": "#/definitions/tokenomics.BlockchainDetails"
                 },
                 "preStaking": {
                     "type": "number",
