@@ -49,7 +49,7 @@ func TestGetCoinStatsBlockchainDetails(t *testing.T) {
 	repo := helperCreateRepoWithRedisOnly(t)
 
 	t.Run("InvalidConfig", func(t *testing.T) {
-		repo.cfg.CoinStats.RefreshInterval = 0
+		repo.cfg.DetailedCoinMetrics.RefreshInterval = 0
 		require.Panics(t, func() {
 			repo.keepBlockchainDetailsCacheUpdated(context.Background())
 		})
@@ -68,7 +68,7 @@ func TestGetCoinStatsBlockchainDetails(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 		defer cancel()
 
-		repo.cfg.CoinStats.RefreshInterval = time.Minute
+		repo.cfg.DetailedCoinMetrics.RefreshInterval = time.Minute
 		repo.keepBlockchainDetailsCacheUpdated(ctx)
 	})
 

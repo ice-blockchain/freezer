@@ -49,18 +49,18 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 		child.Date = child.Date.Add(-1 * stdlibtime.Nanosecond)
 
 	}
-	res.TotalCoins = res.TimeSeries[0].TotalCoins
 	details, err := r.loadCachedBlockchainDetails(ctx)
 	if err != nil {
-		log.Error(err)
+		return nil, errors.Wrap(err, "failed to load cached blockchain details")
 	}
 	res.BlockchainDetails = details
+	res.TotalCoins = res.TimeSeries[0].TotalCoins
 
 	return r.enhanceWithBlockchainCoinStats(res), nil
 }
 
 func (r *repository) loadCachedBlockchainDetails(ctx context.Context) (*BlockchainDetails, error) {
-	vals, err := storage.Get[BlockchainDetails](ctx, r.db, totalCoinStatsDetailsKey, totalCoinStatsDetailsKey)
+	vals, err := storage.Get[BlockchainDetails](ctx, r.db, totalCoinStatsDetailsKey)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get cached blockchain details")
 	} else if len(vals) > 0 {
@@ -138,7 +138,7 @@ func (r *repository) updateCachedBlockchainDetails(ctx context.Context) error {
 	}
 
 	now := time.Now()
-	if value != nil && now.Sub(*value.Timestamp.Time) < r.cfg.CoinStats.RefreshInterval {
+	if value != nil && now.Sub(*value.Timestamp.Time) < r.cfg.DetailedCoinMetrics.RefreshInterval {
 		return nil
 	}
 
@@ -156,12 +156,12 @@ func (r *repository) updateCachedBlockchainDetails(ctx context.Context) error {
 }
 
 func (r *repository) keepBlockchainDetailsCacheUpdated(ctx context.Context) {
-	if r.cfg.CoinStats.RefreshInterval < stdlibtime.Minute {
-		log.Panic(fmt.Sprintf("coinStats.RefreshInterval is too low: %v, minimum is 1 minute", r.cfg.CoinStats.RefreshInterval))
+	if r.cfg.DetailedCoinMetrics.RefreshInterval < stdlibtime.Minute {
+		log.Panic(fmt.Sprintf("coinStats.RefreshInterval is too low: %v, minimum is 1 minute", r.cfg.DetailedCoinMetrics.RefreshInterval))
 	}
 
 	signals := make(chan struct{}, 1)
-	ticker := stdlibtime.NewTicker(r.cfg.CoinStats.RefreshInterval)
+	ticker := stdlibtime.NewTicker(r.cfg.DetailedCoinMetrics.RefreshInterval)
 	defer ticker.Stop()
 
 	// Send initial signal now without waiting for the first tick.

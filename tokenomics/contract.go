@@ -378,8 +378,8 @@ type (
 			Parent stdlibtime.Duration `yaml:"parent"`
 			Child  stdlibtime.Duration `yaml:"child"`
 		} `yaml:"globalAggregationInterval"`
-		CoinStats struct {
+		DetailedCoinMetrics struct {
 			RefreshInterval stdlibtime.Duration `yaml:"refresh-interval"`
-		} `yaml:"coinStats"`
+		} `yaml:"detailed-coin-metrics"`
 	}
 )
