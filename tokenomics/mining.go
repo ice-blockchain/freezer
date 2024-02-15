@@ -296,7 +296,7 @@ func (r *repository) calculateMiningRateSummaries(
 		t2 = 0
 	}
 	positiveTotalNoPreStakingBonus := r.calculateMintedStandardCoins(t0, extraBonus, 0, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
-	if positiveTotalNoPreStakingBonus > baseMiningRate {
+	if positiveTotalNoPreStakingBonus > baseMiningRate && baseMiningRate > 0 {
 		positiveTotalNoPreStakingBonusVal = ((positiveTotalNoPreStakingBonus - baseMiningRate) * 100) / baseMiningRate
 	}
 	miningRates.PositiveTotalNoPreStakingBonus = &MiningRateSummary[string]{
@@ -327,7 +327,7 @@ func (r *repository) calculateMiningRateSummaries(
 		switch miningRates.Type {
 		case PositiveMiningRateType:
 			standardMiningRate = r.calculateMintedStandardCoins(t0, extraBonus, preStakingAllocation, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
-			if standardMiningRate > baseMiningRate {
+			if standardMiningRate > baseMiningRate && baseMiningRate > 0 {
 				localTotalBonus = ((standardMiningRate - baseMiningRate) * 100) / baseMiningRate
 			}
 		case NegativeMiningRateType:
@@ -349,7 +349,7 @@ func (r *repository) calculateMiningRateSummaries(
 		switch miningRates.Type {
 		case PositiveMiningRateType:
 			preStakingMiningRate = r.calculateMintedPreStakingCoins(t0, extraBonus, preStakingAllocation, preStakingBonus, uint32(t1), uint32(t2), baseMiningRate, r.cfg.GlobalAggregationInterval.Child, false)
-			if preStakingMiningRate > baseMiningRate {
+			if preStakingMiningRate > baseMiningRate && baseMiningRate > 0 {
 				localTotalBonus = ((preStakingMiningRate - baseMiningRate) * 100) / baseMiningRate
 			}
 		case NegativeMiningRateType:
@@ -373,7 +373,7 @@ func (r *repository) calculateMiningRateSummaries(
 	}
 	switch miningRates.Type {
 	case PositiveMiningRateType:
-		if standardMiningRate+preStakingMiningRate > baseMiningRate {
+		if standardMiningRate+preStakingMiningRate > baseMiningRate && baseMiningRate > 0 {
 			totalBonusVal = ((standardMiningRate + preStakingMiningRate - baseMiningRate) * 100) / baseMiningRate
 		}
 		totalNoPreStakingBonusRate = positiveTotalNoPreStakingBonus
