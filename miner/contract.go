@@ -162,6 +162,12 @@ type (
 		ID, IDT0, IDTMinus1 int64
 	}
 
+	prestakingResettableUpdatedUser struct {
+		model.PreStakingAllocationResettableField
+		model.PreStakingBonusResettableField
+		model.DeserializedUsersKey
+	}
+
 	miner struct {
 		coinDistributionStartedSignaler             chan struct{}
 		coinDistributionEndedSignaler               chan struct{}

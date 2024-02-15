@@ -163,6 +163,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		quizStatuses                                                         = make(map[string]*quiz.QuizStatus, batchSize)
 		userGlobalRanks                                                      = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                = dwh.InsertDDL(int(batchSize))
+		prestakingResettableUsers                                            = make([]*prestakingResettableUpdatedUser, 0, batchSize)
 		shouldSynchronizeBalanceFunc                                         = func(batchNumberArg uint64) bool { return false }
 		startedCoinDistributionCollecting                                    = isCoinDistributionCollectorEnabled(now)
 	)
@@ -211,6 +212,8 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		userGlobalRanks = userGlobalRanks[:0]
 		referralsThatStoppedMining = referralsThatStoppedMining[:0]
 		coinDistributions = coinDistributions[:0]
+		prestakingResettableUsers = prestakingResettableUsers[:0]
+
 		for k := range t0Referrals {
 			delete(t0Referrals, k)
 		}
@@ -343,11 +346,19 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			if isAdvancedTeamDisabled(usr.LatestDevice) {
 				usr.ActiveT2Referrals = 0
 			}
+			usr.PreStakingAllocation = 0
+			usr.PreStakingBonus = 0
 			updatedUser, shouldGenerateHistory, IDT0Changed, pendingAmountForTMinus1, pendingAmountForT0 := mine(currentAdoption.BaseMiningRate, now, usr, t0Ref, tMinus1Ref)
 			if shouldGenerateHistory {
 				syncQuizUserIDs = append(syncQuizUserIDs, usr.UserID)
 				userHistoryKeys = append(userHistoryKeys, usr.Key())
 			}
+
+			prestakingResettableUsers = append(prestakingResettableUsers, &prestakingResettableUpdatedUser{
+				PreStakingBonusResettableField:      model.PreStakingBonusResettableField{PreStakingBonus: 0},
+				PreStakingAllocationResettableField: model.PreStakingAllocationResettableField{PreStakingAllocation: 0},
+				DeserializedUsersKey:                usr.DeserializedUsersKey,
+			})
 			if updatedUser != nil {
 				var extraBonusIndex uint16
 				if isAvailable, _ := extrabonusnotifier.IsExtraBonusAvailable(now, m.extraBonusStartDate, updatedUser.ExtraBonusStartedAt, m.extraBonusIndicesDistribution, updatedUser.ID, int16(updatedUser.UTCOffset), &extraBonusIndex, &updatedUser.ExtraBonusDaysClaimNotAvailable, &updatedUser.ExtraBonusLastClaimAvailableAt); isAvailable {
@@ -548,7 +559,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 
 		var pipeliner redis.Pipeliner
 		var transactional bool
-		if len(pendingBalancesForTMinus1)+len(pendingBalancesForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks) > 0 {
+		if len(pendingBalancesForTMinus1)+len(pendingBalancesForT0)+len(balanceT1EthereumIncr)+len(balanceT2EthereumIncr)+len(t1ReferralsToIncrementActiveValue)+len(t2ReferralsToIncrementActiveValue)+len(referralsCountGuardOnlyUpdatedUsers)+len(t1ReferralsThatStoppedMining)+len(t2ReferralsThatStoppedMining)+len(extraBonusOnlyUpdatedUsers)+len(referralsUpdated)+len(userGlobalRanks)+len(prestakingResettableUsers) > 0 {
 			pipeliner = m.db.TxPipeline()
 			transactional = true
 		} else {
@@ -604,6 +615,13 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 					return err
 				}
 			}
+
+			for _, value := range prestakingResettableUsers {
+				if err := pipeliner.HSet(reqCtx, value.Key(), storage.SerializeValue(value)...).Err(); err != nil {
+					return err
+				}
+			}
+
 			if len(userGlobalRanks) > 0 {
 				if err := pipeliner.ZAdd(reqCtx, "top_miners", userGlobalRanks...).Err(); err != nil {
 					return err

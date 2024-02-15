@@ -44,15 +44,15 @@ const (
 
 // Values for server.ErrorResponse#Code.
 const (
-	userNotFoundErrorCode                                    = "USER_NOT_FOUND"
-	decreasingPreStakingAllocationOrYearsNotAllowedErrorCode = "DECREASING_PRE_STAKING_ALLOCATION_OR_YEARS_NOT_ALLOWED"
-	miningInProgressErrorCode                                = "MINING_IN_PROGRESS"
-	raceConditionErrorCode                                   = "RACE_CONDITION"
-	resurrectionDecisionRequiredErrorCode                    = "RESURRECTION_DECISION_REQUIRED"
-	kycStepsRequiredErrorCode                                = "KYC_STEPS_REQUIRED"
-	miningDisabledErrorCode                                  = "MINING_DISABLED"
-	noExtraBonusAvailableErrorCode                           = "NO_EXTRA_BONUS_AVAILABLE"
-	extraBonusAlreadyClaimedErrorCode                        = "EXTRA_BONUS_ALREADY_CLAIMED"
+	userNotFoundErrorCode                 = "USER_NOT_FOUND"
+	prestakingDisabled                    = "PRESTAKING_DISABLED"
+	miningInProgressErrorCode             = "MINING_IN_PROGRESS"
+	raceConditionErrorCode                = "RACE_CONDITION"
+	resurrectionDecisionRequiredErrorCode = "RESURRECTION_DECISION_REQUIRED"
+	kycStepsRequiredErrorCode             = "KYC_STEPS_REQUIRED"
+	miningDisabledErrorCode               = "MINING_DISABLED"
+	noExtraBonusAvailableErrorCode        = "NO_EXTRA_BONUS_AVAILABLE"
+	extraBonusAlreadyClaimedErrorCode     = "EXTRA_BONUS_ALREADY_CLAIMED"
 
 	defaultDistributionLimit = 5000
 )
