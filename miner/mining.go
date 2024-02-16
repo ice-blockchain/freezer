@@ -120,10 +120,14 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 
 	} else {
 		if updatedUser.SlashingRateSolo == 0 {
-			updatedUser.SlashingRateSolo = updatedUser.BalanceSolo / 60. / miningSessionRatio
+			updatedUser.SlashingRateSolo = updatedUser.BalanceSolo / 10. / miningSessionRatio
+		} else {
+			if updatedUser.SlashingRateSolo < updatedUser.BalanceSolo/10./miningSessionRatio {
+				updatedUser.SlashingRateSolo = updatedUser.BalanceSolo / 10. / miningSessionRatio
+			}
 		}
 		if unAppliedSoloPending != 0 {
-			updatedUser.SlashingRateSolo += unAppliedSoloPending / 60. / miningSessionRatio
+			updatedUser.SlashingRateSolo += unAppliedSoloPending / 10. / miningSessionRatio
 		}
 		if updatedUser.SlashingRateSolo < 0 {
 			updatedUser.SlashingRateSolo = 0
@@ -133,16 +137,28 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	if t0Ref != nil &&
 		((!t0Ref.MiningSessionSoloEndedAt.IsNil() && t0Ref.MiningSessionSoloEndedAt.Before(*now.Time)) || updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
 		if updatedUser.SlashingRateForT0 == 0 {
-			updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 60. / miningSessionRatio
+			updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 10. / miningSessionRatio
+		} else {
+			if updatedUser.SlashingRateForT0 < updatedUser.BalanceForT0/10./miningSessionRatio {
+				updatedUser.SlashingRateForT0 = updatedUser.BalanceForT0 / 10. / miningSessionRatio
+			}
 		}
 		if updatedUser.SlashingRateT0 == 0 {
-			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 60. / miningSessionRatio
+			updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 10. / miningSessionRatio
+		} else {
+			if updatedUser.SlashingRateT0 < updatedUser.BalanceT0/10./miningSessionRatio {
+				updatedUser.SlashingRateT0 = updatedUser.BalanceT0 / 10. / miningSessionRatio
+			}
 		}
 	}
 	if tMinus1Ref != nil &&
 		((!tMinus1Ref.MiningSessionSoloEndedAt.IsNil() && tMinus1Ref.MiningSessionSoloEndedAt.Before(*now.Time)) || updatedUser.MiningSessionSoloEndedAt.Before(*now.Time)) {
 		if updatedUser.SlashingRateForTMinus1 == 0 {
-			updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 60. / miningSessionRatio
+			updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 10. / miningSessionRatio
+		} else {
+			if updatedUser.SlashingRateForTMinus1 < updatedUser.BalanceForTMinus1/10./miningSessionRatio {
+				updatedUser.SlashingRateForTMinus1 = updatedUser.BalanceForTMinus1 / 10. / miningSessionRatio
+			}
 		}
 	}
 
