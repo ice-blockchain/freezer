@@ -46,7 +46,7 @@ func IsEligibleForEthereumDistribution(
 	standardBalance, minEthereumDistributionICEBalanceRequired float64,
 	ethAddress, country string,
 	distributionDeniedCountries map[string]struct{},
-	now, collectingEndedAt, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate *time.Time,
+	now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, ethereumDistributionEndDate *time.Time,
 	kycState model.KYCState,
 	miningSessionDuration, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
 	var countryAllowed bool

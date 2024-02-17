@@ -47,7 +47,6 @@ func (ref *referral) isEligibleForSelfForEthereumDistribution(now, lastEthereumC
 			ref.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
-			currentCoinDistributionCollectingEndedAt(),
 			ref.MiningSessionSoloStartedAt,
 			ref.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -70,7 +69,6 @@ func (ref *referral) isEligibleForReferralForEthereumDistribution(now *time.Time
 			ref.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
-			currentCoinDistributionCollectingEndedAt(),
 			ref.MiningSessionSoloStartedAt,
 			ref.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -101,7 +99,6 @@ func (u *user) isEligibleForSelfForEthereumDistribution(now *time.Time) bool {
 			u.Country,
 			coinDistributionCollectorSettings.DeniedCountries,
 			now,
-			currentCoinDistributionCollectingEndedAt(),
 			u.MiningSessionSoloStartedAt,
 			u.MiningSessionSoloEndedAt,
 			coinDistributionCollectorSettings.EndDate,
@@ -149,7 +146,6 @@ func (u *user) isEligibleForReferralForEthereumDistribution(now *time.Time) bool
 		u.Country,
 		coinDistributionCollectorSettings.DeniedCountries,
 		now,
-		currentCoinDistributionCollectingEndedAt(),
 		u.MiningSessionSoloStartedAt,
 		u.MiningSessionSoloEndedAt,
 		coinDistributionCollectorSettings.EndDate,
@@ -210,7 +206,7 @@ func (u *user) processEthereumCoinDistribution(
 		soloCD, soloMainnetRewardPoolContributionCD *coindistribution.ByEarnerForReview
 	)
 	const mainnetRewardPoolContributionIdentifier = "mainnet/reward/pool/contribution"
-	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && wasNotProcessedToday(now, u.SoloLastEthereumCoinDistributionProcessedAt) {
+	if u != nil && !u.MiningSessionSoloEndedAt.IsNil() && wasNotProcessedToday(now, u.SoloLastEthereumCoinDistributionProcessedAt) {
 		soloCD = &coindistribution.ByEarnerForReview{
 			CreatedAt:          now,
 			Username:           u.Username,
@@ -233,7 +229,7 @@ func (u *user) processEthereumCoinDistribution(
 		}
 		records = append(records, soloCD, soloMainnetRewardPoolContributionCD)
 	}
-	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0.couldHaveBeenEligibleForEthereumDistributionRecently(now) && t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) { //nolint:lll // .
+	if u != nil && !u.MiningSessionSoloEndedAt.IsNil() && t0 != nil && !t0.MiningSessionSoloEndedAt.IsNil() && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) { //nolint:lll // .
 		if wasNotProcessedToday(now, u.SoloLastEthereumCoinDistributionProcessedAt) {
 			t0CD = &coindistribution.ByEarnerForReview{
 				CreatedAt:    now,
@@ -265,7 +261,7 @@ func (u *user) processEthereumCoinDistribution(
 			records = append(records, forT0CD, forT0MainnetRewardPoolContributionCD)
 		}
 	}
-	if u.couldHaveBeenEligibleForEthereumDistributionRecently(now) && tMinus1.couldHaveBeenEligibleForEthereumDistributionRecently(now) && tMinus1 != nil && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID && wasNotProcessedToday(now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
+	if u != nil && !u.MiningSessionSoloEndedAt.IsNil() && tMinus1 != nil && !tMinus1.MiningSessionSoloEndedAt.IsNil() && tMinus1.UserID != u.UserID && t0 != nil && tMinus1.UserID != t0.UserID && wasNotProcessedToday(now, u.ForTMinus1LastEthereumCoinDistributionProcessedAt) { //nolint:lll // .
 		forTMinus1CD = &coindistribution.ByEarnerForReview{
 			CreatedAt:    now,
 			UserID:       tMinus1.UserID,
