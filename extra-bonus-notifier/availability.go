@@ -15,6 +15,10 @@ func IsExtraBonusAvailable(
 	extraBonusIndex, extraBonusDaysClaimNotAvailable *uint16,
 	extraBonusLastClaimAvailableAt **time.Time,
 ) (available, claimable bool) {
+	if true {
+		return false, false
+	}
+
 	const notifyHourStart, notifyHourEnd = 10, 20
 	var (
 		utcOffset                       = stdlibtime.Duration(utcOffsetFactor) * cfg.ExtraBonuses.UTCOffsetDuration
