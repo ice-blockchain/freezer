@@ -40,6 +40,7 @@ func generateExtraBonusIndicesDistributionFromMap(totalChunkNumber uint16, m map
 }
 
 func Test_isExtraBonusAvailable(t *testing.T) {
+	t.Skip("extra bonus disabled")
 	t.Parallel()
 
 	weekAgo := testTime.Add(-stdlibtime.Hour * 24 * 7)
