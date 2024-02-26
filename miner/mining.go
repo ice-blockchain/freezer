@@ -15,13 +15,17 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	updatedUser = &clonedUser1
 	pendingResurrectionForTMinus1, pendingResurrectionForT0 := resurrect(now, updatedUser, t0Ref, tMinus1Ref)
 	IDT0Changed, _ = changeT0AndTMinus1Referrals(updatedUser)
-	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && updatedUser.isAbsoluteZero() {
+	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) &&
+		(updatedUser.isAbsoluteZero() || (usr.BalanceSolo > 0 && usr.BalanceSoloEthereum >= usr.BalanceSolo)) {
 		if updatedUser.BalanceT1Pending-updatedUser.BalanceT1PendingApplied != 0 ||
 			updatedUser.BalanceT2Pending-updatedUser.BalanceT2PendingApplied != 0 {
 			updatedUser.BalanceT1PendingApplied = updatedUser.BalanceT1Pending
 			updatedUser.BalanceT2PendingApplied = updatedUser.BalanceT2Pending
 			updatedUser.BalanceLastUpdatedAt = now
 
+			return updatedUser, false, IDT0Changed, 0, 0
+		}
+		if usr.BalanceSolo > 0 && usr.BalanceSoloEthereum >= usr.BalanceSolo {
 			return updatedUser, false, IDT0Changed, 0, 0
 		}
 
@@ -207,9 +211,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	}
 	if updatedUser.BalanceForT0 < 0 {
 		updatedUser.BalanceForT0 = 0
+		pendingAmountForT0 = 0
 	}
 	if updatedUser.BalanceForTMinus1 < 0 {
 		updatedUser.BalanceForTMinus1 = 0
+		pendingAmountForTMinus1 = 0
 	}
 
 	if usr.BalanceTotalPreStaking+usr.BalanceTotalStandard == 0 {

@@ -339,6 +339,10 @@ func (u *user) processEthereumCoinDistribution(
 }
 
 func wasNotProcessedToday(now, lastEthereumCoinDistributionProcessedAt *time.Time) bool {
+	if true {
+		return cfg.coinDistributionCollectorSettings.Load().LatestDate.IsNil()
+	}
+
 	return lastEthereumCoinDistributionProcessedAt.IsNil() ||
 		!lastEthereumCoinDistributionProcessedAt.Truncate(cfg.EthereumDistributionFrequency.Min).Equal(now.Truncate(cfg.EthereumDistributionFrequency.Min))
 }

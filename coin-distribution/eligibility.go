@@ -66,6 +66,10 @@ func IsEligibleForEthereumDistribution(
 func IsEligibleForEthereumDistributionNow(id int64,
 	now, lastEthereumCoinDistributionProcessedAt, coinDistributionStartDate, latestCoinDistributionCollectingDate *time.Time,
 	ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax stdlibtime.Duration) bool {
+	if true {
+		return latestCoinDistributionCollectingDate.IsNil()
+	}
+
 	return (lastEthereumCoinDistributionProcessedAt.IsNil() && now.Truncate(ethereumDistributionFrequencyMin).Equal(coinDistributionStartDate.Truncate(ethereumDistributionFrequencyMin))) || //nolint:lll // .
 		((lastEthereumCoinDistributionProcessedAt.IsNil() || !lastEthereumCoinDistributionProcessedAt.Truncate(ethereumDistributionFrequencyMin).Equal(now.Truncate(ethereumDistributionFrequencyMin))) && //nolint:lll // .
 			isEligibleForEthereumDistributionNow(id, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, coinDistributionStartDate, latestCoinDistributionCollectingDate)) //nolint:lll // .
