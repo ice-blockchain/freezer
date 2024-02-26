@@ -223,6 +223,7 @@ require (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.19
+	github.com/crate-crypto/go-ipa => github.com/crate-crypto/go-ipa v0.0.0-20231205143816-408dbffb2041
 	github.com/docker/docker => github.com/docker/docker v20.10.3+incompatible
 	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.15.0
 )

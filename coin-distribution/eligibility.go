@@ -23,7 +23,7 @@ func IsCoinDistributionCollectorEnabled(now *time.Time, ethereumDistributionFreq
 			(now.Hour() >= cs.StartHour &&
 				now.Minute() >= 20 && //nolint:gomnd // .
 				now.After(*cs.StartDate.Time) &&
-				now.Before(*cs.EndDate.Time) &&
+				now.Before(cs.EndDate.Add(ethereumDistributionFrequencyMin)) &&
 				(cs.LatestDate.IsNil() ||
 					!now.Truncate(ethereumDistributionFrequencyMin).Equal(cs.LatestDate.Truncate(ethereumDistributionFrequencyMin)))))
 }
