@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ice-blockchain/eskimo/users"
 	coindistribution "github.com/ice-blockchain/freezer/coin-distribution"
 	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/freezer/tokenomics"
@@ -159,11 +160,11 @@ func (u *user) isEligibleForReferralForEthereumDistribution(now *time.Time) bool
 }
 
 func (u *user) couldHaveBeenEligibleForEthereumDistributionRecently(now *time.Time) bool {
-	return u != nil && !u.MiningSessionSoloEndedAt.IsNil() && u.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8)))
+	return u != nil && !u.MiningSessionSoloEndedAt.IsNil() && u.KYCStepPassedCorrectly(users.QuizKYCStep) && (u.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8))) || coindistribution.AllowInactiveUsers) //nolint:lll // .
 }
 
 func (ref *referral) couldHaveBeenEligibleForEthereumDistributionRecently(now *time.Time) bool {
-	return ref != nil && !ref.MiningSessionSoloEndedAt.IsNil() && ref.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8)))
+	return ref != nil && !ref.MiningSessionSoloEndedAt.IsNil() && ref.KYCStepPassedCorrectly(users.QuizKYCStep) && (ref.MiningSessionSoloEndedAt.After(now.Add(-(cfg.MiningSessionDuration.Max / 8))) || coindistribution.AllowInactiveUsers) //nolint:lll // .
 }
 
 //nolint:funlen // .
@@ -544,7 +545,7 @@ func currentCoinDistributionCollectingEndedAt() *time.Time {
 	if cfg.Development {
 		startingWindow = 10 * stdlibtime.Second
 	} else {
-		startingWindow = 5 * stdlibtime.Minute
+		startingWindow = 20 * stdlibtime.Minute
 	}
 
 	return time.New(coinDistributionCollectorStartedAt.Add(startingWindow))

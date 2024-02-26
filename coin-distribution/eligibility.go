@@ -13,11 +13,15 @@ import (
 	"github.com/ice-blockchain/wintr/time"
 )
 
+const (
+	AllowInactiveUsers bool = true
+)
+
 func IsCoinDistributionCollectorEnabled(now *time.Time, ethereumDistributionFrequencyMin stdlibtime.Duration, cs *CollectorSettings) bool {
 	return cs.Enabled &&
 		(cs.ForcedExecution ||
 			(now.Hour() >= cs.StartHour &&
-				now.Minute() >= 40 && //nolint:gomnd // .
+				now.Minute() >= 20 && //nolint:gomnd // .
 				now.After(*cs.StartDate.Time) &&
 				now.Before(*cs.EndDate.Time) &&
 				(cs.LatestDate.IsNil() ||
@@ -52,7 +56,7 @@ func IsEligibleForEthereumDistribution(
 	distributedBalance := CalculateEthereumDistributionICEBalance(standardBalance, ethereumDistributionFrequencyMin, ethereumDistributionFrequencyMax, now, ethereumDistributionEndDate) //nolint:lll // .
 
 	return countryAllowed &&
-		!miningSessionSoloEndedAt.IsNil() && miningSessionSoloEndedAt.After(*collectingEndedAt.Time) &&
+		!miningSessionSoloEndedAt.IsNil() && (miningSessionSoloEndedAt.After(*collectingEndedAt.Time) || AllowInactiveUsers) &&
 		isEthereumAddressValid(ethAddress) &&
 		((minEthereumDistributionICEBalanceRequired > 0 && distributedBalance >= minEthereumDistributionICEBalanceRequired) || (minEthereumDistributionICEBalanceRequired == 0 && distributedBalance > 0)) && //nolint:lll // .
 		model.CalculateMiningStreak(now, miningSessionSoloStartedAt, miningSessionSoloEndedAt, miningSessionDuration) >= minMiningStreaksRequired &&
