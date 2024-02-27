@@ -3,9 +3,12 @@
 package miner
 
 import (
+	"math"
+	"math/rand"
 	"testing"
 	stdlibtime "time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ice-blockchain/wintr/time"
@@ -26,6 +29,8 @@ func newUser() *user {
 	u.UserID = "test_user_id"
 	u.MiningSessionSoloStartedAt = timeDelta(-stdlibtime.Hour)
 	u.MiningSessionSoloEndedAt = timeDelta(23 * stdlibtime.Hour)
+	u.Username = uuid.NewString()
+	u.ID = rand.Int63n(math.MaxInt64)
 
 	return u
 }
@@ -34,7 +39,9 @@ func newRef() *referral {
 	r := new(referral)
 	r.MiningSessionSoloStartedAt = timeDelta(-stdlibtime.Hour)
 	r.MiningSessionSoloEndedAt = timeDelta(23 * stdlibtime.Hour)
-
+	r.Username = uuid.NewString()
+	r.ID = rand.Int63n(math.MaxInt64)
+	r.UserID = uuid.NewString()
 	return r
 }
 
