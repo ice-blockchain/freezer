@@ -207,9 +207,11 @@ func mine(baseMiningRate float64, now *time.Time, usr *user, t0Ref, tMinus1Ref *
 	}
 	if updatedUser.BalanceForT0 < 0 {
 		updatedUser.BalanceForT0 = 0
+		pendingAmountForT0 = 0
 	}
 	if updatedUser.BalanceForTMinus1 < 0 {
 		updatedUser.BalanceForTMinus1 = 0
+		pendingAmountForTMinus1 = 0
 	}
 
 	if usr.BalanceTotalPreStaking+usr.BalanceTotalStandard == 0 {
