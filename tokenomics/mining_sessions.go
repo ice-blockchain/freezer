@@ -184,16 +184,16 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 		return nil, nil //nolint:nilnil // Nope.
 	}
 	if rollbackNegativeMiningProgress == nil {
+		if allBalanceDistributed {
+			return nil, nil //nolint:nilnil // Nope.
+		}
 		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
 			"amount":                fmt.Sprintf(floatToStringFormatter, amountLost),
 			"duringTheLastXSeconds": uint64(slashingDuration.Seconds()),
 		})
 	}
 	if rollbackNegativeMiningProgress != nil && *rollbackNegativeMiningProgress && allBalanceDistributed {
-		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
-			"amount":                fmt.Sprintf(floatToStringFormatter, amountLost),
-			"duringTheLastXSeconds": uint64(slashingDuration.Seconds()),
-		})
+		*rollbackNegativeMiningProgress = false
 	}
 	return rollbackNegativeMiningProgress, nil
 }
