@@ -9,7 +9,7 @@ require (
 	github.com/alitto/pond v1.8.3
 	github.com/bsm/redislock v0.9.4
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/ethereum/go-ethereum v1.13.13
+	github.com/ethereum/go-ethereum v1.13.14
 	github.com/goccy/go-json v0.10.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ice-blockchain/eskimo v1.299.0

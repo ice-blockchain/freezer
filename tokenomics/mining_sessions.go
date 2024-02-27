@@ -40,6 +40,8 @@ type (
 		model.SlashingRateT0Field
 		model.SlashingRateT1Field
 		model.SlashingRateT2Field
+		model.BalanceSoloEthereumField
+		model.BalanceSoloField
 		model.UTCOffsetField
 		model.IDT0Field
 		model.IDTMinus1Field
@@ -77,7 +79,7 @@ func (r *repository) StartNewMiningSession( //nolint:funlen,gocognit // A lot of
 		old[0].MiningSessionSoloStartedAt.Equal(*old[0].ReferralsCountChangeGuardUpdatedAt.Time) {
 		return ErrDuplicate
 	}
-	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress) //nolint:lll // .
+	shouldRollback, err := r.validateRollbackNegativeMiningProgress(old[0].PreStakingAllocation, old[0].PreStakingBonus, old[0].SlashingRateSolo, old[0].SlashingRateT0, old[0].SlashingRateT1, old[0].SlashingRateT2, old[0].MiningSessionSoloEndedAt, old[0].ResurrectSoloUsedAt, now, rollbackNegativeMiningProgress, old[0].BalanceSoloEthereum >= old[0].BalanceSolo) //nolint:lll // .
 	if err != nil {
 		return err
 	}
@@ -166,6 +168,7 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 	slashingRateSolo, slashingRateT0, slashingRateT1, slashingRateT2 float64,
 	miningSessionSoloEndedAt, resurrectSoloUsedAt, now *time.Time,
 	rollbackNegativeMiningProgress *bool,
+	allBalanceDistributed bool,
 ) (*bool, error) {
 	if !resurrectSoloUsedAt.IsNil() || miningSessionSoloEndedAt.IsNil() ||
 		(now.Sub(*miningSessionSoloEndedAt.Time) < r.cfg.RollbackNegativeMining.Available.After ||
@@ -181,12 +184,17 @@ func (r *repository) validateRollbackNegativeMiningProgress(
 		return nil, nil //nolint:nilnil // Nope.
 	}
 	if rollbackNegativeMiningProgress == nil {
+		if allBalanceDistributed {
+			return nil, nil //nolint:nilnil // Nope.
+		}
 		return nil, terror.New(ErrNegativeMiningProgressDecisionRequired, map[string]any{
 			"amount":                fmt.Sprintf(floatToStringFormatter, amountLost),
 			"duringTheLastXSeconds": uint64(slashingDuration.Seconds()),
 		})
 	}
-
+	if rollbackNegativeMiningProgress != nil && *rollbackNegativeMiningProgress && allBalanceDistributed {
+		*rollbackNegativeMiningProgress = false
+	}
 	return rollbackNegativeMiningProgress, nil
 }
 
