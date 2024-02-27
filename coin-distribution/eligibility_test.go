@@ -3,13 +3,13 @@
 package coindistribution
 
 import (
-	"github.com/ice-blockchain/eskimo/users"
-	"github.com/ice-blockchain/freezer/model"
 	"testing"
 	stdlibtime "time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ice-blockchain/eskimo/users"
+	"github.com/ice-blockchain/freezer/model"
 	"github.com/ice-blockchain/wintr/time"
 )
 
