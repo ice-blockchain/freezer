@@ -58,7 +58,8 @@ func (r *repository) GetTotalCoinsSummary(ctx context.Context, days uint64, _ st
 
 	data := r.enhanceWithBlockchainCoinStats(res)
 	if data != nil && data.BlockchainDetails != nil {
-		data.BlockchainDetails.MarketCap = data.BlockchainDetails.CurrentPrice * data.Blockchain
+		const fixedSupply float64 = 6558033769
+		data.BlockchainDetails.MarketCap = data.BlockchainDetails.CurrentPrice * fixedSupply
 	}
 
 	return data, nil
