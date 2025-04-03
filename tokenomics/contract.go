@@ -281,7 +281,7 @@ const (
 	totalCoinStatsDetailsKey          = "totalCoinStatsDetailsData"
 	miningBoostPricePrecision         = 4 // 4 digits after floating point.
 
-	doctorXTenant = "doctorx"
+	tokeroTenant = "tokero"
 )
 
 type (

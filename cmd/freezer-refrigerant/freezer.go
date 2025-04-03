@@ -268,7 +268,7 @@ func (s *service) GetMiningSummary( //nolint:gocritic // False negative.
 
 		return nil, server.Unexpected(err)
 	}
-	if cfg.Tenant == doctorXTenant {
+	if cfg.Tenant == tokeroTenant {
 		mining.MiningRates.Type = tokenomics.NoneMiningRateType
 		mining.MiningRates.Total.Amount = "0.00"
 	}

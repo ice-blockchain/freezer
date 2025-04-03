@@ -46,7 +46,7 @@ func (s *service) InitializeMiningBoostUpgrade( //nolint:gocritic // False negat
 	ctx context.Context,
 	req *server.Request[InitializeMiningBoostUpgradeRequestBody, tokenomics.PendingMiningBoostUpgrade],
 ) (*server.Response[tokenomics.PendingMiningBoostUpgrade], *server.Response[server.ErrorResponse]) {
-	if cfg.Tenant == doctorXTenant {
+	if cfg.Tenant == tokeroTenant {
 		return nil, server.Forbidden(errMiningBoostDisabled)
 	}
 	resp, err := s.tokenomicsProcessor.InitializeMiningBoostUpgrade(ctx, *req.Data.MiningBoostLevelIndex, req.Data.UserID)
@@ -86,7 +86,7 @@ func (s *service) FinalizeMiningBoostUpgrade( //nolint:gocritic // False negativ
 	ctx context.Context,
 	req *server.Request[FinalizeMiningBoostUpgradeRequestBody, tokenomics.PendingMiningBoostUpgrade],
 ) (*server.Response[tokenomics.PendingMiningBoostUpgrade], *server.Response[server.ErrorResponse]) {
-	if cfg.Tenant == doctorXTenant {
+	if cfg.Tenant == tokeroTenant {
 		return nil, server.Forbidden(errMiningBoostDisabled)
 	}
 	resp, err := s.tokenomicsProcessor.FinalizeMiningBoostUpgrade(ctx, req.Data.Network, req.Data.TXHash, req.Data.UserID)
@@ -133,7 +133,7 @@ func (s *service) StartNewMiningSession( //nolint:gocritic // False negative.
 	ctx context.Context,
 	req *server.Request[StartNewMiningSessionRequestBody, tokenomics.MiningSummary],
 ) (*server.Response[tokenomics.MiningSummary], *server.Response[server.ErrorResponse]) {
-	if cfg.Tenant == doctorXTenant {
+	if cfg.Tenant == tokeroTenant {
 		return nil, server.Forbidden(errMiningDisabled)
 	}
 	ms := &tokenomics.MiningSummary{MiningSession: &tokenomics.MiningSession{UserID: &req.Data.UserID}}
