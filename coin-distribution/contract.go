@@ -126,7 +126,7 @@ const (
 	configKeyCoinDistributerMsgOffline  = "coin_distributer_msg_sent_offline_date"
 	configKeyCoinDistributerMsgFinished = "coin_distributer_msg_sent_finished_date"
 
-	doctorXTenant = "doctorx"
+	tokeroTenant = "tokero"
 )
 
 // .

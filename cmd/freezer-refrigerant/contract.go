@@ -70,7 +70,7 @@ const (
 
 	defaultDistributionLimit = 5000
 
-	doctorXTenant = "doctorx"
+	tokeroTenant = "tokero"
 )
 
 // .

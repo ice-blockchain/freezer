@@ -842,5 +842,5 @@ func didUserStoppedMining(now *time.Time, before *user) *referralCountGuardUpdat
 }
 
 func isTenantInDistributionMode() bool {
-	return cfg.Tenant == doctorXTenant
+	return cfg.Tenant == tokeroTenant
 }

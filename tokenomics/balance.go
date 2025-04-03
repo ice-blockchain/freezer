@@ -279,7 +279,7 @@ func (s *completedTasksSource) Process(ctx context.Context, message *messagebrok
 	if ctx.Err() != nil || len(message.Value) == 0 {
 		return errors.Wrap(ctx.Err(), "unexpected deadline while processing message")
 	}
-	if s.cfg.Tenant == doctorXTenant {
+	if s.cfg.Tenant == tokeroTenant {
 		return nil
 	}
 	const requiredCompletedTasks, adoptionMultiplicationFactor = 6, 168
