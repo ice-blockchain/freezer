@@ -193,6 +193,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		histories                                                                                           = make([]*model.User, 0, batchSize)
 		quizStatuses                                                                                        = make(map[string]*quiz.QuizStatus, batchSize)
 		mandatoryUserFieldsForDistributionProfileList                                                       = make(map[string]*users.MandatoryForDistributionFieldsProfile, batchSize)
+		ranks                                                                                               = make(map[string]int, batchSize)
 		userGlobalRanks                                                                                     = make([]redis.Z, 0, batchSize)
 		historyColumns, historyInsertMetadata                                                               = dwh.InsertDDL(int(batchSize))
 		shouldSynchronizeBalanceFunc                                                                        = func(batchNumberArg uint64) bool { return false }
@@ -282,6 +283,9 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		for k := range mandatoryUserFieldsForDistributionProfileList {
 			delete(mandatoryUserFieldsForDistributionProfileList, k)
 		}
+		for k := range ranks {
+			delete(ranks, k)
+		}
 	}
 	for ctx.Err() == nil {
 		/******************************************************************************************************************************************************
@@ -363,6 +367,51 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 			}
 		}
 		shouldSynchronizeBalance := shouldSynchronizeBalanceFunc(uint64(batchNumber))
+
+		if isTenantInDistributionMode() {
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			t1Referrals := make([]*coindistribution.T1Referrals, 0, len(userResults))
+			for _, usr := range userResults {
+				if t0Referrals[usr.IDT0] == nil || !t0Referrals[usr.IDT0].isVerified() || !usr.isVerified() {
+					continue
+				}
+				t1Referrals = append(t1Referrals, &coindistribution.T1Referrals{
+					Balance:    usr.BalanceForT0,
+					ReferredBy: t0Referrals[usr.IDT0].UserID,
+					UserID:     usr.UserID,
+				})
+			}
+			if err := m.coinDistributionRepository.InsertT1Referrals(reqCtx, t1Referrals); err != nil {
+				reqCancel()
+				log.Error(errors.Wrapf(err, "[miner] failed to insert t1 referrals for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+				resetVars(false)
+				continue
+			}
+			reqCancel()
+
+			if startedCoinDistributionCollecting {
+				reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+				var pairs []coindistribution.ReferralPair
+				for _, usr := range userResults {
+					if t0Referrals[usr.IDT0] == nil || !t0Referrals[usr.IDT0].isVerified() || !usr.isVerified() {
+						continue
+					}
+					pairs = append(pairs, coindistribution.ReferralPair{
+						UserID:     usr.UserID,
+						ReferredBy: t0Referrals[usr.IDT0].UserID,
+					})
+				}
+				var err error
+				ranks, err = m.coinDistributionRepository.CollectT1Ranks(reqCtx, pairs)
+				if err != nil {
+					reqCancel()
+					log.Error(errors.Wrapf(err, "[miner] failed to get t1 ranks for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+					resetVars(false)
+					continue
+				}
+				reqCancel()
+			}
+		}
 		for _, usr := range userResults {
 			if usr.UserID == "" {
 				continue
@@ -430,7 +479,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 						})
 					}
 				}
-				userCoinDistributions, balanceDistributedForT0, balanceDistributedForTMinus1 := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref)
+				userCoinDistributions, balanceDistributedForT0, balanceDistributedForTMinus1 := updatedUser.processEthereumCoinDistribution(startedCoinDistributionCollecting, now, t0Ref, tMinus1Ref, ranks, cfg.miningBoostLevels)
 				coinDistributions = append(coinDistributions, userCoinDistributions...)
 				if balanceDistributedForT0 > 0 {
 					balanceT1EthereumIncr[t0Ref.ID] += balanceDistributedForT0

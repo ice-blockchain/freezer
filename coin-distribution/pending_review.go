@@ -395,3 +395,76 @@ func (r *repository) StartPrepareCoinDistributionsForReviewMonitor(ctx context.C
 		}
 	}
 }
+
+func (r *repository) InsertT1Referrals(ctx context.Context, records []*T1Referrals) error {
+	if len(records) == 0 {
+		return nil
+	}
+	values := make([]string, len(records))
+	args := make([]interface{}, 0, len(records)*4)
+	for i, record := range records {
+		values[i] = fmt.Sprintf("($%d,$%d,$%d)", i*3+1, i*3+2, i*3+3)
+		args = append(args, int64(record.Balance*100), record.ReferredBy, record.UserID)
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO coin_distributions_t1_referrals (balance, referred_by, user_id)
+			VALUES %s 
+			ON CONFLICT (user_id) DO UPDATE 
+				SET balance = EXCLUDED.balance
+			WHERE coin_distributions_t1_referrals.balance != EXCLUDED.balance`,
+		strings.Join(values, ","))
+
+	if _, err := storage.Exec(ctx, r.db, query, args...); err != nil {
+		return errors.Wrap(err, "failed to insert t1 referral records")
+	}
+	return nil
+}
+
+func (r *repository) CollectT1Ranks(ctx context.Context, pairs []ReferralPair) (map[string]int, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	values := make([]string, len(pairs))
+	args := make([]interface{}, 0, len(pairs)*2)
+	for i, pair := range pairs {
+		values[i] = fmt.Sprintf("($%d,$%d)", i*2+1, i*2+2)
+		args = append(args, pair.UserID, pair.ReferredBy)
+	}
+
+	query := fmt.Sprintf(`
+		WITH input_pairs(user_id, referred_by) AS (
+			VALUES %s
+		)
+		SELECT ip.user_id, 
+		       COALESCE(
+		           (SELECT r.rank
+		            FROM (
+		                SELECT user_id, 
+		                       ROW_NUMBER() OVER (PARTITION BY referred_by ORDER BY balance DESC) as rank
+		                FROM coin_distributions_t1_referrals
+		                WHERE referred_by = ip.referred_by
+		            ) r
+		            WHERE r.user_id = ip.user_id),
+		           0
+		       ) as rank
+		FROM input_pairs ip`,
+		strings.Join(values, ","))
+
+	type result struct {
+		UserID string `db:"user_id"`
+		Rank   int    `db:"rank"`
+	}
+	ranks, err := storage.Select[result](ctx, r.db, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get ranks for users")
+	}
+	rankMap := make(map[string]int, len(ranks))
+	for _, r := range ranks {
+		if r.Rank > 0 {
+			rankMap[r.UserID] = r.Rank
+		}
+	}
+
+	return rankMap, nil
+}

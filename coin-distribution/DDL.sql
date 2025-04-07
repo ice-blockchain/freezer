@@ -208,3 +208,12 @@ BEGIN
         commit;
     END IF;
 end; $$;
+
+CREATE TABLE IF NOT EXISTS coin_distributions_t1_referrals (
+                    balance                   bigint    NOT NULL DEFAULT 0,
+                    referred_by               text      NOT NULL,
+                    user_id                   text      NOT NULL PRIMARY KEY
+                ) WITH (FILLFACTOR = 70);
+
+CREATE INDEX IF NOT EXISTS coin_distributions_t1_referrals_referred_by_balance_ix ON coin_distributions_t1_referrals (referred_by, balance DESC);
+CREATE INDEX IF NOT EXISTS coin_distributions_t1_referrals_referred_by_ix ON coin_distributions_t1_referrals (referred_by);
