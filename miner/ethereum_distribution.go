@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	stdlibtime "time"
 
 	"github.com/pkg/errors"
@@ -189,7 +190,7 @@ func (ref *referral) couldHaveBeenEligibleForEthereumDistributionRecently(now *t
 
 //nolint:funlen // .
 func (u *user) processEthereumCoinDistribution(
-	enabled bool, now *time.Time, t0, tMinus1 *referral,
+	enabled bool, now *time.Time, t0, tMinus1 *referral, ranks map[string]int, miningBoostLevels *atomic.Pointer[[]*tokenomics.MiningBoostLevel],
 ) (records []*coindistribution.ByEarnerForReview, balanceDistributedForT0, balanceDistributedForTMinus1 float64) {
 	if !enabled {
 		if u.BalanceSoloEthereumPending != nil {
@@ -347,15 +348,27 @@ func (u *user) processEthereumCoinDistribution(
 
 	if t0 != nil && t0.UserID != u.UserID && (tMinus1 == nil || (tMinus1.UserID != u.UserID && tMinus1.UserID != t0.UserID)) && u.isEligibleForT0ForEthereumDistribution(now, t0.ID) && t0.isEligibleForSelfForEthereumDistribution(now, u.ForT0LastEthereumCoinDistributionProcessedAt, u.isVerified()) { //nolint:lll // .
 		// Amount I've earned for my T0.
-		balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
-		forT0CD.Balance = balanceDistributedForT0
-		if cfg.MainnetRewardPoolContributionPercentage > 0 {
-			forT0MainnetRewardPoolContributionCD.Balance = forT0CD.Balance * cfg.MainnetRewardPoolContributionPercentage
-			forT0CD.Balance -= forT0MainnetRewardPoolContributionCD.Balance
+		shouldProcess := false
+		if miningBoostLevels := miningBoostLevels.Load(); t0.MiningBoostLevelIndex != nil && miningBoostLevels != nil && len(*miningBoostLevels) > 0 &&
+			uint64(*t0.MiningBoostLevelIndex) < uint64(len(*miningBoostLevels)) && ranks != nil {
+			maxReferrals := (*miningBoostLevels)[*t0.MiningBoostLevelIndex].MaxT1Referrals
+			if rank, exists := ranks[u.UserID]; exists && rank < int(maxReferrals) {
+				shouldProcess = true
+			}
 		}
-
-		if forT0CD.Balance > 0 && !cfg.DryRunDistribution {
-			u.ForT0LastEthereumCoinDistributionProcessedAt = now
+		if shouldProcess {
+			balanceDistributedForT0 = u.processEthereumCoinDistributionForForT0(t0, now)
+			forT0CD.Balance = balanceDistributedForT0
+			if cfg.MainnetRewardPoolContributionPercentage > 0 {
+				forT0MainnetRewardPoolContributionCD.Balance = forT0CD.Balance * cfg.MainnetRewardPoolContributionPercentage
+				forT0CD.Balance -= forT0MainnetRewardPoolContributionCD.Balance
+			}
+			if forT0CD.Balance > 0 && !cfg.DryRunDistribution {
+				u.ForT0LastEthereumCoinDistributionProcessedAt = now
+			} else {
+				u.ForT0LastEthereumCoinDistributionProcessedAt = nil
+				balanceDistributedForT0 = 0
+			}
 		} else {
 			u.ForT0LastEthereumCoinDistributionProcessedAt = nil
 			balanceDistributedForT0 = 0

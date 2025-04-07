@@ -37,6 +37,8 @@ type (
 		NotifyCoinDistributionCollectionCycleEnded(ctx context.Context) error
 		GetCollectorSettings(ctx context.Context) (*CollectorSettings, error)
 		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
+		InsertT1Referrals(ctx context.Context, records []*T1Referrals) error
+		CollectT1Ranks(ctx context.Context, pairs []ReferralPair) (map[string]int, error)
 		StartPrepareCoinDistributionsForReviewMonitor(ctx context.Context)
 	}
 	CollectorSettings struct {
@@ -91,6 +93,17 @@ type (
 		InternalID         int64
 		Balance            float64
 		Verified           bool
+	}
+
+	T1Referrals struct {
+		ReferredBy string
+		UserID     string
+		Balance    float64
+	}
+
+	ReferralPair struct {
+		UserID     string
+		ReferredBy string
 	}
 )
 
