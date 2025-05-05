@@ -272,7 +272,7 @@ const (
 	floatToStringFormatter = "%.2f"
 
 	daysCountToInitCoinsCacheOnStartup     = 90
-	routinesCountToInitCoinsCacheOnStartup = 10
+	routinesCountToInitCoinsCacheOnStartup = 1
 	totalCoinStatsCacheLockKey             = "totalCoinStatsCache"
 	totalCoinStatsCacheLockDuration        = 1 * stdlibtime.Minute
 
