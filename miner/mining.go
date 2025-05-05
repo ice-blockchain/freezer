@@ -55,7 +55,7 @@ func mine(now *time.Time, usr *user, t0Ref, tMinus1Ref *referral) (updatedUser *
 	}
 	if updatedUser.MiningSessionSoloEndedAt.Before(*now.Time) && (updatedUser.reachedSlashingFloor() || updatedUser.slashingDisabled()) {
 		fullSlashingDuration := stdlibtime.Duration(cfg.SlashingDaysCount * int64(miningSessionRatio) * int64(miningPeriod))
-		shouldGenerateHistory = (updatedUser.BalanceLastUpdatedAt.Year() != now.Year() ||
+		shouldGenerateHistory = !updatedUser.BalanceLastUpdatedAt.IsNil() && (updatedUser.BalanceLastUpdatedAt.Year() != now.Year() ||
 			updatedUser.BalanceLastUpdatedAt.YearDay() != now.YearDay() ||
 			(cfg.Development && updatedUser.BalanceLastUpdatedAt.Minute() != now.Minute())) &&
 			((updatedUser.slashingDisabled() && updatedUser.BalanceLastUpdatedAt.After(*updatedUser.MiningSessionSoloEndedAt.Time) &&

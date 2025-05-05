@@ -336,8 +336,8 @@ github.com/ice-blockchain/eskimo v1.442.0 h1:isRbSRICKaIRS9ZvzI8D8NleVhlgHCyodxQ
 github.com/ice-blockchain/eskimo v1.442.0/go.mod h1:/vnxChTqobZYfinZiIMd+Eh5C1PtqEM3eqQUZrPZGrQ=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb h1:8TnFP3mc7O+tc44kv2e0/TpZKnEVUaKH+UstwfBwRkk=
 github.com/ice-blockchain/go-tarantool-client v0.0.0-20230327200757-4fc71fa3f7bb/go.mod h1:ZsQU7i3mxhgBBu43Oev7WPFbIjP4TniN/b1UPNGbrq8=
-github.com/ice-blockchain/wintr v1.155.0 h1:4L6xr6zXqGvz57TxPG5vYqltLSBLx11MqsFBQB3+vIU=
-github.com/ice-blockchain/wintr v1.155.0/go.mod h1:aXsSpY7BgHKIkXYGiLTUZ94Jb/elll0CMZft/umpNWA=
+github.com/ice-blockchain/wintr v1.156.0 h1:RQVd/R8pPmePddsv0/3E/ofTH33sHEmRzhitm8kmUlI=
+github.com/ice-blockchain/wintr v1.156.0/go.mod h1:c1B4zlnGF0KXVx0NBM61LtTGjVBwekDvVF1L009zLuI=
 github.com/imroc/req/v3 v3.51.0 h1:GyJxJUrvTVkhGH3v5h2UC04hqU6P465kJQNa9QeyECg=
 github.com/imroc/req/v3 v3.51.0/go.mod h1:sYQMvAjeoDrAdijR8ty71qiAHOBsF8XroF4YVddPdgQ=
 github.com/influxdata/influxdb-client-go/v2 v2.4.0 h1:HGBfZYStlx3Kqvsv1h2pJixbCl/jhnFtxpKFAv9Tu5k=
