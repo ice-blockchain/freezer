@@ -217,7 +217,7 @@ func (r *repository) keepTotalCoinsCacheUpdated(ctx context.Context) {
 			var (
 				now                    = time.Now()
 				newDate                = now.Truncate(r.cfg.GlobalAggregationInterval.Parent)
-				historyGenerationDelta = stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child) * 1.5) //nolint:gomnd // .
+				historyGenerationDelta = stdlibtime.Duration(float64(r.cfg.GlobalAggregationInterval.Child) * 3) //nolint:gomnd // .
 			)
 			lastDateCached, err := r.getLastDateCached(ctx)
 			if err != nil {
