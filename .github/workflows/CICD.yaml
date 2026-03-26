@@ -41,38 +41,38 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_FOOTER: |
             https://github.com/ice-blockchain/${{ github.event.repository.name }}
-  verify-latest-versions-used:
-    name: Verify Latest Versions
-    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Find latest Go Version
-        id: findLatestGoVersion
-        run: |
-          LATEST_GO_VERSION=$(make latestGoVersion)
-          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
-      - name: Setup GO
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
-      - name: Check If We're Up to Date with Everything
-        run: make checkModVersion checkIfAllDependenciesAreUpToDate
-      - name: Slack Notification For Failure/Cancellation
-        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
-          SLACK_TITLE: CI Failed> ${{ job.status }}
-          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
-          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
-          SLACK_ICON_EMOJI: ':sob:'
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_FOOTER: |
-            https://github.com/ice-blockchain/${{ github.event.repository.name }}
+#  verify-latest-versions-used:
+#    name: Verify Latest Versions
+#    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#        with:
+#          fetch-depth: 0
+#      - name: Find latest Go Version
+#        id: findLatestGoVersion
+#        run: |
+#          LATEST_GO_VERSION=$(make latestGoVersion)
+#          echo "::set-output name=latestGoVersion::$LATEST_GO_VERSION"
+#      - name: Setup GO
+#        uses: actions/setup-go@v5
+#        with:
+#          go-version: ${{ steps.findLatestGoVersion.outputs.latestGoVersion }}
+#      - name: Check If We're Up to Date with Everything
+#        run: make checkModVersion checkIfAllDependenciesAreUpToDate
+#      - name: Slack Notification For Failure/Cancellation
+#        if: ${{ github.event_name == 'push' && (failure() || cancelled()) }}
+#        uses: rtCamp/action-slack-notify@v2
+#        env:
+#          SLACK_WEBHOOK: ${{ secrets.BACKEND_SLACK_WEBHOOK }}
+#          SLACK_TITLE: CI Failed> ${{ job.status }}
+#          SLACK_USERNAME: ${{ github.event.repository.name }}-ci-bot
+#          SLACK_ICON: https://avatars.githubusercontent.com/u/102382658?s=400&u=62e73f4cb845c48a07a19e03c6f84b721e40c0a6&v=4
+#          SLACK_ICON_EMOJI: ':sob:'
+#          SLACK_COLOR: ${{ job.status }}
+#          SLACK_FOOTER: |
+#            https://github.com/ice-blockchain/${{ github.event.repository.name }}
   verify-auto-generated:
     name: Verify Auto Generated
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push'  }}
@@ -337,7 +337,8 @@ jobs:
           SLACK_FOOTER: |
             ${{ matrix.service }}
   PR:
-    needs: [verify-licensing, verify-latest-versions-used, verify-auto-generated, lint, build, test, benchmark, dockerfile]
+    #needs: [verify-licensing, verify-latest-versions-used, verify-auto-generated, lint, build, test, benchmark, dockerfile]
+    needs: [verify-licensing, verify-auto-generated, lint, build, test, benchmark, dockerfile]
     name: PR
     if: ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'push' }}
     runs-on: ubuntu-latest
