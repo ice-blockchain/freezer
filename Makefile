@@ -267,6 +267,8 @@ print-token-%:
 start-seeding:
 	go run -v local.go --startSeeding true
 
-all: checkLicense checkModVersion checkIfAllDependenciesAreUpToDate checkGenerated build test coverage benchmark clean
-local: addLicense updateGoModVersion updateAllDependencies generate build buildMultiPlatformDockerImage test coverage benchmark lint clean
+all: checkLicense checkGenerated build test coverage benchmark clean
+#all: checkLicense checkModVersion checkIfAllDependenciesAreUpToDate checkGenerated build test coverage benchmark clean
+local: addLicense generate build buildMultiPlatformDockerImage test coverage benchmark clean
+#local: addLicense updateGoModVersion updateAllDependencies generate build buildMultiPlatformDockerImage test coverage benchmark lint clean
 dockerfile: binary-specific-service

@@ -105,12 +105,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "max number of elements to return. Default is ` + "`" + `10` + "`" + `.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "number of elements to skip before starting to fetch data",
                         "name": "offset",
                         "in": "query"
@@ -180,6 +182,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "number of days in the past to look for. Defaults to 3. Max is 90.",
                         "name": "days",
                         "in": "query"
@@ -279,12 +282,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "max number of elements to return. Default is ` + "`" + `24` + "`" + `.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "number of elements to skip before starting to fetch data",
                         "name": "offset",
                         "in": "query"
@@ -1155,6 +1160,7 @@ const docTemplate = `{
         },
         "users.KYCStep": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 0,
                 1,

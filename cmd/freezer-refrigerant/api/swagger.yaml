@@ -425,6 +425,7 @@ definitions:
     - 8
     - 9
     - 10
+    format: int32
     type: integer
     x-enum-varnames:
     - NoneKYCStep
@@ -500,10 +501,12 @@ paths:
         name: keyword
         type: string
       - description: max number of elements to return. Default is `10`.
+        format: int64
         in: query
         name: limit
         type: integer
       - description: number of elements to skip before starting to fetch data
+        format: int64
         in: query
         name: offset
         type: integer
@@ -551,6 +554,7 @@ paths:
       parameters:
       - description: number of days in the past to look for. Defaults to 3. Max is
           90.
+        format: int64
         in: query
         name: days
         type: integer
@@ -622,10 +626,12 @@ paths:
         name: tz
         type: string
       - description: max number of elements to return. Default is `24`.
+        format: int64
         in: query
         name: limit
         type: integer
       - description: number of elements to skip before starting to fetch data
+        format: int64
         in: query
         name: offset
         type: integer
@@ -944,11 +950,13 @@ paths:
         type: string
       - default: 0
         description: current cursor to fetch data from
+        format: int64
         in: query
         name: cursor
         required: true
         type: integer
       - description: count of records in response, 5000 by default
+        format: int64
         in: query
         name: limit
         type: integer
