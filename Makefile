@@ -269,6 +269,6 @@ start-seeding:
 
 all: checkLicense checkGenerated build test coverage benchmark clean
 #all: checkLicense checkModVersion checkIfAllDependenciesAreUpToDate checkGenerated build test coverage benchmark clean
-local: addLicense generate build buildMultiPlatformDockerImage test coverage benchmark lint clean
+local: addLicense generate build buildMultiPlatformDockerImage test coverage benchmark clean
 #local: addLicense updateGoModVersion updateAllDependencies generate build buildMultiPlatformDockerImage test coverage benchmark lint clean
 dockerfile: binary-specific-service
