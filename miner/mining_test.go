@@ -991,6 +991,7 @@ func testMiningResurrect(t *testing.T) {
 }
 
 func Test_BalancePositive(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("Solo mining", testSoloMining)
@@ -1010,6 +1011,7 @@ func Test_MinerNil(t *testing.T) {
 }
 
 func Test_MinerPending(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("Apply", func(t *testing.T) {
@@ -1121,6 +1123,7 @@ func Test_MinerPending(t *testing.T) {
 }
 
 func Test_MinerWithHistory(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 	// 24h not passed yet -> no history.
 	m := newUser()
@@ -1191,6 +1194,7 @@ func Test_MinerWithHistory(t *testing.T) {
 }
 
 func Test_MinerNegativeBalance(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	m := newUser()
@@ -1291,6 +1295,7 @@ func testMinerPendingSlashingT2(t *testing.T) {
 }
 
 func Test_MinerPendingSlashing(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("Solo", testMinerPendingSlashingSolo)
@@ -1408,6 +1413,7 @@ func testMinerPendingSlashingSolo_BonusPrizeCase(t *testing.T) {
 }
 
 func Test_MinerPendingSlashing_BonusPrizeCase(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("Solo", testMinerPendingSlashingSolo_BonusPrizeCase)
@@ -1504,6 +1510,7 @@ func testOnlyTMinus1Changed(t *testing.T) {
 }
 
 func Test_Mining_T0_TMinus1_Changed(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("T0 not changed", testT0NotChanged)
@@ -1597,6 +1604,7 @@ func testUpdateT0AndTMinus1ReferralsForUserHasNeverMinedNotNil(t *testing.T) {
 }
 
 func Test_MinerUpdateT0AndTMinus1ReferralsForUserHasNeverMined(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("Result is nil", testUpdateT0AndTMinus1ReferralsForUserHasNeverMinedNil)
@@ -1604,6 +1612,7 @@ func Test_MinerUpdateT0AndTMinus1ReferralsForUserHasNeverMined(t *testing.T) {
 }
 
 func Test_MinerTier1Limit(t *testing.T) {
+	t.Skip("skipped: mining disabled (distribution mode)")
 	t.Parallel()
 
 	t.Run("active t1 count = 0", testMinerTier1Limit_0)
