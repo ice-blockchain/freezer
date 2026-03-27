@@ -421,6 +421,30 @@ func (r *repository) InsertT1Referrals(ctx context.Context, records []*T1Referra
 	return nil
 }
 
+func (r *repository) InsertUserBalances(ctx context.Context, records []*UserBalance) error {
+	if len(records) == 0 {
+		return nil
+	}
+	const columns = 7
+	values := make([]string, len(records))
+	args := make([]interface{}, 0, len(records)*columns)
+	for i, record := range records {
+		values[i] = generateValuesSQLParams(i, columns)
+		args = append(args, record.UserID, record.InternalID, record.Username, record.Email, int64(record.Balance*100), record.KYCStepPassed, record.Verified)
+	}
+	query := fmt.Sprintf(`
+		INSERT INTO coin_distributions_user_balances (user_id, internal_id, username, email, balance, kyc_step_passed, verified)
+			VALUES %s
+			ON CONFLICT (user_id) DO UPDATE
+				SET balance = EXCLUDED.balance`,
+		strings.Join(values, ","))
+
+	if _, err := storage.Exec(ctx, r.db, query, args...); err != nil {
+		return errors.Wrap(err, "failed to insert user balance records")
+	}
+	return nil
+}
+
 func (r *repository) CollectT1Ranks(ctx context.Context, pairs []ReferralPair) (map[string]int, error) {
 	if len(pairs) == 0 {
 		return nil, nil

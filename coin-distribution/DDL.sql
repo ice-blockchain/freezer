@@ -217,3 +217,13 @@ CREATE TABLE IF NOT EXISTS coin_distributions_t1_referrals (
 
 CREATE INDEX IF NOT EXISTS coin_distributions_t1_referrals_referred_by_balance_ix ON coin_distributions_t1_referrals (referred_by, balance DESC);
 CREATE INDEX IF NOT EXISTS coin_distributions_t1_referrals_referred_by_ix ON coin_distributions_t1_referrals (referred_by);
+
+CREATE TABLE IF NOT EXISTS coin_distributions_user_balances (
+                    user_id                   text      NOT NULL PRIMARY KEY,
+                    internal_id               bigint    NOT NULL,
+                    username                  text      NOT NULL DEFAULT '',
+                    email                     text,
+                    balance                   bigint    NOT NULL DEFAULT 0,
+                    kyc_step_passed           smallint  NOT NULL DEFAULT 0,
+                    verified                  boolean   NOT NULL DEFAULT FALSE
+                ) WITH (FILLFACTOR = 70);

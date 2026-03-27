@@ -38,6 +38,7 @@ type (
 		GetCollectorSettings(ctx context.Context) (*CollectorSettings, error)
 		CollectCoinDistributionsForReview(ctx context.Context, records []*ByEarnerForReview) error
 		InsertT1Referrals(ctx context.Context, records []*T1Referrals) error
+		InsertUserBalances(ctx context.Context, records []*UserBalance) error
 		CollectT1Ranks(ctx context.Context, pairs []ReferralPair) (map[string]int, error)
 		StartPrepareCoinDistributionsForReviewMonitor(ctx context.Context)
 	}
@@ -104,6 +105,16 @@ type (
 	ReferralPair struct {
 		UserID     string
 		ReferredBy string
+	}
+
+	UserBalance struct {
+		UserID        string
+		Username      string
+		Email         string
+		Balance       float64
+		InternalID    int64
+		KYCStepPassed int16
+		Verified      bool
 	}
 )
 

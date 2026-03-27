@@ -616,6 +616,48 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 		}
 
 		/******************************************************************************************************************************************************
+			6b. Insert user balances for distribution (PostgreSQL).
+		******************************************************************************************************************************************************/
+		if isTenantInDistributionMode() {
+			before = time.Now()
+			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
+			userBalances := make([]*coindistribution.UserBalance, 0, len(userResults))
+			for _, usr := range userResults {
+				if usr.UserID == "" {
+					continue
+				}
+				email := usr.Email
+				if mandatoryFieldsSync, ok := mandatoryUserFieldsForDistributionProfileList[usr.UserID]; ok && mandatoryFieldsSync != nil && mandatoryFieldsSync.Email != "" {
+					email = mandatoryFieldsSync.Email
+				}
+				userBalances = append(userBalances, &coindistribution.UserBalance{
+					UserID:        usr.UserID,
+					Username:      usr.Username,
+					Email:         email,
+					Balance:       usr.BalanceTotalStandard + usr.BalanceTotalPreStaking,
+					InternalID:    usr.ID,
+					KYCStepPassed: int16(usr.KYCStepPassed),
+					Verified:      usr.isVerified(),
+				})
+			}
+			if len(userBalances) > 0 {
+				log.Info(fmt.Sprintf("[miner] inserting user balances: count:%v, batchNumber:%v, totalBatches:%v, workerNumber:%v",
+					len(userBalances), batchNumber, totalBatches, workerNumber))
+			}
+			if err := m.coinDistributionRepository.InsertUserBalances(reqCtx, userBalances); err != nil {
+				log.Error(errors.Wrapf(err, "[miner] failed to insert user balances for batchNumber:%v,workerNumber:%v", batchNumber, workerNumber))
+				reqCancel()
+				resetVars(false)
+
+				continue
+			}
+			reqCancel()
+			if len(userBalances) > 0 {
+				go m.telemetry.collectElapsed(6, *before.Time)
+			}
+		}
+
+		/******************************************************************************************************************************************************
 			7. Inserting history/bookkeeping data.
 		******************************************************************************************************************************************************/
 
