@@ -76,7 +76,9 @@ func MustStartMining(ctx context.Context, cancel context.CancelFunc) Client {
 	mi.extraBonusStartDate = extrabonusnotifier.MustGetExtraBonusStartDate(ctx, mi.db)
 	mi.mustInitCoinDistributionCollector(ctx)
 	if isTenantInDistributionMode() {
-		mi.usersRepository = users.New(context.Background(), nil)
+		if false {
+			mi.usersRepository = users.New(context.Background(), nil)
+		}
 		go mi.coinDistributionRepository.StartPrepareCoinDistributionsForReviewMonitor(ctx)
 	}
 
@@ -102,7 +104,7 @@ func (m *miner) Close() error {
 		errors.Wrap(m.coinDistributionRepository.Close(), "failed to close coinDistributionRepository"),
 		//errors.Wrap(m.quizRepository.Close(), "failed to close quizClient"),
 	)
-	if isTenantInDistributionMode() {
+	if false && isTenantInDistributionMode() {
 		errs = multierror.Append(errs, errors.Wrap(m.usersRepository.Close(), "failed to close usersRepository"))
 	}
 
@@ -598,7 +600,7 @@ func (m *miner) mine(ctx context.Context, workerNumber int64) {
 				go m.telemetry.collectElapsed(6, *before.Time)
 			}
 		}
-		if len(syncMandatoryUserFieldsForDistributionIDs) > 0 {
+		if false && len(syncMandatoryUserFieldsForDistributionIDs) > 0 {
 			reqCtx, reqCancel = context.WithTimeout(context.Background(), requestDeadline)
 			var err error
 			mandatoryUserFieldsForDistributionProfileList, err = m.usersRepository.GetMandatoryForDistributionUserFieldsByIDList(reqCtx, syncMandatoryUserFieldsForDistributionIDs)
